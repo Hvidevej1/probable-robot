@@ -568,7 +568,16 @@
     $('#btn-logout').hidden = false;
     $('#btn-change-pw').hidden = false;
   }
+  // Godmorgen / god formiddag / ... alt efter tidspunktet
+  async function showGreeting() {
+    const h = new Date().getHours();
+    const g = h < 5 ? 'Godnat' : h < 9 ? 'Godmorgen' : h < 12 ? 'God formiddag' : h < 13 ? 'God middag'
+      : h < 18 ? 'God eftermiddag' : h < 23 ? 'Godaften' : 'Godnat';
+    const name = await Store.userName();
+    $('#greeting').textContent = name ? `${g}, ${name}` : g;
+  }
   function showApp(on) {
+    if (on) showGreeting();
     $('#login').hidden = on;
     document.querySelector('header.top').hidden = !on;
     document.querySelector('main').hidden = !on;
@@ -715,6 +724,8 @@
   // Hent det nyeste, når man vender tilbage til appen
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) return;
+    if (!$('#login').hidden) return;
+    showGreeting();
     renderList();
     await Store.refresh();
   });

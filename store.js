@@ -153,6 +153,12 @@ const Store = (() => {
       const { error } = await sb.auth.updateUser({ password: pw });
       if (error) throw new Error(/should be different/i.test(error.message) ? 'Den nye adgangskode skal være forskellig fra den gamle.' : error.message);
     },
+    // Fornavn fra brugerens profil i Supabase (sat i databasen, ligger ikke i koden)
+    async userName() {
+      if (!cloud) return null;
+      const { data: s } = await sb.auth.getSession();
+      return s.session?.user.user_metadata?.name || null;
+    },
     async userEmail() { if (!cloud) return null; const { data: s } = await sb.auth.getSession(); return s.session?.user.email || null; },
 
     saveSettings(s) {
