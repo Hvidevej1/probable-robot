@@ -42,11 +42,13 @@ const Store = (() => {
     id: m.id, name: m.name, strength: m.strength || null, person: m.person || null, kind: m.kind || 'recept',
     status: m.status || 'bestil', runs_out: m.runsOut || null, note: m.note || null, created: m.created, updated: m.updated,
     price: m.price === '' || m.price == null ? null : Number(m.price), tilskud: m.tilskud !== false, updated_by: currentEmail,
+    recept_udloeb: m.receptUdloeb || null, udleveringer: m.udleveringer === '' || m.udleveringer == null ? null : Number(m.udleveringer),
   });
   const rowToMed = r => ({
     id: r.id, name: r.name, strength: r.strength || '', person: r.person || '', kind: r.kind, status: r.status,
     runsOut: r.runs_out || '', note: r.note || '', created: r.created, updated: r.updated,
     price: r.price ?? '', tilskud: r.tilskud !== false,
+    receptUdloeb: r.recept_udloeb || '', udleveringer: r.udleveringer ?? '',
   });
   const prodToRow = p => ({ id: p.id, name: p.name, strength: p.strength || null, pack: p.pack || null, price: p.price || null, varenr: p.varenr || null, ean: p.ean || null });
   const rowToProd = r => ({ id: r.id, name: r.name, strength: r.strength || '', pack: r.pack || '', price: r.price || '', varenr: r.varenr || '', ean: r.ean || '' });

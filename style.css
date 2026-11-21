@@ -126,3 +126,6 @@ label.check input { width: 24px; height: 24px; min-height: 0; flex: none; }
 .ctr-box .gone { color: var(--red); font-weight: 600; }
 .price { font-weight: 600; color: var(--text); }
 .ctr-person { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 8px; }
+button.linklike { background: none; border: 0; padding: 0; min-height: 0; color: var(--text); font: inherit; font-weight: 600; font-size: 1.05rem; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; }
+.card .meta.warn { color: var(--red); font-weight: 600; }
+.card .actions button { min-width: 110px; }

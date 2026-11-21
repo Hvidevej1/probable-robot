@@ -129,6 +129,14 @@
       </label>
       <label class="check"><input type="checkbox" name="tilskud"> Giver tilskud (tæller med i CTR-saldoen)</label>
       <p id="med-copay" class="hint"></p>
+      <div class="row">
+        <label class="stack" style="flex:1">Udleveringer tilbage på recepten
+          <input name="udleveringer" type="number" min="0" inputmode="numeric">
+        </label>
+        <label class="stack" style="flex:1">Recepten udløber
+          <input name="receptUdloeb" type="date">
+        </label>
+      </div>
       <label class="stack">Pakken slipper op omkring
         <input name="runsOut" type="date">
       </label>

@@ -25,6 +25,8 @@ create table if not exists meds (
 alter table meds add column if not exists price numeric;
 alter table meds add column if not exists tilskud boolean default true;
 alter table meds add column if not exists updated_by text;
+alter table meds add column if not exists recept_udloeb date;     -- hvornår recepten udløber
+alter table meds add column if not exists udleveringer int;       -- udleveringer tilbage
 
 create table if not exists products (
   id text primary key,

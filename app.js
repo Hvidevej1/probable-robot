@@ -136,30 +136,47 @@
     const label = eff === 'bestil' && otc ? STATUS.bestil.otcLabel : STATUS[eff].label;
     const meta = [m.strength, otc ? 'Håndkøb' : 'Recept'].filter(Boolean).join(' · ');
 
-    let actions = '';
-    if (eff === 'bestil') {
-      actions = otc
-        ? `<button data-act="hentet" data-id="${m.id}">Købt</button>`
-        : `<button data-act="bestilt" data-id="${m.id}">Jeg har bestilt</button>`;
-    } else if (m.status === 'bestilt') {
-      actions = `<button data-act="klar" data-id="${m.id}">Klar på apoteket</button>`;
-    } else if (m.status === 'klar') {
-      actions = `<button data-act="hentet" data-id="${m.id}">Hentet</button>`;
+    // Altid både "bestil" og "afhentet". Den knap, der passer til status, er fremhævet.
+    const ordered = m.status === 'bestilt' || m.status === 'klar';
+    const btn = (act, text, main) => `<button class="${main ? '' : 'secondary'}" data-act="${act}" data-id="${m.id}">${text}</button>`;
+    let actions;
+    if (otc) {
+      actions = btn('bestil', 'Skal købes', false) + btn('hentet', 'Købt', eff === 'bestil');
     } else {
-      actions = `<button class="secondary" data-act="bestil" data-id="${m.id}">Skal bestilles</button>`;
+      actions = btn('bestilt', ordered ? 'Bestilt ✓' : 'Bestil', eff === 'bestil')
+              + btn('hentet', 'Afhentet', ordered);
+      if (m.status === 'bestilt') actions += btn('klar', 'Klar på apoteket', false);
     }
-    actions += `<button class="secondary" data-act="edit" data-id="${m.id}">Ret</button>`;
+    const rx = otc ? '' : receptText(m);
 
     return `<article class="card s-${eff}">
-      <div class="head"><span class="name">${esc(m.name)}</span><span class="who">${esc(m.person || '')}</span></div>
+      <div class="head"><button class="name linklike" data-act="edit" data-id="${m.id}" title="Detaljer">${esc(m.name)}</button><span class="who">${esc(m.person || '')}</span></div>
       <div class="meta">${esc(meta)}</div>
       <div class="meta">${esc(label)}${m.runsOut ? ' · ' + esc(runsOutText(days)) + ` (${esc(fmtDate(m.runsOut))})` : ''}</div>
       ${autoFlag ? `<div class="warn">Snart tom. Husk at ${otc ? 'købe ny' : 'bestille hos lægen'}.</div>` : ''}
+      ${rx ? `<div class="meta ${rx.warn ? 'warn' : ''}">${esc(rx.text)}</div>` : ''}
       ${priceText(m) ? `<div class="meta price">${esc(priceText(m))}</div>` : ''}
       ${m.note ? `<div class="meta">${esc(m.note)}</div>` : ''}
-      <div class="meta">${lookupLink(m.name)}</div>
+      <div class="meta links">${otc ? '' : `<a class="lookup" href="https://fmk-online.dk" target="_blank" rel="noopener noreferrer">Ret i FMK</a> · `}${lookupLink(m.name)}</div>
       <div class="actions">${actions}</div>
     </article>`;
+  }
+
+  // Receptinfo: udleveringer tilbage og udløbsdato
+  function receptText(m) {
+    const parts = [];
+    let warn = false;
+    if (m.udleveringer !== '' && m.udleveringer != null) {
+      const n = Number(m.udleveringer);
+      parts.push(n === 0 ? 'Ingen udleveringer tilbage, ny recept skal bestilles' : `${n} udlevering${n === 1 ? '' : 'er'} tilbage`);
+      if (n <= 1) warn = true;
+    }
+    if (m.receptUdloeb) {
+      const d = daysUntil(m.receptUdloeb);
+      parts.push(d < 0 ? `recepten udløb ${fmtDate(m.receptUdloeb)}` : `recepten udløber ${fmtDate(m.receptUdloeb)} ${m.receptUdloeb.slice(0, 4)}`);
+      if (d <= 30) warn = true;
+    }
+    return parts.length ? { text: 'Recept: ' + parts.join(' · '), warn } : null;
   }
 
   $('#groups').addEventListener('click', e => {
@@ -195,6 +212,8 @@
     const v = { kind: 'recept', status: 'bestil', person: Store.settings.people[0], ...(m || {}) };
     for (const k of ['name', 'strength', 'person', 'kind', 'status', 'runsOut', 'note']) formMed[k].value = v[k] || '';
     formMed.price.value = v.price === '' || v.price == null ? '' : String(v.price).replace('.', ',');
+    formMed.receptUdloeb.value = v.receptUdloeb || '';
+    formMed.udleveringer.value = v.udleveringer === '' || v.udleveringer == null ? '' : v.udleveringer;
     formMed.tilskud.checked = v.tilskud !== undefined ? v.tilskud !== false : v.kind !== 'handkob';
     formMed.dataset.prevStatus = m?.id ? (Store.meds.find(x => x.id === m.id)?.status || '') : '';
     updateCopayHint();
@@ -209,6 +228,8 @@
       name: formMed.name.value.trim(), strength: formMed.strength.value.trim(), person: formMed.person.value,
       kind: formMed.kind.value, status: formMed.status.value, runsOut: formMed.runsOut.value, note: formMed.note.value.trim(),
       price: parsePrice(formMed.price.value) ?? '', tilskud: formMed.tilskud.checked,
+      receptUdloeb: formMed.receptUdloeb.value,
+      udleveringer: formMed.udleveringer.value === '' ? '' : Math.max(0, parseInt(formMed.udleveringer.value, 10) || 0),
     };
     if (!med.name) { e.preventDefault(); return; }
     if (formMed.dataset.id) med.id = formMed.dataset.id;
