@@ -22,6 +22,7 @@ const Store = (() => {
   let hooks = { onChange() {}, onError() {} };
   let channel = null;
   let currentEmail = null;
+  let nameCache = null;
 
   function loadLocal() {
     try {
@@ -140,6 +141,7 @@ const Store = (() => {
     async logout() {
       if (channel) sb.removeChannel(channel);
       await sb.auth.signOut();
+      nameCache = null;
       data = empty(); localStorage.removeItem(KEY);
     },
     async refresh() { if (cloud) { try { await loadCloud(); } catch { /* bruger det gemte */ } } },
@@ -157,7 +159,12 @@ const Store = (() => {
     async userName() {
       if (!cloud) return null;
       const { data: s } = await sb.auth.getSession();
-      return s.session?.user.user_metadata?.name || null;
+      if (!s.session) return null;
+      if (!nameCache) {
+        try { const { data } = await sb.auth.getUser(); nameCache = data.user?.user_metadata?.name || ''; }
+        catch { nameCache = s.session.user.user_metadata?.name || ''; }
+      }
+      return nameCache || null;
     },
     async userEmail() { if (!cloud) return null; const { data: s } = await sb.auth.getSession(); return s.session?.user.email || null; },
 
