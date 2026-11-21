@@ -4,7 +4,9 @@
 (async () => {
   const APP = 'https://vores-medicin.vercel.app';
   if (location.hostname !== 'fmk-online.dk') { alert('Åbn fmk-online.dk og log ind først, og tryk så på knappen igen.'); return; }
-  const win = window.open(APP + '/#fmk-import', 'vores-medicin');
+  // Appen åbnes i et lille vindue ved siden af, så FMK-fanen bliver i forgrunden.
+  // (En fane i baggrunden arbejder meget langsomt i Chrome.)
+  const win = window.open(APP + '/#fmk-import', 'vores-medicin', 'popup,width=520,height=820');
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const clean = s => (s || '').replace(/­/g, '').replace(/\s+/g, ' ').trim();
   const iso = d => { const m = /(\d\d)-(\d\d)-(\d{4})/.exec(d || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
