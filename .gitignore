@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+.env*
+*.local
+# Aldrig persondata i koden
+*.json.bak
+vores-medicin-*.json

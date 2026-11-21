@@ -1,0 +1,417 @@
+// Vores medicin – hovedprogram
+(() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const STATUS = {
+    bestil:  { label: 'Skal bestilles hos lægen', otcLabel: 'Skal købes', group: 'Skal bestilles' },
+    bestilt: { label: 'Bestilt, venter på apoteket', group: 'Bestilt' },
+    klar:    { label: 'Klar til afhentning på apoteket', group: 'Klar på apoteket' },
+    hentet:  { label: 'Hjemme', group: 'Hjemme' },
+  };
+  const ORDER = ['bestil', 'bestilt', 'klar', 'hentet'];
+
+  // Opslag på min.medicin.dk. Kun produktets navn sendes med, aldrig hvem det er til.
+  const lookupUrl = name => 'https://min.medicin.dk/Search/Search/Search/' + encodeURIComponent(String(name).trim());
+  const lookupLink = name => `<a class="lookup" href="${esc(lookupUrl(name))}" target="_blank" rel="noopener noreferrer">Slå op på min.medicin.dk</a>`;
+
+  // ---------- hjælpere ----------
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+  function saved(ok) { if (!ok) toast('Kunne ikke gemme. Er browserens lager fuldt eller slået fra?'); }
+
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Math.round((d - today) / 86400000);
+  }
+  function fmtDate(dateStr) {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString('da-DK', { day: 'numeric', month: 'long' });
+  }
+  function runsOutText(days) {
+    if (days === null) return '';
+    if (days < 0) return `Sluppet op for ${-days} dag${-days === 1 ? '' : 'e'} siden`;
+    if (days === 0) return 'Slipper op i dag';
+    if (days === 1) return 'Slipper op i morgen';
+    return `Slipper op om ${days} dage`;
+  }
+  // En vare "hjemme" der snart slipper op, tæller som "skal bestilles"
+  function effectiveStatus(m) {
+    if (m.status === 'hentet') {
+      const d = daysUntil(m.runsOut);
+      if (d !== null && d <= Number(Store.settings.remindDays || 10)) return 'bestil';
+    }
+    return m.status;
+  }
+
+  // ---------- faner ----------
+  document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view)));
+  function showView(name) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+    document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== 'view-' + name);
+    if (name === 'handkob') renderProducts();
+    if (name === 'indstillinger') { fillSettings(); showSyncStatus(); }
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- liste ----------
+  function fillPersonSelects() {
+    const people = Store.settings.people.filter(Boolean);
+    const filter = $('#filter-person');
+    const cur = filter.value || 'alle';
+    filter.innerHTML = `<option value="alle">Begge</option>` + people.map(p => `<option>${esc(p)}</option>`).join('');
+    filter.value = [...filter.options].some(o => o.value === cur) ? cur : 'alle';
+    $('#form-med').person.innerHTML = people.map(p => `<option>${esc(p)}</option>`).join('') + `<option value="Fælles">Fælles</option>`;
+  }
+
+  function renderList() {
+    const who = $('#filter-person').value;
+    const meds = Store.meds.filter(m => who === 'alle' || m.person === who || m.person === 'Fælles');
+    const groups = Object.fromEntries(ORDER.map(s => [s, []]));
+    meds.forEach(m => groups[effectiveStatus(m)].push(m));
+    // Mest akutte først
+    const sortKey = m => { const d = daysUntil(m.runsOut); return d === null ? 9999 : d; };
+    Object.values(groups).forEach(g => g.sort((a, b) => sortKey(a) - sortKey(b) || a.name.localeCompare(b.name, 'da')));
+
+    const html = ORDER.map(s => {
+      const list = groups[s];
+      if (s === 'hentet' && !list.length && meds.length) return '';
+      return `<div class="group">
+        <h2>${STATUS[s].group} <span class="count">${list.length}</span></h2>
+        ${list.length ? list.map(card).join('') : `<p class="empty">${s === 'bestil' && !meds.length ? 'Ingen medicin endnu. Tryk “+ Tilføj medicin” forneden.' : 'Intet her lige nu.'}</p>`}
+      </div>`;
+    }).join('');
+    $('#groups').innerHTML = html;
+  }
+
+  function card(m) {
+    const eff = effectiveStatus(m);
+    const days = daysUntil(m.runsOut);
+    const otc = m.kind === 'handkob';
+    const autoFlag = eff !== m.status;
+    const label = eff === 'bestil' && otc ? STATUS.bestil.otcLabel : STATUS[eff].label;
+    const meta = [m.strength, otc ? 'Håndkøb' : 'Recept'].filter(Boolean).join(' · ');
+
+    let actions = '';
+    if (eff === 'bestil') {
+      actions = otc
+        ? `<button data-act="hentet" data-id="${m.id}">Købt</button>`
+        : `<button data-act="bestilt" data-id="${m.id}">Jeg har bestilt</button>`;
+    } else if (m.status === 'bestilt') {
+      actions = `<button data-act="klar" data-id="${m.id}">Klar på apoteket</button>`;
+    } else if (m.status === 'klar') {
+      actions = `<button data-act="hentet" data-id="${m.id}">Hentet</button>`;
+    } else {
+      actions = `<button class="secondary" data-act="bestil" data-id="${m.id}">Skal bestilles</button>`;
+    }
+    actions += `<button class="secondary" data-act="edit" data-id="${m.id}">Ret</button>`;
+
+    return `<article class="card s-${eff}">
+      <div class="head"><span class="name">${esc(m.name)}</span><span class="who">${esc(m.person || '')}</span></div>
+      <div class="meta">${esc(meta)}</div>
+      <div class="meta">${esc(label)}${m.runsOut ? ' · ' + esc(runsOutText(days)) + ` (${esc(fmtDate(m.runsOut))})` : ''}</div>
+      ${autoFlag ? `<div class="warn">Snart tom. Husk at ${otc ? 'købe ny' : 'bestille hos lægen'}.</div>` : ''}
+      ${m.note ? `<div class="meta">${esc(m.note)}</div>` : ''}
+      <div class="meta">${lookupLink(m.name)}</div>
+      <div class="actions">${actions}</div>
+    </article>`;
+  }
+
+  $('#groups').addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    const m = Store.meds.find(x => x.id === b.dataset.id);
+    if (!m) return;
+    const act = b.dataset.act;
+    if (act === 'edit') return openMed(m);
+    if (act === 'hentet') {
+      // Spørg hvornår den nye pakke slipper op
+      openMed({ ...m, status: 'hentet', runsOut: '' }, 'Hvornår slipper den nye pakke op?');
+      return;
+    }
+    saved(Store.upsertMed({ id: m.id, status: act }));
+    toast(`${m.name}: ${STATUS[act].group.toLowerCase()}`);
+    renderList();
+  });
+
+  $('#filter-person').addEventListener('change', renderList);
+
+  // ---------- dialog: medicin ----------
+  const dlgMed = $('#dlg-med'), formMed = $('#form-med');
+  formMed.status.innerHTML = ORDER.map(s => `<option value="${s}">${STATUS[s].label}</option>`).join('');
+
+  function openMed(m = null, title = null) {
+    formMed.reset();
+    fillOtcDatalist();
+    const isNew = !m || !m.id;
+    $('#dlg-med-title').textContent = title || (isNew ? 'Tilføj medicin' : 'Ret medicin');
+    $('#btn-delete').hidden = isNew;
+    formMed.dataset.id = m?.id || '';
+    const v = { kind: 'recept', status: 'bestil', person: Store.settings.people[0], ...(m || {}) };
+    for (const k of ['name', 'strength', 'person', 'kind', 'status', 'runsOut', 'note']) formMed[k].value = v[k] || '';
+    dlgMed.showModal();
+    if (isNew && !v.name) formMed.name.focus();
+  }
+  $('#btn-add').addEventListener('click', () => openMed());
+
+  formMed.addEventListener('submit', e => {
+    if (e.submitter?.value !== 'save') return;
+    const med = {
+      name: formMed.name.value.trim(), strength: formMed.strength.value.trim(), person: formMed.person.value,
+      kind: formMed.kind.value, status: formMed.status.value, runsOut: formMed.runsOut.value, note: formMed.note.value.trim(),
+    };
+    if (!med.name) { e.preventDefault(); return; }
+    if (formMed.dataset.id) med.id = formMed.dataset.id;
+    saved(Store.upsertMed(med));
+    toast('Gemt');
+    renderList();
+  });
+  // Når man vælger et kendt håndkøbsprodukt i navnefeltet, udfyldes styrke og type
+  formMed.name.addEventListener('change', () => {
+    const p = Store.products.find(p => productLabel(p) === formMed.name.value);
+    if (p) {
+      formMed.name.value = p.name;
+      if (!formMed.strength.value) formMed.strength.value = [p.strength, p.pack].filter(Boolean).join(', ');
+      formMed.kind.value = 'handkob';
+    }
+  });
+  $('#btn-delete').addEventListener('click', () => {
+    const id = formMed.dataset.id;
+    const m = Store.meds.find(x => x.id === id);
+    if (m && confirm(`Slet ${m.name} fra listen?`)) {
+      saved(Store.deleteMed(id)); dlgMed.close(); toast('Slettet'); renderList();
+    }
+  });
+
+  // ---------- håndkøb ----------
+  const productLabel = p => [p.name, p.strength, p.pack].filter(Boolean).join(' – ');
+  function fillOtcDatalist() {
+    $('#otc-names').innerHTML = Store.products.slice(0, 2000).map(p => `<option value="${esc(productLabel(p))}">`).join('');
+  }
+
+  function renderProducts() {
+    const q = $('#otc-search').value.trim().toLowerCase();
+    const all = Store.products;
+    const hits = q ? all.filter(p => [p.name, p.strength, p.varenr, p.ean].some(v => (v || '').toLowerCase().includes(q))) : all;
+    const shown = hits.slice(0, 100);
+    $('#otc-status').textContent = all.length
+      ? `${all.length} produkter i alt${q ? `, ${hits.length} passer på søgningen` : ''}${hits.length > shown.length ? '. Viser de første 100.' : '.'}`
+      : 'Ingen produkter endnu. Indlæs en fil, scan en stregkode eller skriv selv.';
+    $('#otc-list').innerHTML = shown.map(p => `<li>
+      <div><div>${esc(p.name)}</div>
+        <div class="meta">${esc([p.strength, p.pack, p.price && p.price + ' kr.', p.varenr && 'vnr. ' + p.varenr].filter(Boolean).join(' · '))}</div>
+        <div class="meta">${lookupLink(p.name)}</div></div>
+      <button data-pid="${p.id}">Sæt på listen</button>
+    </li>`).join('');
+  }
+  $('#otc-search').addEventListener('input', renderProducts);
+  $('#otc-list').addEventListener('click', e => {
+    const b = e.target.closest('button[data-pid]');
+    if (!b) return;
+    const p = Store.products.find(x => x.id === b.dataset.pid);
+    openMed({ name: p.name, strength: [p.strength, p.pack].filter(Boolean).join(', '), kind: 'handkob', status: 'bestil' });
+  });
+
+  $('#otc-file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    let text = await file.text();
+    // Danske regneark gemmes tit som Windows-1252; prøv det, hvis æøå ser forkerte ud
+    if (text.includes('�')) text = new TextDecoder('windows-1252').decode(await file.arrayBuffer());
+    const res = ProductCSV.read(text);
+    if (res.missingName) {
+      toast('Kunne ikke finde en kolonne med produktnavn i filen.');
+      $('#otc-status').textContent = 'Filen skal have en kolonne der hedder fx “Navn” eller “Produktnavn”.' +
+        (res.headers ? ` Fundne kolonner: ${res.headers.join(', ')}` : '');
+      return;
+    }
+    const r = Store.mergeProducts(res.products);
+    saved(r.ok);
+    toast(`Indlæst: ${r.added} nye, ${r.updated} opdateret`);
+    renderProducts();
+    if (res.filtered) $('#otc-status').textContent += ` ${res.filtered} receptpligtige varer i filen blev sprunget over.`;
+  });
+
+  // Skriv selv
+  const dlgOtc = $('#dlg-otc'), formOtc = $('#form-otc');
+  function openOtc(prefill = {}) {
+    formOtc.reset();
+    for (const k of ['name', 'strength', 'pack', 'price', 'varenr', 'ean']) formOtc[k].value = prefill[k] || '';
+    dlgOtc.showModal();
+  }
+  $('#btn-otc-new').addEventListener('click', () => openOtc());
+  formOtc.addEventListener('submit', e => {
+    if (e.submitter?.value !== 'save') return;
+    const p = {};
+    for (const k of ['name', 'strength', 'pack', 'price', 'varenr', 'ean']) p[k] = formOtc[k].value.trim();
+    p.varenr = p.varenr.replace(/\D/g, ''); p.ean = p.ean.replace(/\D/g, '');
+    if (!p.name) { e.preventDefault(); return; }
+    saved(Store.mergeProducts([p]).ok);
+    toast('Produkt gemt');
+    renderProducts();
+  });
+
+  // ---------- stregkode-scanner ----------
+  const dlgScan = $('#dlg-scan'), video = $('#scan-video');
+  let stream = null, scanning = false;
+  $('#btn-scan').addEventListener('click', async () => {
+    if (!('BarcodeDetector' in window)) {
+      // iPhone har ikke indbygget stregkodelæser; hent en, første gang der scannes
+      try { await loadScript('vendor/barcode-detector-3.2.2.js'); } catch { /* håndteres herunder */ }
+    }
+    if (!('BarcodeDetector' in window)) {
+      toast('Kunne ikke starte scanneren. Skriv tallene under stregkoden i søgefeltet i stedet.');
+      $('#otc-search').focus();
+      return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    } catch {
+      toast('Fik ikke lov til at bruge kameraet.');
+      return;
+    }
+    video.srcObject = stream; await video.play();
+    dlgScan.showModal();
+    scanning = true;
+    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'data_matrix', 'upc_a'] });
+    const tick = async () => {
+      if (!scanning) return;
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length) return found(codes[0].rawValue);
+      } catch { /* prøv igen */ }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  function loadScript(src) {
+    return new Promise((ok, fail) => {
+      const el = document.createElement('script');
+      el.src = src; el.onload = ok; el.onerror = fail;
+      document.head.appendChild(el);
+    });
+  }
+  function stopScan() {
+    scanning = false;
+    stream?.getTracks().forEach(t => t.stop()); stream = null;
+    if (dlgScan.open) dlgScan.close();
+  }
+  $('#btn-scan-close').addEventListener('click', stopScan);
+  dlgScan.addEventListener('cancel', stopScan);
+
+  function found(raw) {
+    stopScan();
+    // Medicinpakker har ofte en GS1-kode: (01) + 14 cifre. Træk stregkoden ud.
+    let code = raw.replace(/[^\d]/g, '');
+    const gtin = raw.match(/(?:^|\x1d|\(01\))01?(\d{14})/);
+    if (gtin) code = gtin[1].replace(/^0/, '');
+    const p = Store.products.find(p => p.ean && (p.ean === code || p.ean.endsWith(code) || code.endsWith(p.ean)));
+    if (p) {
+      $('#otc-search').value = p.name; renderProducts();
+      toast(`Fundet: ${p.name}`);
+    } else {
+      toast('Ukendt stregkode. Skriv produktets navn, så husker appen den.');
+      openOtc({ ean: code });
+    }
+  }
+
+  // ---------- indstillinger ----------
+  function fillSettings() {
+    $('#person1').value = Store.settings.people[0] || '';
+    $('#person2').value = Store.settings.people[1] || '';
+    $('#remind-days').value = Store.settings.remindDays;
+  }
+  $('#btn-save-settings').addEventListener('click', () => {
+    const oldPeople = Store.settings.people.slice();
+    const people = [$('#person1').value.trim(), $('#person2').value.trim()].map((p, i) => p || oldPeople[i] || '');
+    // Omdøb personen på eksisterende medicin
+    Store.meds.forEach(m => {
+      const i = oldPeople.indexOf(m.person);
+      if (i >= 0 && people[i] !== oldPeople[i]) Store.upsertMed({ id: m.id, person: people[i] });
+    });
+    saved(Store.saveSettings({ people, remindDays: Math.max(1, Number($('#remind-days').value) || 10) }));
+    fillPersonSelects(); renderList();
+    toast('Gemt');
+  });
+
+  $('#btn-export').addEventListener('click', () => {
+    const blob = new Blob([Store.exportJSON()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `vores-medicin-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $('#import-backup').addEventListener('change', async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    if (!confirm(Store.cloud ? 'Medicinen fra kopien lægges ind i jeres fælles liste. Fortsæt?' : 'Dette erstatter listen på denne enhed med kopien. Fortsæt?')) return;
+    try {
+      saved(Store.importJSON(await file.text()));
+      fillPersonSelects(); renderList(); fillSettings();
+      toast('Kopien er hentet ind');
+    } catch (err) {
+      toast(err.message || 'Kunne ikke læse filen.');
+    }
+  });
+
+  // ---------- log ind og deling ----------
+  function rerenderAll() {
+    fillPersonSelects();
+    renderList();
+    if (!$('#view-handkob').hidden) renderProducts();
+  }
+  async function showSyncStatus() {
+    if (!Store.cloud) {
+      $('#sync-status').textContent = 'Listen gemmes kun på denne enhed. Når den fælles database er sat op, kan I begge se og rette den samme liste.';
+      $('#btn-logout').hidden = true;
+      return;
+    }
+    const email = await Store.userEmail();
+    $('#sync-status').textContent = `Fælles liste. Du er logget ind som ${email}. Ændringer ses med det samme på den andens telefon.`;
+    $('#btn-logout').hidden = false;
+  }
+  function showApp(on) {
+    $('#login').hidden = on;
+    document.querySelector('header.top').hidden = !on;
+    document.querySelector('main').hidden = !on;
+  }
+  $('#form-login').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    $('#btn-login').disabled = true; $('#login-msg').textContent = '';
+    try {
+      await Store.login(f.email.value.trim(), f.password.value);
+      f.reset(); showApp(true); rerenderAll(); showSyncStatus();
+    } catch (err) {
+      $('#login-msg').textContent = err.message || 'Kunne ikke logge ind.';
+    } finally {
+      $('#btn-login').disabled = false;
+    }
+  });
+  $('#btn-logout').addEventListener('click', async () => {
+    if (!confirm('Log ud på denne enhed?')) return;
+    await Store.logout();
+    showApp(false);
+  });
+
+  // ---------- start ----------
+  (async () => {
+    const res = await Store.init({ onChange: rerenderAll, onError: toast });
+    if (res.needsLogin) { showApp(false); return; }
+    showApp(true);
+    rerenderAll();
+    showSyncStatus();
+  })();
+  // Hent det nyeste, når man vender tilbage til appen
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) return;
+    renderList();
+    await Store.refresh();
+  });
+})();

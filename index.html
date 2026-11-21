@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vores medicin</title>
+  <meta name="theme-color" content="#2f6f5e">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Medicin">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Log ind (kun når den fælles liste er sat op) -->
+  <section id="login" class="login" hidden>
+    <h1>Vores medicin</h1>
+    <p class="hint">Log ind for at se jeres fælles liste.</p>
+    <form id="form-login">
+      <label class="stack">E-mail <input name="email" type="email" autocomplete="username" required></label>
+      <label class="stack">Adgangskode <input name="password" type="password" autocomplete="current-password" required></label>
+      <button id="btn-login">Log ind</button>
+      <p id="login-msg" class="warn-text" role="alert"></p>
+    </form>
+  </section>
+
+  <header class="top">
+    <h1>Vores medicin</h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="liste" role="tab">Liste</button>
+      <button class="tab" data-view="handkob" role="tab">Håndkøb</button>
+      <button class="tab" data-view="indstillinger" role="tab">Mere</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- LISTE -->
+    <section id="view-liste" class="view">
+      <div class="filter">
+        <label>Vis for
+          <select id="filter-person"></select>
+        </label>
+      </div>
+      <div id="groups"></div>
+      <button class="fab" id="btn-add" aria-label="Tilføj medicin">+ Tilføj medicin</button>
+    </section>
+
+    <!-- HÅNDKØB -->
+    <section id="view-handkob" class="view" hidden>
+      <p class="hint">Her er de håndkøbsprodukter, appen kender. Søg, scan en stregkode eller indlæs en fil. Tryk på et produkt for at sætte det på jeres liste.</p>
+      <div class="row">
+        <input type="search" id="otc-search" placeholder="Søg på navn, varenummer eller stregkode">
+        <button id="btn-scan" class="secondary">Scan</button>
+      </div>
+      <div class="row">
+        <label class="button secondary file">Indlæs fil (CSV)
+          <input type="file" id="otc-file" accept=".csv,.txt,text/csv" hidden>
+        </label>
+        <button id="btn-otc-new" class="secondary">Skriv selv</button>
+      </div>
+      <p id="otc-status" class="hint"></p>
+      <ul id="otc-list" class="otc-list"></ul>
+    </section>
+
+    <!-- MERE -->
+    <section id="view-indstillinger" class="view" hidden>
+      <h2>Personer</h2>
+      <p class="hint">Navnene på dem, medicinen er til.</p>
+      <div class="row">
+        <input id="person1" placeholder="Fx Hans">
+        <input id="person2" placeholder="Fx din kone">
+      </div>
+      <label class="stack">Mind mig om at bestille, når der er så mange dage tilbage
+        <input id="remind-days" type="number" min="1" max="60">
+      </label>
+      <button id="btn-save-settings">Gem</button>
+
+      <h2>Deling</h2>
+      <p id="sync-status" class="hint"></p>
+      <button id="btn-logout" class="secondary" hidden>Log ud</button>
+
+      <h2>Sikkerhedskopi</h2>
+      <p class="hint">Gem en kopi af listen som fil, eller hent en tidligere kopi ind.</p>
+      <div class="row">
+        <button id="btn-export" class="secondary">Gem kopi</button>
+        <label class="button secondary file">Hent kopi
+          <input type="file" id="import-backup" accept=".json,application/json" hidden>
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <!-- Dialog: tilføj / ret medicin -->
+  <dialog id="dlg-med">
+    <form method="dialog" id="form-med">
+      <h2 id="dlg-med-title">Tilføj medicin</h2>
+      <label class="stack">Navn
+        <input name="name" required autocomplete="off" list="otc-names">
+      </label>
+      <datalist id="otc-names"></datalist>
+      <label class="stack">Styrke / pakning
+        <input name="strength" placeholder="Fx 500 mg, 100 stk.">
+      </label>
+      <label class="stack">Til
+        <select name="person"></select>
+      </label>
+      <label class="stack">Type
+        <select name="kind">
+          <option value="recept">Recept (bestilles hos lægen)</option>
+          <option value="handkob">Håndkøb</option>
+        </select>
+      </label>
+      <label class="stack">Status
+        <select name="status"></select>
+      </label>
+      <label class="stack">Pakken slipper op omkring
+        <input name="runsOut" type="date">
+      </label>
+      <label class="stack">Note
+        <textarea name="note" rows="2" placeholder="Fx 'ring til lægen før kl. 9'"></textarea>
+      </label>
+      <div class="row end">
+        <button type="button" class="danger" id="btn-delete" hidden>Slet</button>
+        <span class="spacer"></span>
+        <button value="cancel" formnovalidate class="secondary">Annullér</button>
+        <button value="save" id="btn-save-med">Gem</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dialog: håndkøbsprodukt -->
+  <dialog id="dlg-otc">
+    <form method="dialog" id="form-otc">
+      <h2>Håndkøbsprodukt</h2>
+      <label class="stack">Navn <input name="name" required></label>
+      <label class="stack">Styrke <input name="strength"></label>
+      <label class="stack">Pakning <input name="pack"></label>
+      <label class="stack">Pris (kr.) <input name="price" inputmode="decimal"></label>
+      <label class="stack">Varenummer <input name="varenr" inputmode="numeric"></label>
+      <label class="stack">Stregkode <input name="ean" inputmode="numeric"></label>
+      <div class="row end">
+        <button value="cancel" formnovalidate class="secondary">Annullér</button>
+        <button value="save">Gem</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dialog: scanner -->
+  <dialog id="dlg-scan">
+    <h2>Scan stregkode</h2>
+    <video id="scan-video" playsinline muted></video>
+    <p id="scan-msg" class="hint">Hold stregkoden på pakken foran kameraet.</p>
+    <div class="row end"><button id="btn-scan-close" class="secondary">Luk</button></div>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="vendor/supabase-js-2.119.0.js"></script>
+  <script src="store.js"></script>
+  <script src="csv.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
