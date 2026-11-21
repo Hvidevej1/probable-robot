@@ -58,23 +58,33 @@
     if (m.kind === 'handkob') return { pay: price, full: price, tilskud: false };
     if (m.tilskud === false) {
       // Receptmedicin uden offentligt tilskud: "danmark" gruppe 1/2 giver 50 %, gruppe 5 25 % (max 3.000/1.500 kr. pr. år)
-      const g = String(ctrOf(m.person)?.danmark || '');
-      const pct = { '1': 50, '2': 50, '5': 25 }[g] || 0;
+      const pct = (DANMARK[String(ctrOf(m.person)?.danmark || '')] || [0, 0, 0])[2];
       return { pay: price, full: price, tilskud: false, danmark: Math.round(price * pct) / 100 };
     }
     const info = ctrOf(m.person);
     if (!info || (info.saldo == null && !info.periodEnd)) return { pay: null, full: price, tilskud: true };
-    const pay = CTR.copay(price, CTR.activeSaldo(info));
-    return { pay, full: price, tilskud: true, danmark: danmarkBack(info.danmark, pay) };
+    // Tilskud beregnes kun af tilskudsprisen (prisen på den billigste tilsvarende pakning).
+    // Er pakken dyrere, betaler man selv forskellen fuldt ud.
+    const tp = Math.min(price, parsePrice(m.tilskudspris) ?? price);
+    const ctrPart = CTR.copay(tp, CTR.activeSaldo(info));
+    const extra = Math.round((price - tp) * 100) / 100;
+    const pay = Math.round((ctrPart + extra) * 100) / 100;
+    return { pay, full: price, tilskud: true, danmark: danmarkBack(info.danmark, ctrPart, extra) };
   }
   // Sygeforsikringen "danmark" (2026): tilskud af egenbetalingen for medicin med
   // offentligt tilskud, købt som den billigste pakning. Gruppe 1 og 2: 100 %, gruppe 5: 50 %.
   // (Dyrere pakning end den billigste: kun en del af merprisen dækkes. Det regner appen ikke med.)
-  function danmarkBack(gruppe, pay) {
-    const pct = { '1': 100, '2': 100, '5': 50 }[String(gruppe || '')];
-    return pct ? Math.round(pay * pct) / 100 : 0;
+  // Merprisen over tilskudsprisen: gruppe 2 100 %, gruppe 1 50 %, gruppe 5 25 %.
+  const DANMARK = { '2': [100, 100, 50], '1': [100, 50, 50], '5': [50, 25, 25], basis: [0, 0, 0] };
+  function danmarkBack(gruppe, ctrPart, extra = 0) {
+    const g = DANMARK[String(gruppe || '')];
+    return g ? Math.round(ctrPart * g[0] + extra * g[1]) / 100 : 0;
   }
   function priceText(m) {
+    const t = priceTextCore(m);
+    return t && m.prisOpdateret ? `${t} · pris fra medicinpriser.dk ${fmtDate(m.prisOpdateret)}` : t;
+  }
+  function priceTextCore(m) {
     const p = myPrice(m);
     if (!p) return '';
     if (!p.tilskud) return p.danmark ? `Pris ${CTR.kr(p.full)}, “danmark” giver ${CTR.kr(p.danmark)} tilbage. Reelt ${CTR.kr(p.full - p.danmark)}` : `Pris: ${CTR.kr(p.full)}`;
@@ -274,7 +284,8 @@
     const justPicked = med.status === 'hentet' && formMed.dataset.prevStatus && formMed.dataset.prevStatus !== 'hentet';
     if (justPicked && med.tilskud && med.kind !== 'handkob' && med.price && Store.settings.people.includes(med.person)) {
       const ctr = { ...(Store.settings.ctr || {}) };
-      ctr[med.person] = { ...CTR.afterPurchase(ctr[med.person], med.price), danmark: ctr[med.person]?.danmark || '' };
+      const ctrPrice = Math.min(parsePrice(med.price) || 0, parsePrice(med.tilskudspris) ?? Infinity);
+      ctr[med.person] = { ...CTR.afterPurchase(ctr[med.person], ctrPrice), danmark: ctr[med.person]?.danmark || '' };
       saved(Store.saveSettings({ ctr }));
       toast(`Gemt. CTR-saldo for ${med.person} er nu ${CTR.kr(ctr[med.person].saldo)}`);
     } else toast('Gemt');
@@ -464,7 +475,7 @@
         </div>
         <label class="stack">Sygeforsikringen “danmark”
           <select data-ctr="danmark" data-i="${i}">
-            ${[['', 'Ikke medlem'], ['2', 'Gruppe 2'], ['1', 'Gruppe 1'], ['5', 'Gruppe 5']].map(([v, t]) => `<option value="${v}" ${String(info.danmark || '') === v ? 'selected' : ''}>${t}</option>`).join('')}
+            ${[['', 'Ikke medlem'], ['2', 'Gruppe 2 (højeste)'], ['1', 'Gruppe 1'], ['5', 'Gruppe 5'], ['basis', 'Basis (intet medicintilskud)']].map(([v, t]) => `<option value="${v}" ${String(info.danmark || '') === v ? 'selected' : ''}>${t}</option>`).join('')}
           </select>
         </label>
       </div>`;
@@ -698,6 +709,7 @@
       const left = open.reduce((n, r) => n + Math.max(0, (r.total || 0) - (r.udleveret || 0)), 0);
       const pick = (open.length ? open : list).reduce((a, b) => (b.gyldigTil > a.gyldigTil ? b : a));
       const fields = { udleveringer: left, receptUdloeb: open.length ? pick.gyldigTil : '' };
+      if (pick.varenr) fields.varenr = pick.varenr;
       const existing = Store.meds.find(m => normName(m.name) === k && m.kind !== 'handkob');
       if (existing) {
         Store.upsertMed({ id: existing.id, ...fields });
