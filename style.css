@@ -135,3 +135,11 @@ button.linklike { background: none; border: 0; padding: 0; min-height: 0; color:
 .card .actions button { min-width: 110px; }
 input[readonly] { background: var(--bg); color: var(--muted); }
 select:disabled { color: var(--muted); }
+
+/* Venter på FMK */
+.wait { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); padding: 16px; }
+.wait[hidden] { display: none; }
+.wait-box { background: var(--card, #222); color: var(--text, #fff); border-radius: 14px; padding: 24px; max-width: 340px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+.wait-box p { margin: 8px 0 0; }
+.spinner { width: 44px; height: 44px; margin: 0 auto 8px; border: 5px solid rgba(127,127,127,.3); border-top-color: var(--brand, #6cc2a8); border-radius: 50%; animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -692,13 +692,17 @@
     if (location.hash !== '#fmk-import' || !window.opener) return;
     history.replaceState(null, '', location.pathname);
     const opener = window.opener;
+    $('#fmk-wait').hidden = false;
     window.addEventListener('message', e => {
       if (e.origin !== FMK_ORIGIN) return;
       const res = applyFmk(e.data);
-      if (res) { opener.postMessage('fmk-done', FMK_ORIGIN); showFmkResult(res); clearInterval(ping); }
+      if (res) { $('#fmk-wait').hidden = true; opener.postMessage('fmk-done', FMK_ORIGIN); showFmkResult(res); clearInterval(ping); }
     });
     const ping = setInterval(() => { try { opener.postMessage('fmk-ready', FMK_ORIGIN); } catch { clearInterval(ping); } }, 1000);
-    setTimeout(() => clearInterval(ping), 120000);
+    setTimeout(() => {
+      clearInterval(ping);
+      if (!$('#fmk-wait').hidden) { $('#fmk-wait').hidden = true; toast('Fik ikke noget fra FMK. Prøv at trykke på bogmærket igen.'); }
+    }, 5 * 60000);
   }
 
   // Bogmærket bygges ud fra fmk-hent.js

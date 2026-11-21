@@ -13,8 +13,14 @@
   const today = new Date().toISOString().slice(0, 10);
   const box = document.createElement('div');
   box.style.cssText = 'position:fixed;top:12px;right:12px;z-index:99999;background:#2f6f5e;color:#fff;padding:12px 16px;border-radius:10px;font:16px system-ui;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+  box.style.display = 'flex'; box.style.alignItems = 'center'; box.style.gap = '10px';
+  const spin = document.createElement('span');
+  spin.style.cssText = 'width:18px;height:18px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;flex:none';
+  spin.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], { duration: 900, iterations: Infinity });
+  const msg = document.createElement('span');
+  box.append(spin, msg);
   document.body.appendChild(box);
-  const say = t => { box.textContent = t; };
+  const say = (t, done) => { msg.textContent = t; if (done) spin.remove(); };
   const tab = name => [...document.querySelectorAll('[role=tab]')].find(t => clean(t.innerText) === name);
 
   try {
@@ -61,11 +67,11 @@
     window.addEventListener('message', e => {
       if (e.origin !== APP) return;
       if (e.data === 'fmk-ready') send();
-      if (e.data === 'fmk-done') { sent = true; say('Færdig! Appen er opdateret.'); setTimeout(() => box.remove(), 4000); }
+      if (e.data === 'fmk-done') { sent = true; say('✓ Færdig! Appen er opdateret.', true); setTimeout(() => box.remove(), 4000); }
     });
     send();
-    setTimeout(() => { if (!sent) say('Appen svarede ikke. Er du logget ind i appen? Prøv igen.'); }, 20000);
+    setTimeout(() => { if (!sent) say('Appen svarede ikke. Er du logget ind i appen? Prøv igen.', true); }, 20000);
   } catch (err) {
-    say('Noget gik galt: ' + err.message);
+    say('Noget gik galt: ' + err.message, true);
   }
 })();
