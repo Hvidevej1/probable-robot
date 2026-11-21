@@ -48,6 +48,45 @@
     return m.status;
   }
 
+  // ---------- CTR / pris ----------
+  const ctrOf = person => (Store.settings.ctr || {})[person];
+  const parsePrice = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return isFinite(n) && n > 0 ? n : null; };
+  // Hvad koster pakken for denne person lige nu?
+  function myPrice(m) {
+    const price = parsePrice(m.price);
+    if (price === null) return null;
+    if (m.tilskud === false || m.kind === 'handkob') return { pay: price, full: price, tilskud: false };
+    const info = ctrOf(m.person);
+    if (!info) return { pay: null, full: price, tilskud: true };
+    return { pay: CTR.copay(price, CTR.activeSaldo(info)), full: price, tilskud: true };
+  }
+  function priceText(m) {
+    const p = myPrice(m);
+    if (!p) return '';
+    if (!p.tilskud) return `Pris: ${CTR.kr(p.full)}`;
+    if (p.pay === null) return `Pris uden tilskud: ${CTR.kr(p.full)} (skriv CTR-saldo under “Mere” for at se jeres pris)`;
+    return `Din pris ca. ${CTR.kr(p.pay)} (uden tilskud ${CTR.kr(p.full)})`;
+  }
+
+  function renderCtrSummary() {
+    const who = $('#filter-person').value;
+    const people = Store.settings.people.filter(p => p && (who === 'alle' || who === p));
+    const lines = people.map(p => {
+      const info = ctrOf(p);
+      if (!info) return '';
+      const saldo = CTR.activeSaldo(info);
+      let end = '';
+      if (info.periodEnd) {
+        const d = daysUntil(info.periodEnd);
+        end = d < 0 ? `<span class="gone">Perioden er udløbet. Ny periode starter ved næste køb med tilskud.</span>`
+          : `Udløber ${esc(fmtDate(info.periodEnd))} ${new Date(info.periodEnd).getFullYear()} ` +
+            (d <= 30 ? `<span class="soon">(om ${d} dage)</span>` : `(om ${d} dage)`);
+      }
+      return `<div class="line"><b>${esc(p)}</b>: CTR-saldo ${CTR.kr(saldo)}, ${CTR.currentPct(saldo)} % tilskud nu. ${end}</div>`;
+    }).filter(Boolean);
+    $('#ctr-summary').innerHTML = lines.length ? `<div class="ctr-box">${lines.join('')}</div>` : '';
+  }
+
   // ---------- faner ----------
   document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view)));
   function showView(name) {
@@ -86,6 +125,7 @@
       </div>`;
     }).join('');
     $('#groups').innerHTML = html;
+    renderCtrSummary();
   }
 
   function card(m) {
@@ -115,6 +155,7 @@
       <div class="meta">${esc(meta)}</div>
       <div class="meta">${esc(label)}${m.runsOut ? ' · ' + esc(runsOutText(days)) + ` (${esc(fmtDate(m.runsOut))})` : ''}</div>
       ${autoFlag ? `<div class="warn">Snart tom. Husk at ${otc ? 'købe ny' : 'bestille hos lægen'}.</div>` : ''}
+      ${priceText(m) ? `<div class="meta price">${esc(priceText(m))}</div>` : ''}
       ${m.note ? `<div class="meta">${esc(m.note)}</div>` : ''}
       <div class="meta">${lookupLink(m.name)}</div>
       <div class="actions">${actions}</div>
@@ -153,6 +194,10 @@
     formMed.dataset.id = m?.id || '';
     const v = { kind: 'recept', status: 'bestil', person: Store.settings.people[0], ...(m || {}) };
     for (const k of ['name', 'strength', 'person', 'kind', 'status', 'runsOut', 'note']) formMed[k].value = v[k] || '';
+    formMed.price.value = v.price === '' || v.price == null ? '' : String(v.price).replace('.', ',');
+    formMed.tilskud.checked = v.tilskud !== undefined ? v.tilskud !== false : v.kind !== 'handkob';
+    formMed.dataset.prevStatus = m?.id ? (Store.meds.find(x => x.id === m.id)?.status || '') : '';
+    updateCopayHint();
     dlgMed.showModal();
     if (isNew && !v.name) formMed.name.focus();
   }
@@ -163,13 +208,28 @@
     const med = {
       name: formMed.name.value.trim(), strength: formMed.strength.value.trim(), person: formMed.person.value,
       kind: formMed.kind.value, status: formMed.status.value, runsOut: formMed.runsOut.value, note: formMed.note.value.trim(),
+      price: parsePrice(formMed.price.value) ?? '', tilskud: formMed.tilskud.checked,
     };
     if (!med.name) { e.preventDefault(); return; }
     if (formMed.dataset.id) med.id = formMed.dataset.id;
     saved(Store.upsertMed(med));
-    toast('Gemt');
+    // Hentet med tilskud: læg købet til CTR-saldoen
+    const justPicked = med.status === 'hentet' && formMed.dataset.prevStatus && formMed.dataset.prevStatus !== 'hentet';
+    if (justPicked && med.tilskud && med.kind !== 'handkob' && med.price && Store.settings.people.includes(med.person)) {
+      const ctr = { ...(Store.settings.ctr || {}) };
+      ctr[med.person] = CTR.afterPurchase(ctr[med.person], med.price);
+      saved(Store.saveSettings({ ctr }));
+      toast(`Gemt. CTR-saldo for ${med.person} er nu ${CTR.kr(ctr[med.person].saldo)}`);
+    } else toast('Gemt');
     renderList();
   });
+  function updateCopayHint() {
+    const m = { price: formMed.price.value, tilskud: formMed.tilskud.checked, kind: formMed.kind.value, person: formMed.person.value };
+    $('#med-copay').textContent = priceText(m);
+  }
+  ['price', 'tilskud', 'person'].forEach(k => formMed[k].addEventListener('input', updateCopayHint));
+  formMed.kind.addEventListener('change', () => { formMed.tilskud.checked = formMed.kind.value !== 'handkob'; updateCopayHint(); });
+
   // Når man vælger et kendt håndkøbsprodukt i navnefeltet, udfyldes styrke og type
   formMed.name.addEventListener('change', () => {
     const p = Store.products.find(p => productLabel(p) === formMed.name.value);
@@ -177,6 +237,9 @@
       formMed.name.value = p.name;
       if (!formMed.strength.value) formMed.strength.value = [p.strength, p.pack].filter(Boolean).join(', ');
       formMed.kind.value = 'handkob';
+      formMed.tilskud.checked = false;
+      if (!formMed.price.value && p.price) formMed.price.value = String(p.price).replace('.', ',');
+      updateCopayHint();
     }
   });
   $('#btn-delete').addEventListener('click', () => {
@@ -213,7 +276,7 @@
     const b = e.target.closest('button[data-pid]');
     if (!b) return;
     const p = Store.products.find(x => x.id === b.dataset.pid);
-    openMed({ name: p.name, strength: [p.strength, p.pack].filter(Boolean).join(', '), kind: 'handkob', status: 'bestil' });
+    openMed({ name: p.name, strength: [p.strength, p.pack].filter(Boolean).join(', '), kind: 'handkob', status: 'bestil', price: p.price || '', tilskud: false });
   });
 
   $('#otc-file').addEventListener('change', async e => {
@@ -321,7 +384,36 @@
   }
 
   // ---------- indstillinger ----------
+  function fillCtrFields() {
+    $('#ctr-fields').innerHTML = Store.settings.people.filter(Boolean).map((p, i) => {
+      const info = ctrOf(p) || {};
+      return `<div class="ctr-person">
+        <b>${esc(p)}</b>
+        <div class="row">
+          <label class="stack" style="flex:1">Saldo (kr.)<input data-ctr="saldo" data-i="${i}" inputmode="decimal" value="${esc(info.saldo != null ? String(info.saldo).replace('.', ',') : '')}"></label>
+          <label class="stack" style="flex:1">Udløber<input data-ctr="periodEnd" data-i="${i}" type="date" value="${esc(info.periodEnd || '')}"></label>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  $('#btn-save-ctr').addEventListener('click', () => {
+    const ctr = { ...(Store.settings.ctr || {}) };
+    Store.settings.people.forEach((p, i) => {
+      if (!p) return;
+      const saldoRaw = document.querySelector(`[data-ctr=saldo][data-i="${i}"]`).value.trim();
+      const end = document.querySelector(`[data-ctr=periodEnd][data-i="${i}"]`).value;
+      if (!saldoRaw && !end) { delete ctr[p]; return; }
+      const saldo = Number(saldoRaw.replace(/\./g, '').replace(',', '.')) || 0;
+      ctr[p] = { saldo, periodEnd: end, updatedOn: new Date().toISOString().slice(0, 10) };
+    });
+    saved(Store.saveSettings({ ctr }));
+    renderList();
+    toast('CTR-saldo gemt');
+  });
+
   function fillSettings() {
+    fillCtrFields();
+    showPushStatus();
     $('#person1').value = Store.settings.people[0] || '';
     $('#person2').value = Store.settings.people[1] || '';
     $('#remind-days').value = Store.settings.remindDays;
@@ -334,7 +426,13 @@
       const i = oldPeople.indexOf(m.person);
       if (i >= 0 && people[i] !== oldPeople[i]) Store.upsertMed({ id: m.id, person: people[i] });
     });
-    saved(Store.saveSettings({ people, remindDays: Math.max(1, Number($('#remind-days').value) || 10) }));
+    const ctr = {};
+    for (const [k, v] of Object.entries(Store.settings.ctr || {})) {
+      const i = oldPeople.indexOf(k);
+      ctr[i >= 0 ? people[i] : k] = v;
+    }
+    saved(Store.saveSettings({ people, ctr, remindDays: Math.max(1, Number($('#remind-days').value) || 10) }));
+    fillCtrFields();
     fillPersonSelects(); renderList();
     toast('Gemt');
   });
@@ -359,6 +457,62 @@
       toast(err.message || 'Kunne ikke læse filen.');
     }
   });
+
+  // ---------- push-beskeder ----------
+  const vapidKey = (window.MEDICIN_CONFIG || {}).vapidPublicKey;
+  const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const standalone = () => window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+
+  async function showPushStatus() {
+    const btn = $('#btn-push'), st = $('#push-status');
+    btn.hidden = false;
+    if (!Store.cloud || !vapidKey) { st.textContent = 'Push-beskeder kan slås til, når den fælles liste er sat op.'; btn.hidden = true; return; }
+    if (!pushSupported()) {
+      st.textContent = isIOS && !standalone()
+        ? 'Læg først appen på hjemmeskærmen (Del → “Føj til hjemmeskærm”) og åbn den derfra.'
+        : 'Denne browser kan ikke modtage push-beskeder.';
+      btn.hidden = true; return;
+    }
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && await reg.pushManager.getSubscription();
+    if (sub && Notification.permission === 'granted') {
+      st.textContent = 'Push-beskeder er slået til på denne telefon.';
+      btn.textContent = 'Slå push-beskeder fra';
+      btn.dataset.on = '1';
+    } else {
+      st.textContent = Notification.permission === 'denied'
+        ? 'Beskeder er blokeret. Slå dem til under Indstillinger → Notifikationer → Medicin.' : '';
+      btn.textContent = 'Slå push-beskeder til';
+      btn.dataset.on = '';
+    }
+  }
+  function urlB64ToUint8Array(b64) {
+    const pad = '='.repeat((4 - b64.length % 4) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(raw, c => c.charCodeAt(0));
+  }
+  $('#btn-push').addEventListener('click', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js');
+      await navigator.serviceWorker.ready;
+      if ($('#btn-push').dataset.on) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) { await Store.removePushSubscription(sub.endpoint); await sub.unsubscribe(); }
+        toast('Push-beskeder er slået fra');
+      } else {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { toast('Du skal tillade beskeder for at få push.'); return showPushStatus(); }
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(vapidKey) });
+        await Store.savePushSubscription(sub);
+        toast('Push-beskeder er slået til');
+      }
+    } catch (err) {
+      toast('Kunne ikke slå push til: ' + (err.message || err));
+    }
+    showPushStatus();
+  });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
   // ---------- log ind og deling ----------
   function rerenderAll() {

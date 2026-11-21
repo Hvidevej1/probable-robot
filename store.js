@@ -11,7 +11,7 @@ const Store = (() => {
   }) : null;
 
   const empty = () => ({
-    settings: { people: ['Mig', 'Min kone'], remindDays: 10 },
+    settings: { people: ['Mig', 'Min kone'], remindDays: 10, ctr: {} },
     meds: [],
     products: [],
   });
@@ -19,6 +19,7 @@ const Store = (() => {
   let data = loadLocal();
   let hooks = { onChange() {}, onError() {} };
   let channel = null;
+  let currentEmail = null;
 
   function loadLocal() {
     try {
@@ -40,13 +41,18 @@ const Store = (() => {
   const medToRow = m => ({
     id: m.id, name: m.name, strength: m.strength || null, person: m.person || null, kind: m.kind || 'recept',
     status: m.status || 'bestil', runs_out: m.runsOut || null, note: m.note || null, created: m.created, updated: m.updated,
+    price: m.price === '' || m.price == null ? null : Number(m.price), tilskud: m.tilskud !== false, updated_by: currentEmail,
   });
   const rowToMed = r => ({
     id: r.id, name: r.name, strength: r.strength || '', person: r.person || '', kind: r.kind, status: r.status,
     runsOut: r.runs_out || '', note: r.note || '', created: r.created, updated: r.updated,
+    price: r.price ?? '', tilskud: r.tilskud !== false,
   });
   const prodToRow = p => ({ id: p.id, name: p.name, strength: p.strength || null, pack: p.pack || null, price: p.price || null, varenr: p.varenr || null, ean: p.ean || null });
   const rowToProd = r => ({ id: r.id, name: r.name, strength: r.strength || '', pack: r.pack || '', price: r.price || '', varenr: r.varenr || '', ean: r.ean || '' });
+
+  const rowToSettings = r => ({ people: r.people || ['Mig', 'Min kone'], remindDays: r.remind_days ?? 10, ctr: r.ctr || {} });
+  const settingsToRow = st => ({ id: 1, people: st.people, remind_days: st.remindDays, ctr: st.ctr || {} });
 
   // Sender en ændring til databasen i baggrunden
   function push(promise, what) {
@@ -73,7 +79,7 @@ const Store = (() => {
     if (settings.error) throw settings.error;
     data.meds = meds.map(rowToMed);
     data.products = products.map(rowToProd);
-    if (settings.data) data.settings = { people: settings.data.people || data.settings.people, remindDays: settings.data.remind_days ?? 10 };
+    if (settings.data) data.settings = rowToSettings(settings.data);
     saveLocal();
     hooks.onChange();
   }
@@ -98,7 +104,7 @@ const Store = (() => {
         saveLocal(); hooks.onChange();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, ev => {
-        if (ev.new) data.settings = { people: ev.new.people, remindDays: ev.new.remind_days };
+        if (ev.new) data.settings = rowToSettings(ev.new);
         saveLocal(); hooks.onChange();
       })
       .subscribe();
@@ -116,6 +122,7 @@ const Store = (() => {
       if (!cloud) return { needsLogin: false };
       const { data: s } = await sb.auth.getSession();
       if (!s.session) return { needsLogin: true };
+      currentEmail = s.session.user.email;
       try { await loadCloud(); listen(); }
       catch (e) { hooks.onError('Kunne ikke hente den fælles liste. Viser den sidst gemte.'); }
       return { needsLogin: false, email: s.session.user.email };
@@ -123,6 +130,7 @@ const Store = (() => {
     async login(email, password) {
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Forkert e-mail eller adgangskode.' : error.message);
+      currentEmail = email.toLowerCase();
       await loadCloud(); listen();
     },
     async logout() {
@@ -135,7 +143,7 @@ const Store = (() => {
 
     saveSettings(s) {
       data.settings = { ...data.settings, ...s };
-      if (cloud) push(sb.from('settings').upsert({ id: 1, people: data.settings.people, remind_days: data.settings.remindDays }), 'indstillingerne');
+      if (cloud) push(sb.from('settings').upsert(settingsToRow(data.settings)), 'indstillingerne');
       return saveLocal();
     },
 
@@ -185,6 +193,17 @@ const Store = (() => {
       return { added, updated, ok };
     },
 
+    // Gemmer telefonens adresse til push-beskeder i den fælles database
+    async savePushSubscription(sub) {
+      if (!cloud) throw new Error('Push-beskeder kræver den fælles liste.');
+      const j = sub.toJSON();
+      const { error } = await sb.from('push_subscriptions').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, email: currentEmail });
+      if (error) throw new Error(error.message);
+    },
+    async removePushSubscription(endpoint) {
+      if (cloud) await sb.from('push_subscriptions').delete().eq('endpoint', endpoint);
+    },
+
     exportJSON() { return JSON.stringify(data, null, 2); },
     importJSON(text) {
       const parsed = JSON.parse(text);
@@ -193,7 +212,7 @@ const Store = (() => {
       if (cloud) {
         if (data.meds.length) push(sb.from('meds').upsert(data.meds.map(medToRow)), 'medicinen');
         for (let i = 0; i < data.products.length; i += 500) push(sb.from('products').upsert(data.products.slice(i, i + 500).map(prodToRow)), 'produkterne');
-        push(sb.from('settings').upsert({ id: 1, people: data.settings.people, remind_days: data.settings.remindDays }), 'indstillingerne');
+        push(sb.from('settings').upsert(settingsToRow(data.settings)), 'indstillingerne');
       }
       return saveLocal();
     },

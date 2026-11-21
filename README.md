@@ -16,6 +16,15 @@ Står felterne i `config.js` tomme, gemmes alt kun i browseren på den enhed, ma
 
 Kun e-mailadresserne i tabellen `members` kan se og rette listen. Nøglen i `config.js` er den offentlige nøgle og må gerne ligge i koden. Den hemmelige *service_role*-nøgle må aldrig lægges her.
 
+## CTR-saldo og pris
+Under "Mere" skrives hver persons CTR-saldo og udløbsdato (findes på sundhed.dk eller på apoteket). Skriver man prisen uden tilskud på en vare, viser appen jeres egenbetaling. Når en vare med tilskud markeres "Hentet", lægges prisen til saldoen. Tilskudsgrænserne for 2026 står i `ctr.js` og skal tjekkes ved årsskiftet.
+
+## Push-beskeder
+Kræver den fælles liste. På iPhone skal appen ligge på hjemmeskærmen.
+1. Lav et sæt VAPID-nøgler (Claude kan lave dem). Den offentlige lægges i `config.js`.
+2. Læg funktionen `supabase/functions/send-push` op under Edge Functions, slå "Verify JWT" fra, og sæt hemmelighederne `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` og `PUSH_SECRET`.
+3. Ret og kør `supabase/push.sql`.
+
 ## Persondata
 Der må aldrig lægges medicinlister, sikkerhedskopier eller andre personlige oplysninger i dette repository. Opslag på min.medicin.dk sender kun produktets navn.
 

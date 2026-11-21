@@ -17,8 +17,14 @@ create table if not exists meds (
   runs_out date,
   note text,
   created timestamptz default now(),
-  updated timestamptz default now()
+  updated timestamptz default now(),
+  price numeric,              -- tilskudspris i kr.
+  tilskud boolean default true,
+  updated_by text             -- e-mail på den, der sidst rettede
 );
+alter table meds add column if not exists price numeric;
+alter table meds add column if not exists tilskud boolean default true;
+alter table meds add column if not exists updated_by text;
 
 create table if not exists products (
   id text primary key,
@@ -33,7 +39,18 @@ create table if not exists products (
 create table if not exists settings (
   id int primary key default 1,
   people text[] default array['Mig', 'Min kone'],
-  remind_days int default 10
+  remind_days int default 10,
+  ctr jsonb default '{}'::jsonb   -- CTR-saldo og udløbsdato pr. person
+);
+alter table settings add column if not exists ctr jsonb default '{}'::jsonb;
+
+-- Telefoner der vil have push-beskeder
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  p256dh text not null,
+  auth text not null,
+  email text,
+  created timestamptz default now()
 );
 insert into settings (id) values (1) on conflict do nothing;
 
@@ -48,6 +65,7 @@ alter table members  enable row level security;
 alter table meds     enable row level security;
 alter table products enable row level security;
 alter table settings enable row level security;
+alter table push_subscriptions enable row level security;
 
 drop policy if exists "medlemmer" on meds;
 drop policy if exists "medlemmer" on products;
@@ -55,6 +73,8 @@ drop policy if exists "medlemmer" on settings;
 create policy "medlemmer" on meds     for all to authenticated using (is_member()) with check (is_member());
 create policy "medlemmer" on products for all to authenticated using (is_member()) with check (is_member());
 create policy "medlemmer" on settings for all to authenticated using (is_member()) with check (is_member());
+drop policy if exists "medlemmer" on push_subscriptions;
+create policy "medlemmer" on push_subscriptions for all to authenticated using (is_member()) with check (is_member());
 
 -- Så den anden telefon får ændringer med det samme
 alter publication supabase_realtime add table meds, products, settings;

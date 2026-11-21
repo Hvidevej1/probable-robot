@@ -6,4 +6,6 @@
 window.MEDICIN_CONFIG = {
   supabaseUrl: '',
   supabaseAnonKey: '',
+  // Offentlig nøgle til push-beskeder (VAPID). Den private del ligger kun i Supabase.
+  vapidPublicKey: '',
 };
