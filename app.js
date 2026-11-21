@@ -562,7 +562,7 @@
     $('#btn-login').disabled = true; $('#login-msg').textContent = '';
     try {
       await Store.login(f.email.value.trim(), f.password.value);
-      f.reset(); showApp(true); rerenderAll(); showSyncStatus();
+      f.reset(); showApp(true); rerenderAll(); showSyncStatus(); startFmkImport();
     } catch (err) {
       $('#login-msg').textContent = err.message || 'Kunne ikke logge ind.';
     } finally {
@@ -575,13 +575,97 @@
     showApp(false);
   });
 
+  // ---------- hent fra FMK (bogmærket "Send til appen") ----------
+  const FMK_ORIGIN = 'https://fmk-online.dk';
+  const normName = n => String(n || '').toLowerCase().replace(/[®"“”']/g, '').replace(/\s+/g, ' ').trim();
+  let fmkHandled = null;
+
+  function applyFmk(data) {
+    if (!data || data.type !== 'fmk-data' || fmkHandled === data.hentet) return null;
+    fmkHandled = data.hentet;
+    const person = Store.settings.people[0];
+    const res = { updated: 0, added: [], empty: [], ctr: null };
+
+    if (data.ctr && data.ctr.saldo != null) {
+      const ctr = { ...(Store.settings.ctr || {}) };
+      ctr[person] = { saldo: data.ctr.saldo, periodEnd: data.ctr.periodEnd || '', updatedOn: new Date().toISOString().slice(0, 10), kilde: 'FMK' };
+      Store.saveSettings({ ctr });
+      res.ctr = ctr[person];
+    }
+
+    // Saml recepter pr. præparat
+    const byName = new Map();
+    for (const r of data.recepter || []) {
+      const k = normName(r.name);
+      if (!byName.has(k)) byName.set(k, []);
+      byName.get(k).push(r);
+    }
+    const closed = s => /afsluttet|annuller|udløbet|seponeret/i.test(s || '');
+    for (const [k, list] of byName) {
+      const open = list.filter(r => !closed(r.status));
+      const left = open.reduce((n, r) => n + Math.max(0, (r.total || 0) - (r.udleveret || 0)), 0);
+      const pick = (open.length ? open : list).reduce((a, b) => (b.gyldigTil > a.gyldigTil ? b : a));
+      const fields = { udleveringer: left, receptUdloeb: open.length ? pick.gyldigTil : '' };
+      const existing = Store.meds.find(m => normName(m.name) === k && m.kind !== 'handkob');
+      if (existing) {
+        Store.upsertMed({ id: existing.id, ...fields });
+        res.updated++;
+      } else if (open.length) {
+        Store.upsertMed({
+          name: pick.name, strength: [pick.styrke, pick.form && pick.form.toLowerCase()].filter(Boolean).join(' '),
+          person, kind: 'recept', status: 'hentet', tilskud: true,
+          note: [pick.dosering, pick.indikation].filter(Boolean).join('. '), ...fields,
+        });
+        res.added.push(pick.name);
+      }
+      if (open.length === 0 || left === 0) res.empty.push(pick.name);
+    }
+    renderList();
+    return res;
+  }
+
+  function showFmkResult(res) {
+    const lines = [];
+    if (res.ctr) lines.push(`CTR-saldo: ${CTR.kr(res.ctr.saldo)}, periode til ${res.ctr.periodEnd ? fmtDate(res.ctr.periodEnd) + ' ' + res.ctr.periodEnd.slice(0, 4) : '?'}.`);
+    lines.push(`${res.updated} præparater opdateret med receptinfo.`);
+    if (res.added.length) lines.push(`Nye fra FMK: ${res.added.join(', ')}.`);
+    if (res.empty.length) lines.push(`Ingen udleveringer tilbage (skal fornyes hos lægen): ${res.empty.join(', ')}.`);
+    $('#fmk-result').innerHTML = lines.map(l => `<p>${esc(l)}</p>`).join('');
+    $('#dlg-fmk').showModal();
+  }
+
+  function startFmkImport() {
+    if (location.hash !== '#fmk-import' || !window.opener) return;
+    history.replaceState(null, '', location.pathname);
+    const opener = window.opener;
+    window.addEventListener('message', e => {
+      if (e.origin !== FMK_ORIGIN) return;
+      const res = applyFmk(e.data);
+      if (res) { opener.postMessage('fmk-done', FMK_ORIGIN); showFmkResult(res); clearInterval(ping); }
+    });
+    const ping = setInterval(() => { try { opener.postMessage('fmk-ready', FMK_ORIGIN); } catch { clearInterval(ping); } }, 1000);
+    setTimeout(() => clearInterval(ping), 120000);
+  }
+
+  // Bogmærket bygges ud fra fmk-hent.js
+  async function fillFmkBookmark() {
+    try {
+      const code = await (await fetch('fmk-hent.js', { cache: 'no-store' })).text();
+      const body = code.replace(/^\s*\/\/.*$/gm, '');
+      $('#fmk-bookmark').href = 'javascript:' + encodeURIComponent(body);
+    } catch { /* uden net */ }
+  }
+  $('#fmk-bookmark').addEventListener('click', e => { e.preventDefault(); toast('Træk knappen op i bogmærkelinjen i stedet for at klikke.'); });
+
   // ---------- start ----------
   (async () => {
     const res = await Store.init({ onChange: rerenderAll, onError: toast });
+    fillFmkBookmark();
     if (res.needsLogin) { showApp(false); return; }
     showApp(true);
     rerenderAll();
     showSyncStatus();
+    startFmkImport();
   })();
   // Hent det nyeste, når man vender tilbage til appen
   document.addEventListener('visibilitychange', async () => {

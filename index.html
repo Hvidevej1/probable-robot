@@ -76,6 +76,11 @@
       </label>
       <button id="btn-save-settings">Gem</button>
 
+      <h2>Hent fra FMK</h2>
+      <p class="hint">Hent recepter, udleveringer og CTR-saldo fra fmk-online.dk med ét tryk. Første gang: Træk den grønne knap herunder op i Chromes bogmærkelinje (tryk Ctrl+Shift+B, hvis linjen ikke ses). Derefter: Log ind på fmk-online.dk med MitID, og tryk på bogmærket “Send til appen”.</p>
+      <p><a id="fmk-bookmark" class="button" href="#">Send til appen</a></p>
+      <p class="hint"><a href="https://fmk-online.dk" target="_blank" rel="noopener noreferrer">Åbn fmk-online.dk</a></p>
+
       <h2>CTR-saldo (medicintilskud)</h2>
       <p class="hint">Saldoen viser, hvor meget tilskudsberettiget medicin I har købt i jeres tilskudsperiode. Jo højere saldo, jo mindre betaler I selv. I kan se saldo og udløbsdato på sundhed.dk (log ind med MitID) eller spørge på apoteket. Appen lægger selv nye køb til, når I trykker “Hentet”.</p>
       <div id="ctr-fields"></div>
@@ -175,6 +180,12 @@
     <video id="scan-video" playsinline muted></video>
     <p id="scan-msg" class="hint">Hold stregkoden på pakken foran kameraet.</p>
     <div class="row end"><button id="btn-scan-close" class="secondary">Luk</button></div>
+  </dialog>
+
+  <dialog id="dlg-fmk">
+    <h2>Opdateret fra FMK</h2>
+    <div id="fmk-result"></div>
+    <form method="dialog" class="row end"><button>OK</button></form>
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
