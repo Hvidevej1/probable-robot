@@ -106,7 +106,7 @@
       ? `Vaccine: intet offentligt tilskud. Pris ${CTR.kr(p.full)}, “danmark” giver op til ${CTR.kr(p.danmark)} (50 %) tilbage. Reelt fra ${CTR.kr(p.full - p.danmark)}`
       : `Vaccine: intet offentligt tilskud. Pris ${CTR.kr(p.full)}`;
     if (!p.tilskud) return p.danmark ? `Pris ${CTR.kr(p.full)}, “danmark” giver ${CTR.kr(p.danmark)} tilbage. Reelt ${CTR.kr(p.full - p.danmark)}` : `Pris: ${CTR.kr(p.full)}`;
-    if (p.pay === null) return `Pris uden tilskud: ${CTR.kr(p.full)} (skriv CTR-saldo under “Mere” for at se jeres pris)`;
+    if (p.pay === null) return `Pris uden tilskud: ${CTR.kr(p.full)} (hent CTR-saldo fra FMK for at se din pris)`;
     if (p.danmark) {
       const net = Math.max(0, p.pay - p.danmark);
       return `På apoteket ca. ${CTR.kr(p.pay)}, “danmark” giver ${CTR.kr(p.danmark)} tilbage. Reelt ${CTR.kr(net)} (uden tilskud ${CTR.kr(p.full)})`;
