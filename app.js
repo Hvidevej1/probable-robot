@@ -5,11 +5,10 @@
 
   const STATUS = {
     bestil:  { label: 'Skal bestilles hos lægen', otcLabel: 'Skal købes', group: 'Skal bestilles' },
-    bestilt: { label: 'Bestilt, venter på apoteket', group: 'Bestilt' },
-    klar:    { label: 'Klar til afhentning på apoteket', group: 'Klar på apoteket' },
+    bestilt: { label: 'Bestilt, hentes på apoteket', group: 'Bestilt' },
     hentet:  { label: 'Hjemme', group: 'Hjemme' },
   };
-  const ORDER = ['bestil', 'bestilt', 'klar', 'hentet'];
+  const ORDER = ['bestil', 'bestilt', 'hentet'];
 
   // Opslag på min.medicin.dk. Kun produktets navn sendes med, aldrig hvem det er til.
   const lookupUrl = name => 'https://min.medicin.dk/Search/Search/Search/' + encodeURIComponent(String(name).trim());
@@ -41,6 +40,7 @@
   }
   // En vare "hjemme" der snart slipper op, tæller som "skal bestilles"
   function effectiveStatus(m) {
+    if (m.status === 'klar') return 'bestilt'; // gammel status, findes ikke længere
     if (m.status === 'hentet') {
       const d = daysUntil(m.runsOut);
       if (d !== null && d <= Number(Store.settings.remindDays || 10)) return 'bestil';
@@ -145,7 +145,6 @@
     } else {
       actions = btn('bestilt', ordered ? 'Bestilt ✓' : 'Bestil', eff === 'bestil')
               + btn('hentet', 'Afhentet', ordered);
-      if (m.status === 'bestilt') actions += btn('klar', 'Klar på apoteket', false);
     }
     const rx = otc ? '' : receptText(m);
 
@@ -220,6 +219,7 @@
     $('#btn-delete').hidden = isNew;
     formMed.dataset.id = m?.id || '';
     const v = { kind: 'recept', status: 'bestil', person: Store.settings.people[0], ...(m || {}) };
+    if (v.status === 'klar') v.status = 'bestilt';
     for (const k of ['name', 'strength', 'person', 'kind', 'status', 'runsOut', 'note']) formMed[k].value = v[k] || '';
     formMed.price.value = v.price === '' || v.price == null ? '' : String(v.price).replace('.', ',');
     formMed.receptUdloeb.value = v.receptUdloeb || '';

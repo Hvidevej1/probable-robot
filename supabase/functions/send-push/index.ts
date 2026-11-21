@@ -8,7 +8,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.119.0";
 
 const TEXT: Record<string, (n: string, p: string, otc: boolean) => string> = {
   bestil: (n, p, otc) => otc ? `${n} skal købes (${p}).` : `${n} skal bestilles hos lægen (${p}).`,
-  klar: (n, p) => `${n} er klar til afhentning på apoteket (${p}).`,
+  bestilt: (n, p) => `${n} er bestilt (${p}). Husk at hente den på apoteket.`,
 };
 
 Deno.serve(async (req) => {
