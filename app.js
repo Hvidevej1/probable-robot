@@ -81,8 +81,14 @@
     return g ? Math.round(ctrPart * g[0] + extra * g[1]) / 100 : 0;
   }
   function priceText(m) {
-    const t = priceTextCore(m);
-    return t && m.prisOpdateret ? `${t} · pris fra medicinpriser.dk ${fmtDate(m.prisOpdateret)}` : t;
+    let t = priceTextCore(m);
+    // Findes der et billigere kopiprodukt? Så vis hvad det koster for jer.
+    const own = parsePrice(m.price), cheap = parsePrice(m.billigstPris);
+    if (t && own && cheap && cheap < own - 0.5 && m.billigstVarenr !== m.varenr) {
+      const c = priceTextCore({ ...m, price: cheap });
+      t += ` · Billigste kopi: ${m.billigstNavn} (${CTR.kr(cheap)}). ${c.replace(/^Pris: /, 'Pris ').replace(/ \(uden tilskud.*\)$/, '')}. Spørg efter den på apoteket.`;
+    }
+    return t && m.prisOpdateret ? `${t} · priser fra medicinpriser.dk ${fmtDate(m.prisOpdateret)}` : t;
   }
   function priceTextCore(m) {
     const p = myPrice(m);

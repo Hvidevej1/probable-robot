@@ -3,6 +3,9 @@
 alter table meds add column if not exists varenr text;            -- varenummer fra FMK
 alter table meds add column if not exists tilskudspris numeric;   -- "Tilskud beregnes af"
 alter table meds add column if not exists pris_opdateret date;    -- hvornår prisen sidst blev hentet
+alter table meds add column if not exists billigst_navn text;     -- billigste kopiprodukt med samme pakning
+alter table meds add column if not exists billigst_varenr text;
+alter table meds add column if not exists billigst_pris numeric;
 
 create extension if not exists pg_cron;
 create extension if not exists pg_net;

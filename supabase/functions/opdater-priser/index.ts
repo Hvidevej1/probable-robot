@@ -12,10 +12,25 @@ async function lookup(varenr: string) {
     headers: { "User-Agent": "Mozilla/5.0 (vores-medicin prisopslag)" },
   });
   if (!res.ok) return null;
-  const text = (await res.text()).replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
+  const html = await res.text();
+  const clean = (s: string) => s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  const text = clean(html);
   const pris = num(/Pris pr\. pakning\s*([\d.]+,\d+)\s*kr/.exec(text)?.[1]);
   const tilskud = num(/Tilskud beregnes af\s*([\d.]+,\d+)\s*kr/.exec(text)?.[1]);
-  return pris ? { pris, tilskud } : null;
+  const pakning = /Pakning\s+(.+?)\s+Virksomt stof/.exec(text)?.[1] ?? "";
+  // Substituerbare lægemidler (kopiprodukter): apoteket skal tilbyde det billigste,
+  // og tilskuddet beregnes ud fra det billigste. Find det billigste med samme pakning.
+  let billigst: { navn: string; varenr: string; pris: number } | null = null;
+  for (const row of html.split(/<tr[\s>]/i).slice(1)) {
+    const id = /id=["']mvnr(\d+)["']/.exec(row);
+    const title = /title=["']([^"']+)["']/.exec(row);
+    if (!id || !title) continue;
+    const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((c) => clean(c[1]));
+    const p = num(cells[cells.length - 1]?.replace(/[^\d.,]/g, ""));
+    if (!p || (pakning && cells[2] && cells[2] !== pakning)) continue;
+    if (!billigst || p < billigst.pris) billigst = { navn: title[1].replace(/&quot;/g, "\"").replace(/&amp;/g, "&").replace(/\s*\d+$/, ""), varenr: id[1], pris: p };
+  }
+  return pris ? { pris, tilskud, billigst } : null;
 }
 
 Deno.serve(async () => {
@@ -27,8 +42,11 @@ Deno.serve(async () => {
     try {
       const p = await lookup(m.varenr);
       if (!p) { result.push(`${m.name}: ikke fundet`); continue; }
-      await db.from("meds").update({ price: p.pris, tilskudspris: p.tilskud, pris_opdateret: today }).eq("id", m.id);
-      result.push(`${m.name}: ${p.pris} kr.`);
+      await db.from("meds").update({
+        price: p.pris, tilskudspris: p.tilskud, pris_opdateret: today,
+        billigst_navn: p.billigst?.navn ?? null, billigst_varenr: p.billigst?.varenr ?? null, billigst_pris: p.billigst?.pris ?? null,
+      }).eq("id", m.id);
+      result.push(`${m.name}: ${p.pris} kr.${p.billigst ? `, billigst ${p.billigst.navn} ${p.billigst.pris} kr.` : ""}`);
     } catch (e) {
       result.push(`${m.name}: fejl ${(e as Error).message}`);
     }
