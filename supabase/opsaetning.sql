@@ -83,6 +83,9 @@ create policy "medlemmer" on push_subscriptions for all to authenticated using (
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on meds, products, settings, push_subscriptions to authenticated;
 grant execute on function is_member to authenticated;
+-- Funktionen send-push læser med service_role-nøglen og skal også have adgang
+grant usage on schema public to service_role;
+grant select, insert, update, delete on meds, products, settings, push_subscriptions, members to service_role;
 
 -- Så den anden telefon får ændringer med det samme
 alter publication supabase_realtime add table meds, products, settings;
