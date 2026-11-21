@@ -709,7 +709,7 @@
       $('#fmk-bookmark').href = 'javascript:' + encodeURIComponent(body);
     } catch { /* uden net */ }
   }
-  $('#fmk-bookmark').addEventListener('click', e => { e.preventDefault(); toast('Træk knappen op i bogmærkelinjen i stedet for at klikke.'); });
+  $('#fmk-bookmark').addEventListener('click', e => { e.preventDefault(); toast('Knappen virker ikke herinde. Træk den op i bogmærkelinjen, og tryk på den der, mens du er logget ind på fmk-online.dk.'); });
 
   // ---------- start ----------
   (async () => {
