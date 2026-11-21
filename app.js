@@ -330,6 +330,7 @@
       formMed.kind.value = 'handkob';
       formMed.tilskud.checked = false;
       if (!formMed.price.value && p.price) formMed.price.value = String(p.price).replace('.', ',');
+      applyKind();
       updateCopayHint();
     }
   });
