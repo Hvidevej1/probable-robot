@@ -61,7 +61,7 @@
   }
 
   // ---------- CTR / pris ----------
-  const ctrOf = person => (Store.settings.ctr || {})[person];
+  const ctrOf = owner => Store.ctrOf(owner);
   const parsePrice = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return isFinite(n) && n > 0 ? n : null; };
   // Hvad koster pakken for denne person lige nu?
   function myPrice(m) {
@@ -70,10 +70,10 @@
     if (m.kind === 'handkob') return { pay: price, full: price, tilskud: false };
     if (m.tilskud === false) {
       // Receptmedicin uden offentligt tilskud: "danmark" gruppe 1/2 giver 50 %, gruppe 5 25 % (max 3.000/1.500 kr. pr. år)
-      const pct = (DANMARK[String(ctrOf(m.person)?.danmark || '')] || [0, 0, 0])[2];
+      const pct = (DANMARK[String(ctrOf(m.owner)?.danmark || '')] || [0, 0, 0])[2];
       return { pay: price, full: price, tilskud: false, danmark: Math.round(price * pct) / 100 };
     }
-    const info = ctrOf(m.person);
+    const info = ctrOf(m.owner);
     if (!info || (info.saldo == null && !info.periodEnd)) return { pay: null, full: price, tilskud: true };
     // Tilskud beregnes kun af tilskudsprisen (prisen på den billigste tilsvarende pakning).
     // Er pakken dyrere, betaler man selv forskellen fuldt ud.
@@ -115,11 +115,10 @@
   }
 
   function renderCtrSummary() {
-    const who = $('#filter-person').value;
-    const people = Store.settings.people.filter(p => p && (who === 'alle' || who === p));
+    const people = [Store.viewOwner];
     const lines = people.map(p => {
       const info = ctrOf(p);
-      if (!info) return '';
+      if (!info || info.saldo == null) return '';
       const saldo = CTR.activeSaldo(info);
       let end = '';
       if (info.periodEnd) {
@@ -128,7 +127,7 @@
           : `Udløber ${esc(fmtDate(info.periodEnd))} ${new Date(info.periodEnd).getFullYear()} ` +
             (d <= 30 ? `<span class="soon">(om ${d} dage)</span>` : `(om ${d} dage)`);
       }
-      return `<div class="line"><b>${esc(p)}</b>: CTR-saldo ${CTR.kr(saldo)}, ${CTR.currentPct(saldo)} % tilskud nu. ${end}</div>`;
+      return `<div class="line">CTR-saldo ${CTR.kr(saldo)}, ${CTR.currentPct(saldo)} % tilskud nu. ${end}</div>`;
     }).filter(Boolean);
     $('#ctr-summary').innerHTML = lines.length ? `<div class="ctr-box">${lines.join('')}</div>` : '';
   }
@@ -144,23 +143,17 @@
   }
 
   // ---------- liste ----------
+  // Hvis medicinliste: ens egen, eller en man har fuldmagt til
   function fillPersonSelects() {
-    const people = Store.settings.people.filter(Boolean);
+    const owners = Store.owners();
     const filter = $('#filter-person');
-    const cur = filter.value || 'alle';
-    filter.innerHTML = `<option value="alle">Begge</option>` + people.map(p => `<option>${esc(p)}</option>`).join('');
-    filter.value = [...filter.options].some(o => o.value === cur) ? cur : 'alle';
-    $('#form-med').person.innerHTML = people.map(p => `<option>${esc(p)}</option>`).join('') + (people.length > 1 ? `<option value="Fælles">Fælles</option>` : '');
-    // Kun én person: skjul valg af person
-    const single = people.length <= 1;
-    document.querySelector('.filter').hidden = single;
-    $('#form-med').person.closest('label').hidden = single;
-    if (single) filter.value = 'alle';
+    filter.innerHTML = owners.map(o => `<option value="${esc(o.id)}">${esc(o.id === Store.me ? (o.name ? o.name + ' (mig)' : 'Mig') : o.name)}</option>`).join('');
+    filter.value = Store.viewOwner;
+    document.querySelector('.filter').hidden = owners.length <= 1;
   }
 
   function renderList() {
-    const who = $('#filter-person').value;
-    const meds = Store.meds.filter(m => who === 'alle' || m.person === who || m.person === 'Fælles');
+    const meds = Store.meds.filter(m => (m.owner || '') === Store.viewOwner);
     const groups = Object.fromEntries(ORDER.map(s => [s, []]));
     meds.forEach(m => groups[effectiveStatus(m)].push(m));
     // Mest akutte først
@@ -201,7 +194,7 @@
     const rx = otc ? '' : receptText(m);
 
     return `<article class="card s-${eff}">
-      <div class="head"><button class="name linklike" data-act="edit" data-id="${m.id}" title="Detaljer">${esc(m.name)}</button><span class="who">${esc(m.person || '')}</span></div>
+      <div class="head"><button class="name linklike" data-act="edit" data-id="${m.id}" title="Detaljer">${esc(m.name)}</button></div>
       <div class="meta">${esc(meta)}</div>
       <div class="meta">${esc(label)}${m.runsOut ? ' · ' + esc(runsOutText(days)) + ` (${esc(fmtDate(m.runsOut))})` : ''}</div>
       ${autoFlag ? `<div class="warn">Snart tom. Husk at ${otc ? 'købe ny' : 'bestille hos lægen'}.</div>` : ''}
@@ -252,7 +245,7 @@
     renderList();
   });
 
-  $('#filter-person').addEventListener('change', renderList);
+  $('#filter-person').addEventListener('change', e => Store.setViewOwner(e.target.value));
 
   // ---------- dialog: medicin ----------
   const dlgMed = $('#dlg-med'), formMed = $('#form-med');
@@ -270,9 +263,9 @@
     $('#med-locked-hint').hidden = !locked;
     $('#btn-delete').hidden = isNew;
     formMed.dataset.id = m?.id || '';
-    const v = { kind: 'recept', status: 'bestil', person: Store.settings.people[0], ...(m || {}) };
+    const v = { kind: 'recept', status: 'bestil', ...(m || {}) };
     if (v.status === 'klar') v.status = 'bestilt';
-    for (const k of ['name', 'strength', 'person', 'kind', 'status', 'runsOut', 'note']) formMed[k].value = v[k] || '';
+    for (const k of ['name', 'strength', 'kind', 'status', 'runsOut', 'note']) formMed[k].value = v[k] || '';
     formMed.price.value = v.price === '' || v.price == null ? '' : String(v.price).replace('.', ',');
     formMed.receptUdloeb.value = v.receptUdloeb || '';
     formMed.udleveringer.value = v.udleveringer === '' || v.udleveringer == null ? '' : v.udleveringer;
@@ -289,7 +282,7 @@
   formMed.addEventListener('submit', e => {
     if (e.submitter?.value !== 'save') return;
     const med = {
-      name: formMed.name.value.trim(), strength: formMed.strength.value.trim(), person: formMed.person.value,
+      name: formMed.name.value.trim(), strength: formMed.strength.value.trim(),
       kind: formMed.kind.value, status: formMed.status.value, runsOut: formMed.runsOut.value, note: formMed.note.value.trim(),
       price: parsePrice(formMed.price.value) ?? '', tilskud: formMed.tilskud.checked,
       receptUdloeb: formMed.receptUdloeb.value,
@@ -303,10 +296,10 @@
     renderList();
   });
   function updateCopayHint() {
-    const m = { price: formMed.price.value, tilskud: formMed.tilskud.checked, kind: formMed.kind.value, person: formMed.person.value };
+    const m = { price: formMed.price.value, tilskud: formMed.tilskud.checked, kind: formMed.kind.value, owner: Store.viewOwner };
     $('#med-copay').textContent = priceText(m);
   }
-  ['price', 'tilskud', 'person'].forEach(k => formMed[k].addEventListener('input', updateCopayHint));
+  ['price', 'tilskud'].forEach(k => formMed[k].addEventListener('input', updateCopayHint));
   // Håndkøb: ingen recept- eller tilskudsfelter, og kun "skal købes" / "købt"
   function applyKind() {
     const otc = formMed.kind.value === 'handkob';
@@ -476,16 +469,17 @@
   }
 
   // ---------- indstillinger ----------
+  // CTR for de lister, man har adgang til. Saldo og udløb kommer kun fra FMK.
   function fillCtrFields() {
-    $('#ctr-fields').innerHTML = Store.settings.people.filter(Boolean).map((p, i) => {
-      const info = ctrOf(p) || {};
+    $('#ctr-fields').innerHTML = Store.owners().map((o, i) => {
+      const info = ctrOf(o.id) || {};
       return `<div class="ctr-person">
-        <b>${esc(p)}</b>
+        <b>${esc(o.name)}</b>
         <p class="ctr-readonly">${info.saldo != null
           ? `Saldo: <b>${esc(CTR.kr(info.saldo))}</b> · udløber ${info.periodEnd ? esc(fmtDate(info.periodEnd) + ' ' + info.periodEnd.slice(0, 4)) : '?'}<br><span class="hint">Hentet fra FMK ${info.updatedOn ? esc(fmtDate(info.updatedOn) + ' ' + info.updatedOn.slice(0, 4)) : ''}</span>`
           : '<span class="hint">Ingen saldo endnu. Den hentes med “Send til appen” fra FMK.</span>'}</p>
         <label class="stack">Sygeforsikringen “danmark”
-          <select data-ctr="danmark" data-i="${i}">
+          <select data-ctr="danmark" data-owner="${esc(o.id)}">
             ${[['', 'Ikke medlem'], ['2', 'Gruppe 2 (højeste)'], ['1', 'Gruppe 1'], ['5', 'Gruppe 5'], ['basis', 'Basis (intet medicintilskud)']].map(([v, t]) => `<option value="${v}" ${String(info.danmark || '') === v ? 'selected' : ''}>${t}</option>`).join('')}
           </select>
         </label>
@@ -493,42 +487,57 @@
     }).join('');
   }
   $('#btn-save-ctr').addEventListener('click', () => {
-    const ctr = { ...(Store.settings.ctr || {}) };
-    Store.settings.people.forEach((p, i) => {
-      if (!p) return;
-      // Kun "danmark"-gruppen kan vælges her. Saldo og udløbsdato kommer kun fra FMK.
-      const danmark = document.querySelector(`[data-ctr=danmark][data-i="${i}"]`).value;
-      if (!ctr[p] && !danmark) return;
-      ctr[p] = { ...(ctr[p] || {}), danmark };
+    document.querySelectorAll('[data-ctr=danmark]').forEach(sel => {
+      const owner = sel.dataset.owner;
+      if (!Store.ctrOf(owner) && !sel.value) return;
+      saved(Store.saveCtr(owner, { danmark: sel.value }));
     });
-    saved(Store.saveSettings({ ctr }));
     renderList();
     toast('Gemt');
   });
 
+  // ---------- fuldmagt ----------
+  function fillFuldmagt() {
+    if (!Store.cloud) { $('#fuldmagt').innerHTML = ''; return; }
+    const me = Store.me;
+    const given = Store.grants.filter(g => g.owner === me);
+    const got = Store.grants.filter(g => g.grantee === me);
+    const others = Store.users.filter(u => u.id !== me && !given.some(g => g.grantee === u.id));
+    const row = (text, owner, grantee) => `<li><span>${esc(text)}</span> <button class="secondary small" data-revoke="${esc(owner)}|${esc(grantee)}">Fjern</button></li>`;
+    $('#fuldmagt').innerHTML = `
+      <p class="hint">Med fuldmagt kan en anden se og passe din medicin: bestille, hente og få push-beskeder om den. Du kan altid fjerne den igen.</p>
+      <h3>Har fuldmagt til min medicin</h3>
+      ${given.length ? `<ul class="plain">${given.map(g => row(Store.nameOf(g.grantee), g.owner, g.grantee)).join('')}</ul>` : '<p class="hint">Ingen.</p>'}
+      ${others.length ? `<div class="row"><select id="fuldmagt-ny">${others.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')}</select><button id="btn-fuldmagt">Giv fuldmagt</button></div>` : ''}
+      <h3>Jeg har fuldmagt til</h3>
+      ${got.length ? `<ul class="plain">${got.map(g => row(Store.nameOf(g.owner), g.owner, g.grantee)).join('')}</ul>` : '<p class="hint">Ingen.</p>'}`;
+  }
+  $('#fuldmagt').addEventListener('click', async e => {
+    try {
+      if (e.target.id === 'btn-fuldmagt') {
+        const id = $('#fuldmagt-ny').value;
+        if (!confirm(`Give ${Store.nameOf(id)} fuldmagt til at se og passe din medicin?`)) return;
+        await Store.grant(id); toast('Fuldmagt givet');
+      }
+      const r = e.target.dataset.revoke;
+      if (r) {
+        const [owner, grantee] = r.split('|');
+        if (!confirm('Fjerne fuldmagten?')) return;
+        await Store.revoke(owner, grantee); toast('Fuldmagt fjernet');
+      }
+    } catch (err) { toast('Det lykkedes ikke: ' + err.message); }
+    fillFuldmagt(); fillCtrFields(); fillPersonSelects(); renderList();
+  });
+
   function fillSettings() {
     fillCtrFields();
+    fillFuldmagt();
     showPushStatus();
-    $('#person1').value = Store.settings.people[0] || '';
-    $('#person2').value = Store.settings.people[1] || '';
     $('#remind-days').value = Store.settings.remindDays;
   }
   $('#btn-save-settings').addEventListener('click', () => {
-    const oldPeople = Store.settings.people.slice();
-    const people = [$('#person1').value.trim() || oldPeople[0] || 'Mig', $('#person2').value.trim()];
-    // Omdøb personen på eksisterende medicin
-    Store.meds.forEach(m => {
-      const i = oldPeople.indexOf(m.person);
-      if (i >= 0 && people[i] !== oldPeople[i]) Store.upsertMed({ id: m.id, person: people[i] });
-    });
-    const ctr = {};
-    for (const [k, v] of Object.entries(Store.settings.ctr || {})) {
-      const i = oldPeople.indexOf(k);
-      ctr[i >= 0 ? people[i] : k] = v;
-    }
-    saved(Store.saveSettings({ people, ctr, remindDays: Math.max(1, Number($('#remind-days').value) || 10) }));
-    fillCtrFields();
-    fillPersonSelects(); renderList();
+    saved(Store.saveSettings({ remindDays: Math.max(1, Number($('#remind-days').value) || 10) }));
+    renderList();
     toast('Gemt');
   });
 
@@ -695,14 +704,13 @@
   function applyFmk(data) {
     if (!data || data.type !== 'fmk-data' || fmkHandled === data.hentet) return null;
     fmkHandled = data.hentet;
-    const person = Store.settings.people[0];
-    const res = { updated: 0, added: [], empty: [], ctr: null };
+    // FMK-data lægges på den liste, der vises (ens egen eller en man har fuldmagt til)
+    const owner = Store.viewOwner;
+    const res = { updated: 0, added: [], empty: [], ctr: null, who: Store.nameOf(owner) };
 
     if (data.ctr && data.ctr.saldo != null) {
-      const ctr = { ...(Store.settings.ctr || {}) };
-      ctr[person] = { saldo: data.ctr.saldo, periodEnd: data.ctr.periodEnd || '', updatedOn: new Date().toISOString().slice(0, 10), kilde: 'FMK', danmark: ctr[person]?.danmark || '' };
-      Store.saveSettings({ ctr });
-      res.ctr = ctr[person];
+      Store.saveCtr(owner, { saldo: data.ctr.saldo, periodEnd: data.ctr.periodEnd || '', updatedOn: new Date().toISOString().slice(0, 10) });
+      res.ctr = Store.ctrOf(owner);
     }
 
     // Saml recepter pr. præparat
@@ -719,14 +727,14 @@
       const pick = (open.length ? open : list).reduce((a, b) => (b.gyldigTil > a.gyldigTil ? b : a));
       const fields = { udleveringer: left, receptUdloeb: open.length ? pick.gyldigTil : '' };
       if (pick.varenr) fields.varenr = pick.varenr;
-      const existing = Store.meds.find(m => normName(m.name) === k && m.kind !== 'handkob');
+      const existing = Store.meds.find(m => (m.owner || '') === owner && normName(m.name) === k && m.kind !== 'handkob');
       if (existing) {
         Store.upsertMed({ id: existing.id, ...fields });
         res.updated++;
       } else if (open.length) {
         Store.upsertMed({
           name: pick.name, strength: [pick.styrke, pick.form && pick.form.toLowerCase()].filter(Boolean).join(' '),
-          person, kind: 'recept', status: 'hentet', tilskud: true,
+          owner, kind: 'recept', status: 'hentet', tilskud: true,
           note: [pick.dosering, pick.indikation].filter(Boolean).join('. '), ...fields,
         });
         res.added.push(pick.name);
@@ -739,6 +747,7 @@
 
   function showFmkResult(res) {
     const lines = [];
+    if (res.who) lines.push(`Opdateret for ${res.who}.`);
     if (res.ctr) lines.push(`CTR-saldo: ${CTR.kr(res.ctr.saldo)}, periode til ${res.ctr.periodEnd ? fmtDate(res.ctr.periodEnd) + ' ' + res.ctr.periodEnd.slice(0, 4) : '?'}.`);
     lines.push(`${res.updated} præparater opdateret med receptinfo.`);
     if (res.added.length) lines.push(`Nye fra FMK: ${res.added.join(', ')}.`);

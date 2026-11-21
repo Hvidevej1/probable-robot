@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Medicin">
-  <link rel="stylesheet" href="style.css?v=202611212215">
+  <link rel="stylesheet" href="style.css?v=202611212240">
 </head>
 <body>
   <!-- Log ind (kun når den fælles liste er sat op) -->
@@ -40,7 +40,7 @@
     <!-- LISTE -->
     <section id="view-liste" class="view">
       <div class="filter">
-        <label>Vis for
+        <label>Vis medicin for
           <select id="filter-person"></select>
         </label>
       </div>
@@ -68,19 +68,17 @@
 
     <!-- MERE -->
     <section id="view-indstillinger" class="view" hidden>
-      <h2>Personer</h2>
-      <p class="hint">Navnene på dem, medicinen er til.</p>
-      <div class="row">
-        <input id="person1" placeholder="Fx Hans">
-        <input id="person2" placeholder="Person 2 (tom = kun én)">
-      </div>
+      <h2>Påmindelser</h2>
       <label class="stack">Mind mig om at bestille, når der er så mange dage tilbage
         <input id="remind-days" type="number" min="1" max="60">
       </label>
       <button id="btn-save-settings">Gem</button>
 
+      <h2>Fuldmagt</h2>
+      <div id="fuldmagt"></div>
+
       <h2>Hent fra FMK</h2>
-      <p class="hint">Hent recepter, udleveringer og CTR-saldo fra fmk-online.dk. Virker kun på computeren i Chrome, ikke på iPhone. Knappen herunder skal ikke trykkes på her i appen.</p>
+      <p class="hint">Hent recepter, udleveringer og CTR-saldo fra fmk-online.dk. Det lægges ind på den medicinliste, der vises lige nu. Virker kun på computeren i Chrome, ikke på iPhone. Knappen herunder skal ikke trykkes på her i appen.</p>
       <ol class="hint">
         <li><b>Kun første gang:</b> Hold musen nede på den grønne knap herunder, og træk den op i Chromes bogmærkelinje øverst (tryk Ctrl+Shift+B, hvis linjen ikke ses).</li>
         <li>Åbn fmk-online.dk, og log ind med MitID.</li>
@@ -128,9 +126,6 @@
       <datalist id="otc-names"></datalist>
       <label class="stack">Styrke / pakning
         <input name="strength" placeholder="Fx 500 mg, 100 stk.">
-      </label>
-      <label class="stack">Til
-        <select name="person"></select>
       </label>
       <label class="stack">Type
         <select name="kind">
@@ -220,12 +215,12 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=202611212215"></script>
+  <script src="config.js?v=202611212240"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script src="dagens.js?v=202611212215"></script>
-  <script src="ctr.js?v=202611212215"></script>
-  <script src="store.js?v=202611212215"></script>
-  <script src="csv.js?v=202611212215"></script>
-  <script src="app.js?v=202611212215"></script>
+  <script src="dagens.js?v=202611212240"></script>
+  <script src="ctr.js?v=202611212240"></script>
+  <script src="store.js?v=202611212240"></script>
+  <script src="csv.js?v=202611212240"></script>
+  <script src="app.js?v=202611212240"></script>
 </body>
 </html>

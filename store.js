@@ -16,12 +16,18 @@ const Store = (() => {
     settings: { people: ['Mig', 'Min kone'], remindDays: 10, ctr: {} },
     meds: [],
     products: [],
+    users: [],    // [{ id, name, email }] alle brugere af appen
+    grants: [],   // fuldmagter [{ owner, grantee }], hvor man selv er part
+    ctr: {},      // CTR pr. ejer-id { saldo, periodEnd, updatedOn, danmark }
   });
 
   let data = loadLocal();
   let hooks = { onChange() {}, onError() {} };
   let channel = null;
   let currentEmail = null;
+  let me = '';          // den indloggedes bruger-id
+  let viewOwner = '';   // hvis medicinliste der vises
+  const VIEW_KEY = 'vores-medicin-vis';
   let nameCache = null;
 
   function loadLocal() {
@@ -42,7 +48,7 @@ const Store = (() => {
 
   // ---- oversættelse mellem appen og databasens kolonner ----
   const medToRow = m => ({
-    id: m.id, name: m.name, strength: m.strength || null, person: m.person || null, kind: m.kind || 'recept',
+    id: m.id, name: m.name, strength: m.strength || null, kind: m.kind || 'recept', ...(m.owner ? { owner: m.owner } : {}),
     status: m.status || 'bestil', runs_out: m.runsOut || null, note: m.note || null, created: m.created, updated: m.updated,
     price: m.price === '' || m.price == null ? null : Number(m.price), tilskud: m.tilskud !== false, updated_by: currentEmail,
     recept_udloeb: m.receptUdloeb || null, udleveringer: m.udleveringer === '' || m.udleveringer == null ? null : Number(m.udleveringer),
@@ -50,7 +56,7 @@ const Store = (() => {
     billigst_navn: m.billigstNavn || null, billigst_varenr: m.billigstVarenr || null, billigst_pris: m.billigstPris === '' || m.billigstPris == null ? null : Number(m.billigstPris),
   });
   const rowToMed = r => ({
-    id: r.id, name: r.name, strength: r.strength || '', person: r.person || '', kind: r.kind, status: r.status,
+    id: r.id, name: r.name, strength: r.strength || '', owner: r.owner || '', kind: r.kind, status: r.status,
     runsOut: r.runs_out || '', note: r.note || '', created: r.created, updated: r.updated,
     price: r.price ?? '', tilskud: r.tilskud !== false,
     receptUdloeb: r.recept_udloeb || '', udleveringer: r.udleveringer ?? '',
@@ -60,6 +66,7 @@ const Store = (() => {
   const prodToRow = p => ({ id: p.id, name: p.name, strength: p.strength || null, pack: p.pack || null, price: p.price || null, varenr: p.varenr || null, ean: p.ean || null });
   const rowToProd = r => ({ id: r.id, name: r.name, strength: r.strength || '', pack: r.pack || '', price: r.price || '', varenr: r.varenr || '', ean: r.ean || '' });
 
+  const rowToCtr = r => ({ saldo: r.saldo == null ? null : Number(r.saldo), periodEnd: r.period_end || '', updatedOn: r.updated_on || '', danmark: r.danmark || '' });
   const rowToSettings = r => ({ people: r.people || ['Mig', 'Min kone'], remindDays: r.remind_days ?? 10, ctr: r.ctr || {} });
   const settingsToRow = st => ({ id: 1, people: st.people, remind_days: st.remindDays, ctr: st.ctr || {} });
 
@@ -82,13 +89,18 @@ const Store = (() => {
   }
 
   async function loadCloud() {
-    const [meds, products, settings] = await Promise.all([
+    const [meds, products, settings, ctr, grants, users] = await Promise.all([
       fetchAll('meds'), fetchAll('products'), sb.from('settings').select('*').eq('id', 1).maybeSingle(),
+      sb.from('ctr').select('*'), sb.from('fuldmagt').select('owner,grantee'), sb.rpc('app_users'),
     ]);
     if (settings.error) throw settings.error;
     data.meds = meds.map(rowToMed);
     data.products = products.map(rowToProd);
     if (settings.data) data.settings = rowToSettings(settings.data);
+    if (!ctr.error) data.ctr = Object.fromEntries(ctr.data.map(r => [r.owner, rowToCtr(r)]));
+    if (!grants.error) data.grants = grants.data;
+    if (!users.error) data.users = users.data;
+    pickView();
     saveLocal();
     hooks.onChange();
   }
@@ -112,6 +124,11 @@ const Store = (() => {
         }
         saveLocal(); hooks.onChange();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ctr' }, ev => {
+        if (ev.new && ev.new.owner) data.ctr[ev.new.owner] = rowToCtr(ev.new);
+        saveLocal(); hooks.onChange();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fuldmagt' }, () => { loadCloud().catch(() => {}); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, ev => {
         if (ev.new) data.settings = rowToSettings(ev.new);
         saveLocal(); hooks.onChange();
@@ -119,8 +136,50 @@ const Store = (() => {
       .subscribe();
   }
 
+  // Hvem må man se medicin for: en selv + dem, der har givet en fuldmagt
+  function owners() {
+    if (!cloud) return [{ id: '', name: '' }];
+    const ids = [me, ...data.grants.filter(g => g.grantee === me).map(g => g.owner)];
+    return [...new Set(ids)].map(id => ({ id, name: nameOf(id) }));
+  }
+  function nameOf(id) { const u = data.users.find(u => u.id === id); return u ? u.name : ''; }
+  function pickView() {
+    let saved = ''; try { saved = localStorage.getItem(VIEW_KEY) || ''; } catch { /* ingen lager */ }
+    const ids = owners().map(o => o.id);
+    viewOwner = ids.includes(viewOwner) ? viewOwner : ids.includes(saved) ? saved : (ids[0] || '');
+  }
+  async function setMe() {
+    const { data: s } = await sb.auth.getSession();
+    me = s.session?.user.id || '';
+    if (!viewOwner) viewOwner = me;
+  }
+
   return {
     cloud,
+    get me() { return me; },
+    get users() { return data.users; },
+    get grants() { return data.grants; },
+    owners, nameOf,
+    get viewOwner() { return viewOwner; },
+    setViewOwner(id) { viewOwner = id; try { localStorage.setItem(VIEW_KEY, id); } catch { /* ingen lager */ } hooks.onChange(); },
+    ctrOf(owner) { return data.ctr[owner] || null; },
+    // Gemmer CTR for en ejer (saldo/udløb kun fra FMK; "danmark"-gruppen vælges af brugeren)
+    saveCtr(owner, patch) {
+      const cur = data.ctr[owner] || {};
+      const c = data.ctr[owner] = { ...cur, ...patch };
+      if (cloud) push(sb.from('ctr').upsert({ owner, saldo: c.saldo ?? null, period_end: c.periodEnd || null, updated_on: c.updatedOn || null, danmark: c.danmark || '' }), 'CTR-saldoen');
+      return saveLocal();
+    },
+    async grant(grantee) {
+      const { error } = await sb.from('fuldmagt').insert({ owner: me, grantee });
+      if (error && !/duplicate/i.test(error.message)) throw new Error(error.message);
+      await loadCloud();
+    },
+    async revoke(owner, grantee) {
+      const { error } = await sb.from('fuldmagt').delete().eq('owner', owner).eq('grantee', grantee);
+      if (error) throw new Error(error.message);
+      await loadCloud();
+    },
     get settings() { return data.settings; },
     get meds() { return data.meds; },
     get products() { return data.products; },
@@ -132,6 +191,7 @@ const Store = (() => {
       const { data: s } = await sb.auth.getSession();
       if (!s.session) return { needsLogin: true };
       currentEmail = s.session.user.email;
+      await setMe();
       try { await loadCloud(); listen(); }
       catch (e) { hooks.onError('Kunne ikke hente den fælles liste. Viser den sidst gemte.'); }
       return { needsLogin: false, email: s.session.user.email };
@@ -140,12 +200,13 @@ const Store = (() => {
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Forkert e-mail eller adgangskode.' : error.message);
       currentEmail = email.toLowerCase();
+      await setMe();
       await loadCloud(); listen();
     },
     async logout() {
       if (channel) sb.removeChannel(channel);
       await sb.auth.signOut();
-      nameCache = null;
+      nameCache = null; me = ''; viewOwner = '';
       data = empty(); localStorage.removeItem(KEY);
     },
     async refresh() { if (cloud) { try { await loadCloud(); } catch { /* bruger det gemte */ } } },
@@ -186,7 +247,7 @@ const Store = (() => {
         if (i < 0) return false;
         full = data.meds[i] = { ...data.meds[i], ...med, updated: now };
       } else {
-        full = { ...med, id: id(), created: now, updated: now };
+        full = { owner: viewOwner || undefined, ...med, id: id(), created: now, updated: now };
         data.meds.push(full);
       }
       if (cloud) push(sb.from('meds').upsert(medToRow(full)), full.name);

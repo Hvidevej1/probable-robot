@@ -144,3 +144,7 @@ select:disabled { color: var(--muted); }
 .wait-box p { margin: 8px 0 0; }
 .spinner { width: 44px; height: 44px; margin: 0 auto 8px; border: 5px solid rgba(127,127,127,.3); border-top-color: var(--brand, #6cc2a8); border-radius: 50%; animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+ul.plain { list-style: none; padding: 0; margin: 0 0 8px; }
+ul.plain li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; }
+button.small { padding: 4px 12px; font-size: 0.9em; }
+#fuldmagt h3 { font-size: 1em; margin: 14px 0 4px; }
