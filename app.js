@@ -750,7 +750,7 @@
         $('#fmk-wait').hidden = true; opener.postMessage('fmk-done', FMK_ORIGIN); showFmkResult(res); clearInterval(ping);
         // Hent dagens priser fra medicinpriser.dk med det samme (ellers sker det hver morgen)
         const url = (window.MEDICIN_CONFIG || {}).supabaseUrl;
-        if (url) setTimeout(() => fetch(url + '/functions/v1/opdater-priser', { method: 'POST', body: '{}' })
+        if (url) setTimeout(() => fetch(url + '/functions/v1/opdater-priser', { method: 'POST', body: '{}', mode: 'no-cors' })
           .then(() => Store.refresh()).then(renderList).catch(() => {}), 3000);
       }
     });
