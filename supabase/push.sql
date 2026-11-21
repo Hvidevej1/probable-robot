@@ -1,7 +1,6 @@
 -- Push-beskeder: når medicin bliver sat til "skal bestilles" eller "bestilt",
--- sendes en besked til de andre telefoner.
--- Kør denne fil EFTER opsaetning.sql og efter at funktionen "send-push" er lagt op.
--- Ret de to steder med STORE BOGSTAVER først.
+-- kalder databasen funktionen send-push. Kør EFTER opsaetning.sql og efter at
+-- funktionen "send-push" er lagt op. Ret projekt-adressen, hvis den er en anden.
 
 create extension if not exists pg_net;
 
@@ -11,11 +10,9 @@ begin
   if new.status in ('bestil', 'bestilt')
      and (tg_op = 'INSERT' or old.status is distinct from new.status) then
     perform net.http_post(
-      url := 'https://DIT-PROJEKT-ID.supabase.co/functions/v1/send-push',
-      body := jsonb_build_object('name', new.name, 'person', new.person, 'status', new.status,
-                                 'kind', new.kind, 'by', new.updated_by),
-      headers := jsonb_build_object('Content-Type', 'application/json',
-                                    'x-push-secret', 'SAMME-HEMMELIGE-ORD-SOM-PUSH_SECRET')
+      url := 'https://andmqexhvvidvebsosgw.supabase.co/functions/v1/send-push',
+      body := jsonb_build_object('id', new.id),
+      headers := jsonb_build_object('Content-Type', 'application/json')
     );
   end if;
   return new;
