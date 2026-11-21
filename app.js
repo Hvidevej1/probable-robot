@@ -298,15 +298,8 @@
     if (!med.name) { e.preventDefault(); return; }
     if (formMed.dataset.id) med.id = formMed.dataset.id;
     saved(Store.upsertMed(med));
-    // Hentet med tilskud: læg købet til CTR-saldoen
-    const justPicked = med.status === 'hentet' && formMed.dataset.prevStatus && formMed.dataset.prevStatus !== 'hentet';
-    if (justPicked && med.tilskud && med.kind !== 'handkob' && med.price && Store.settings.people.includes(med.person)) {
-      const ctr = { ...(Store.settings.ctr || {}) };
-      const ctrPrice = Math.min(parsePrice(med.price) || 0, parsePrice(med.tilskudspris) ?? Infinity);
-      ctr[med.person] = { ...CTR.afterPurchase(ctr[med.person], ctrPrice), danmark: ctr[med.person]?.danmark || '' };
-      saved(Store.saveSettings({ ctr }));
-      toast(`Gemt. CTR-saldo for ${med.person} er nu ${CTR.kr(ctr[med.person].saldo)}`);
-    } else toast('Gemt');
+    // CTR-saldoen ændres kun via FMK-hentningen (Hans' ønske), ikke når noget hentes.
+    toast('Gemt');
     renderList();
   });
   function updateCopayHint() {
@@ -487,10 +480,9 @@
       const info = ctrOf(p) || {};
       return `<div class="ctr-person">
         <b>${esc(p)}</b>
-        <div class="row">
-          <label class="stack" style="flex:1">Saldo (kr.)<input data-ctr="saldo" data-i="${i}" inputmode="decimal" value="${esc(info.saldo != null ? String(info.saldo).replace('.', ',') : '')}"></label>
-          <label class="stack" style="flex:1">Udløber<input data-ctr="periodEnd" data-i="${i}" type="date" value="${esc(info.periodEnd || '')}"></label>
-        </div>
+        <p class="ctr-readonly">${info.saldo != null
+          ? `Saldo: <b>${esc(CTR.kr(info.saldo))}</b> · udløber ${info.periodEnd ? esc(fmtDate(info.periodEnd) + ' ' + info.periodEnd.slice(0, 4)) : '?'}<br><span class="hint">Hentet fra FMK ${info.updatedOn ? esc(fmtDate(info.updatedOn) + ' ' + info.updatedOn.slice(0, 4)) : ''}</span>`
+          : '<span class="hint">Ingen saldo endnu. Den hentes med “Send til appen” fra FMK.</span>'}</p>
         <label class="stack">Sygeforsikringen “danmark”
           <select data-ctr="danmark" data-i="${i}">
             ${[['', 'Ikke medlem'], ['2', 'Gruppe 2 (højeste)'], ['1', 'Gruppe 1'], ['5', 'Gruppe 5'], ['basis', 'Basis (intet medicintilskud)']].map(([v, t]) => `<option value="${v}" ${String(info.danmark || '') === v ? 'selected' : ''}>${t}</option>`).join('')}
@@ -503,16 +495,14 @@
     const ctr = { ...(Store.settings.ctr || {}) };
     Store.settings.people.forEach((p, i) => {
       if (!p) return;
-      const saldoRaw = document.querySelector(`[data-ctr=saldo][data-i="${i}"]`).value.trim();
-      const end = document.querySelector(`[data-ctr=periodEnd][data-i="${i}"]`).value;
+      // Kun "danmark"-gruppen kan vælges her. Saldo og udløbsdato kommer kun fra FMK.
       const danmark = document.querySelector(`[data-ctr=danmark][data-i="${i}"]`).value;
-      if (!saldoRaw && !end && !danmark) { delete ctr[p]; return; }
-      const saldo = Number(saldoRaw.replace(/\./g, '').replace(',', '.')) || 0;
-      ctr[p] = { saldo, periodEnd: end, updatedOn: new Date().toISOString().slice(0, 10), danmark };
+      if (!ctr[p] && !danmark) return;
+      ctr[p] = { ...(ctr[p] || {}), danmark };
     });
     saved(Store.saveSettings({ ctr }));
     renderList();
-    toast('CTR-saldo gemt');
+    toast('Gemt');
   });
 
   function fillSettings() {
