@@ -4,8 +4,8 @@
 // fordi databasen selv kun lukker jeres to e-mailadresser ind.
 // Læg ALDRIG "service_role"/"secret"-nøglen her.
 window.MEDICIN_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://andmqexhvvidvebsosgw.supabase.co',
+  supabaseAnonKey: 'sb_publishable_tJBHraZvhygUuo2XM2zRiw_U-BlK7VL',
   // Offentlig nøgle til push-beskeder (VAPID). Den private del ligger kun i Supabase.
   vapidPublicKey: '',
 };
