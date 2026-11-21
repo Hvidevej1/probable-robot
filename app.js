@@ -104,7 +104,12 @@
     const cur = filter.value || 'alle';
     filter.innerHTML = `<option value="alle">Begge</option>` + people.map(p => `<option>${esc(p)}</option>`).join('');
     filter.value = [...filter.options].some(o => o.value === cur) ? cur : 'alle';
-    $('#form-med').person.innerHTML = people.map(p => `<option>${esc(p)}</option>`).join('') + `<option value="Fælles">Fælles</option>`;
+    $('#form-med').person.innerHTML = people.map(p => `<option>${esc(p)}</option>`).join('') + (people.length > 1 ? `<option value="Fælles">Fælles</option>` : '');
+    // Kun én person: skjul valg af person
+    const single = people.length <= 1;
+    document.querySelector('.filter').hidden = single;
+    $('#form-med').person.closest('label').hidden = single;
+    if (single) filter.value = 'alle';
   }
 
   function renderList() {
@@ -451,7 +456,7 @@
   }
   $('#btn-save-settings').addEventListener('click', () => {
     const oldPeople = Store.settings.people.slice();
-    const people = [$('#person1').value.trim(), $('#person2').value.trim()].map((p, i) => p || oldPeople[i] || '');
+    const people = [$('#person1').value.trim() || oldPeople[0] || 'Mig', $('#person2').value.trim()];
     // Omdøb personen på eksisterende medicin
     Store.meds.forEach(m => {
       const i = oldPeople.indexOf(m.person);
