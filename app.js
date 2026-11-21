@@ -746,7 +746,13 @@
     window.addEventListener('message', e => {
       if (e.origin !== FMK_ORIGIN) return;
       const res = applyFmk(e.data);
-      if (res) { $('#fmk-wait').hidden = true; opener.postMessage('fmk-done', FMK_ORIGIN); showFmkResult(res); clearInterval(ping); }
+      if (res) {
+        $('#fmk-wait').hidden = true; opener.postMessage('fmk-done', FMK_ORIGIN); showFmkResult(res); clearInterval(ping);
+        // Hent dagens priser fra medicinpriser.dk med det samme (ellers sker det hver morgen)
+        const url = (window.MEDICIN_CONFIG || {}).supabaseUrl;
+        if (url) setTimeout(() => fetch(url + '/functions/v1/opdater-priser', { method: 'POST', body: '{}' })
+          .then(() => Store.refresh()).then(renderList).catch(() => {}), 3000);
+      }
     });
     const ping = setInterval(() => { try { opener.postMessage('fmk-ready', FMK_ORIGIN); } catch { clearInterval(ping); } }, 1000);
     setTimeout(() => {
