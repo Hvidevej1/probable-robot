@@ -56,6 +56,13 @@
     const price = parsePrice(m.price);
     if (price === null) return null;
     if (m.kind === 'handkob') return { pay: price, full: price, tilskud: false };
+    if (isVaccine(m)) {
+      // Vacciner: intet offentligt tilskud (CTR), undtagen gratis vaccinationsprogrammer.
+      // "danmark" (2026) giver 50 % for medlemmer på 26 år og derover i gruppe 1, 2 og 5.
+      const g = String(ctrOf(m.owner)?.danmark || '');
+      const pct = ['1', '2', '5'].includes(g) ? VACCINE_PCT : 0;
+      return { pay: price, full: price, tilskud: false, vaccine: true, danmark: Math.round(price * pct) / 100 };
+    }
     if (m.tilskud === false) {
       // Receptmedicin uden offentligt tilskud: "danmark" gruppe 1/2 giver 50 %, gruppe 5 25 % (max 3.000/1.500 kr. pr. år)
       const pct = (DANMARK[String(ctrOf(m.owner)?.danmark || '')] || [0, 0, 0])[2];
@@ -71,6 +78,8 @@
     const pay = Math.round((ctrPart + extra) * 100) / 100;
     return { pay, full: price, tilskud: true, danmark: danmarkBack(info.danmark, ctrPart, extra) };
   }
+  const VACCINE_PCT = 50;
+  const isVaccine = m => m.kind === 'vaccine' || /vaccin|abrysvo|arexvy|prevenar|pneumovax|capvaxive|shingrix|vaxigrip|influvac|efluelda|comirnaty|spikevax|boostrix|diteboost|twinrix|havrix|engerix|gardasil|encepur|ticovac|dukoral|vivotif|ixiaro|rabipur|verorab/i.test(m.name || '');
   // Sygeforsikringen "danmark" (2026): tilskud af egenbetalingen for medicin med
   // offentligt tilskud, købt som den billigste pakning. Gruppe 1 og 2: 100 %, gruppe 5: 50 %.
   // (Dyrere pakning end den billigste: kun en del af merprisen dækkes. Det regner appen ikke med.)
@@ -93,6 +102,9 @@
   function priceTextCore(m) {
     const p = myPrice(m);
     if (!p) return '';
+    if (p.vaccine) return p.danmark
+      ? `Vaccine: intet offentligt tilskud. Pris ${CTR.kr(p.full)}, “danmark” giver op til ${CTR.kr(p.danmark)} (50 %) tilbage. Reelt fra ${CTR.kr(p.full - p.danmark)}`
+      : `Vaccine: intet offentligt tilskud. Pris ${CTR.kr(p.full)}`;
     if (!p.tilskud) return p.danmark ? `Pris ${CTR.kr(p.full)}, “danmark” giver ${CTR.kr(p.danmark)} tilbage. Reelt ${CTR.kr(p.full - p.danmark)}` : `Pris: ${CTR.kr(p.full)}`;
     if (p.pay === null) return `Pris uden tilskud: ${CTR.kr(p.full)} (skriv CTR-saldo under “Mere” for at se jeres pris)`;
     if (p.danmark) {
@@ -166,7 +178,7 @@
     const otc = m.kind === 'handkob';
     const autoFlag = eff !== m.status;
     const label = eff === 'bestil' && otc ? STATUS.bestil.otcLabel : STATUS[eff].label;
-    const meta = [m.strength, otc ? 'Håndkøb' : 'Recept'].filter(Boolean).join(' · ');
+    const meta = [m.strength, otc ? 'Håndkøb' : isVaccine(m) ? 'Vaccine' : 'Recept'].filter(Boolean).join(' · ');
 
     // Altid både "skal afhentes" og "afhentet". Den knap, der passer til status, er fremhævet.
     // "Skal afhentes" sender en push-besked med det samme og igen efter 3 dage, hvis den ikke er hentet.
@@ -298,9 +310,12 @@
       : ORDER.map(s => `<option value="${s}">${STATUS[s].label}</option>`).join('');
     formMed.status.value = otc && cur === 'bestilt' ? 'bestil' : cur;
     if (!formMed.status.value) formMed.status.value = 'bestil';
+    const vac = formMed.kind.value === 'vaccine';
+    formMed.tilskud.closest('label').hidden = vac;
+    if (vac) formMed.tilskud.checked = false;
     if (otc) { formMed.tilskud.checked = false; formMed.udleveringer.value = ''; formMed.receptUdloeb.value = ''; }
   }
-  formMed.kind.addEventListener('change', () => { formMed.tilskud.checked = formMed.kind.value !== 'handkob'; applyKind(); updateCopayHint(); });
+  formMed.kind.addEventListener('change', () => { formMed.tilskud.checked = formMed.kind.value === 'recept'; applyKind(); updateCopayHint(); });
 
   // Når man vælger et kendt håndkøbsprodukt i navnefeltet, udfyldes styrke og type
   formMed.name.addEventListener('change', () => {
