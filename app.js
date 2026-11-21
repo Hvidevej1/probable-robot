@@ -15,6 +15,18 @@
   const lookupLink = name => `<a class="lookup" href="${esc(lookupUrl(name))}" target="_blank" rel="noopener noreferrer">Slå op på min.medicin.dk</a>`;
 
   // ---------- hjælpere ----------
+  // Apoteket-appen (Danmarks Apotekerforening) har intet direkte link til et bestemt produkt.
+  // Linket åbner appen via App Store ("Åbn"), og navnet kopieres, så det kan sættes ind i appens søgning.
+  const APOTEKET_APP = 'https://apps.apple.com/dk/app/apoteket/id1511142405';
+  const apoteketLink = name => `<a class="lookup apoteket" href="${APOTEKET_APP}" target="_blank" rel="noopener noreferrer" data-name="${esc(name)}">Lager og pris i Apoteket-appen</a>`;
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a.apoteket');
+    if (!a) return;
+    const name = a.dataset.name || '';
+    try { navigator.clipboard?.writeText(name); } catch {}
+    toast(`"${name}" er kopieret. Tryk "Åbn" og sæt navnet ind i søgningen i Apoteket-appen.`);
+  });
+
   function toast(msg) {
     const t = $('#toast');
     t.textContent = msg; t.classList.add('show');
@@ -196,7 +208,7 @@
       ${rx ? `<div class="meta ${rx.warn ? 'warn' : ''}">${esc(rx.text)}</div>` : ''}
       ${priceText(m) ? `<div class="meta price">${esc(priceText(m))}</div>` : ''}
       ${m.note ? `<div class="meta">${esc(m.note)}</div>` : ''}
-      <div class="meta links">${otc ? '' : `<a class="lookup" href="https://fmk-online.dk" target="_blank" rel="noopener noreferrer">Se i FMK</a> · `}${lookupLink(m.name)}</div>
+      <div class="meta links">${otc ? '' : `<a class="lookup" href="https://fmk-online.dk" target="_blank" rel="noopener noreferrer">Se i FMK</a> · `}${lookupLink(m.name)} · ${apoteketLink(m.name)}</div>
       <div class="actions">${actions}</div>
     </article>`;
   }
