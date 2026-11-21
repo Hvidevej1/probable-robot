@@ -157,7 +157,7 @@
       ${rx ? `<div class="meta ${rx.warn ? 'warn' : ''}">${esc(rx.text)}</div>` : ''}
       ${priceText(m) ? `<div class="meta price">${esc(priceText(m))}</div>` : ''}
       ${m.note ? `<div class="meta">${esc(m.note)}</div>` : ''}
-      <div class="meta links">${otc ? '' : `<a class="lookup" href="https://fmk-online.dk" target="_blank" rel="noopener noreferrer">Ret i FMK</a> · `}${lookupLink(m.name)}</div>
+      <div class="meta links">${otc ? '' : `<a class="lookup" href="https://fmk-online.dk" target="_blank" rel="noopener noreferrer">Se i FMK</a> · `}${lookupLink(m.name)}</div>
       <div class="actions">${actions}</div>
     </article>`;
   }
@@ -186,6 +186,11 @@
     if (!m) return;
     const act = b.dataset.act;
     if (act === 'edit') return openMed(m);
+    if (act === 'bestilt' && m.kind !== 'handkob' && m.udleveringer !== '' && Number(m.udleveringer) === 0) {
+      // Ingen udleveringer tilbage: lægen skal forny recepten
+      window.open('https://www.sundhed.dk/borger/min-side/min-sundhedsjournal/medicinkortet/', '_blank', 'noopener');
+      toast('Recepten er brugt op. Bed lægen om fornyelse på sundhed.dk (fanen Receptfornyelse).');
+    }
     if (act === 'hentet') {
       // Spørg hvornår den nye pakke slipper op
       openMed({ ...m, status: 'hentet', runsOut: '' }, 'Hvornår slipper den nye pakke op?');
@@ -206,7 +211,12 @@
     formMed.reset();
     fillOtcDatalist();
     const isNew = !m || !m.id;
-    $('#dlg-med-title').textContent = title || (isNew ? 'Tilføj medicin' : 'Ret medicin');
+    // Receptmedicin ordineres af lægen; i appen kan man kun rette sine egne noter
+    const locked = !isNew && (m.kind || 'recept') !== 'handkob';
+    $('#dlg-med-title').textContent = title || (isNew ? 'Tilføj medicin' : locked ? 'Dine noter' : 'Ret håndkøbsprodukt');
+    formMed.name.readOnly = formMed.strength.readOnly = locked;
+    formMed.kind.disabled = locked;
+    $('#med-locked-hint').hidden = !locked;
     $('#btn-delete').hidden = isNew;
     formMed.dataset.id = m?.id || '';
     const v = { kind: 'recept', status: 'bestil', person: Store.settings.people[0], ...(m || {}) };
