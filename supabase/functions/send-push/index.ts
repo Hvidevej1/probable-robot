@@ -1,8 +1,10 @@
 // Supabase Edge Function "send-push": sender push-besked til jeres telefoner.
 // Databasen kalder den (se supabase/push.sql) med id på et præparat, når det
-// bliver sat til "skal bestilles" eller "bestilt". Funktionen slår selv
+// bliver sat til "skal bestilles" eller "skal afhentes". Funktionen slår selv
 // præparatet op og sender kun, hvis det netop er ændret. Derfor kan et kald
 // udefra højst udløse en besked om noget, der faktisk lige er sket.
+// Hver time kaldes den også med { remind: true }: alt, der har stået som
+// "skal afhentes" i 3 dage uden at være hentet, giver én ny påmindelse.
 // Kræver hemmelighederne VAPID_PUBLIC_KEY og VAPID_PRIVATE_KEY.
 // "Verify JWT" skal være slået FRA for denne funktion.
 import webpush from "npm:web-push@3.6.7";
@@ -10,27 +12,18 @@ import { createClient } from "npm:@supabase/supabase-js@2.119.0";
 
 const TEXT: Record<string, (n: string, otc: boolean) => string> = {
   bestil: (n, otc) => (otc ? `${n} skal købes.` : `${n} skal bestilles.`),
-  bestilt: (n) => `${n} er bestilt. Husk at hente den på apoteket.`,
+  bestilt: (n) => `${n} skal afhentes på apoteket.`,
 };
+const DAYS = 3;
 
-Deno.serve(async (req) => {
-  let id = "";
-  try { id = String((await req.json()).id || ""); } catch { /* tomt kald */ }
-  if (!id) return new Response("Mangler id", { status: 400 });
-
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data: med } = await db.from("meds").select("name,status,kind,updated").eq("id", id).maybeSingle();
-  if (!med || !TEXT[med.status]) return new Response("Ingen besked", { status: 200 });
-  if (Date.now() - new Date(med.updated).getTime() > 2 * 60 * 1000) return new Response("For gammel", { status: 200 });
-
+async function sendAll(db: ReturnType<typeof createClient>, body: string) {
   webpush.setVapidDetails(
     "https://vores-medicin.vercel.app",
     Deno.env.get("VAPID_PUBLIC_KEY")!,
     Deno.env.get("VAPID_PRIVATE_KEY")!,
   );
   const { data: subs } = await db.from("push_subscriptions").select("*");
-  const payload = JSON.stringify({ title: "Vores medicin", body: TEXT[med.status](med.name, med.kind === "handkob") });
-
+  const payload = JSON.stringify({ title: "Vores medicin", body });
   let sent = 0;
   for (const s of subs ?? []) {
     try {
@@ -41,5 +34,36 @@ Deno.serve(async (req) => {
       if (code === 404 || code === 410) await db.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
     }
   }
-  return new Response(JSON.stringify({ sent }), { headers: { "Content-Type": "application/json" } });
+  return sent;
+}
+
+const json = (o: unknown) => new Response(JSON.stringify(o), { headers: { "Content-Type": "application/json" } });
+
+Deno.serve(async (req) => {
+  let body: { id?: string; remind?: boolean } = {};
+  try { body = await req.json(); } catch { /* tomt kald */ }
+  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  // Påmindelse: står stadig som "skal afhentes" efter 3 dage
+  if (body.remind) {
+    const before = new Date(Date.now() - DAYS * 86400000).toISOString();
+    const { data: due } = await db.from("meds").select("id,name,updated,reminded")
+      .eq("status", "bestilt").lt("updated", before);
+    const list = (due ?? []).filter((m) => !m.reminded || m.reminded < m.updated);
+    if (!list.length) return json({ sent: 0 });
+    const names = list.map((m) => m.name);
+    const text = names.length === 1
+      ? `${names[0]} er stadig ikke hentet på apoteket. Tryk Afhentet i appen, når den er hentet.`
+      : `Disse er stadig ikke hentet på apoteket: ${names.join(", ")}. Tryk Afhentet i appen, når de er hentet.`;
+    const sent = await sendAll(db, text);
+    await db.from("meds").update({ reminded: new Date().toISOString() }).in("id", list.map((m) => m.id));
+    return json({ sent, reminded: names.length });
+  }
+
+  const id = String(body.id || "");
+  if (!id) return new Response("Mangler id", { status: 400 });
+  const { data: med } = await db.from("meds").select("name,status,kind,updated").eq("id", id).maybeSingle();
+  if (!med || !TEXT[med.status]) return new Response("Ingen besked", { status: 200 });
+  if (Date.now() - new Date(med.updated).getTime() > 2 * 60 * 1000) return new Response("For gammel", { status: 200 });
+  return json({ sent: await sendAll(db, TEXT[med.status](med.name, med.kind === "handkob")) });
 });

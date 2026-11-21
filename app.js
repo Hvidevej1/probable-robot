@@ -5,7 +5,7 @@
 
   const STATUS = {
     bestil:  { label: 'Skal bestilles hos lægen', otcLabel: 'Skal købes', group: 'Skal bestilles' },
-    bestilt: { label: 'Bestilt, hentes på apoteket', group: 'Bestilt' },
+    bestilt: { label: 'Skal afhentes på apoteket', group: 'Skal afhentes' },
     hentet:  { label: 'Hjemme', group: 'Hjemme' },
   };
   const ORDER = ['bestil', 'bestilt', 'hentet'];
@@ -141,14 +141,15 @@
     const label = eff === 'bestil' && otc ? STATUS.bestil.otcLabel : STATUS[eff].label;
     const meta = [m.strength, otc ? 'Håndkøb' : 'Recept'].filter(Boolean).join(' · ');
 
-    // Altid både "bestil" og "afhentet". Den knap, der passer til status, er fremhævet.
+    // Altid både "skal afhentes" og "afhentet". Den knap, der passer til status, er fremhævet.
+    // "Skal afhentes" sender en push-besked med det samme og igen efter 3 dage, hvis den ikke er hentet.
     const ordered = m.status === 'bestilt' || m.status === 'klar';
     const btn = (act, text, main) => `<button class="${main ? '' : 'secondary'}" data-act="${act}" data-id="${m.id}">${text}</button>`;
     let actions;
     if (otc) {
       actions = btn('bestil', 'Skal købes', false) + btn('hentet', 'Købt', eff === 'bestil');
     } else {
-      actions = btn('bestilt', ordered ? 'Bestilt ✓' : 'Bestil', eff === 'bestil')
+      actions = btn('bestilt', ordered ? 'Skal afhentes ✓' : 'Skal afhentes', eff === 'bestil')
               + btn('hentet', 'Afhentet', ordered);
     }
     const rx = otc ? '' : receptText(m);

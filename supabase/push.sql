@@ -21,3 +21,15 @@ end $$;
 drop trigger if exists meds_push on meds;
 create trigger meds_push after insert or update on meds
   for each row execute function notify_push();
+
+-- Påmindelse: hver time tjekkes, om noget har stået som "skal afhentes" i 3 dage.
+alter table meds add column if not exists reminded timestamptz;  -- sidste påmindelse
+create extension if not exists pg_cron;
+select cron.unschedule('afhent-paamindelse') where exists (select 1 from cron.job where jobname = 'afhent-paamindelse');
+select cron.schedule('afhent-paamindelse', '0 * * * *', $$
+  select net.http_post(
+    url := 'https://andmqexhvvidvebsosgw.supabase.co/functions/v1/send-push',
+    body := '{"remind": true}'::jsonb,
+    headers := '{"Content-Type": "application/json"}'::jsonb
+  );
+$$);

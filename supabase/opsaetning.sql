@@ -20,7 +20,8 @@ create table if not exists meds (
   updated timestamptz default now(),
   price numeric,              -- tilskudspris i kr.
   tilskud boolean default true,
-  updated_by text             -- e-mail på den, der sidst rettede
+  updated_by text,            -- e-mail på den, der sidst rettede
+  reminded timestamptz        -- sidste påmindelse om at hente
 );
 alter table meds add column if not exists price numeric;
 alter table meds add column if not exists tilskud boolean default true;
