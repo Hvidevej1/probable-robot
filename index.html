@@ -20,6 +20,7 @@
       <label class="stack">E-mail <input name="email" type="email" autocomplete="username" required></label>
       <label class="stack">Adgangskode <input name="password" type="password" autocomplete="current-password" required></label>
       <button id="btn-login">Log ind</button>
+      <button type="button" id="btn-forgot" class="secondary">Glemt adgangskode?</button>
       <p id="login-msg" class="warn-text" role="alert"></p>
     </form>
   </section>
@@ -93,7 +94,10 @@
 
       <h2>Deling</h2>
       <p id="sync-status" class="hint"></p>
-      <button id="btn-logout" class="secondary" hidden>Log ud</button>
+      <div class="row">
+        <button id="btn-change-pw" class="secondary" hidden>Skift adgangskode</button>
+        <button id="btn-logout" class="secondary" hidden>Log ud</button>
+      </div>
 
       <h2>Sikkerhedskopi</h2>
       <p class="hint">Gem en kopi af listen som fil, eller hent en tidligere kopi ind.</p>
@@ -187,6 +191,20 @@
     <h2>Opdateret fra FMK</h2>
     <div id="fmk-result"></div>
     <form method="dialog" class="row end"><button>OK</button></form>
+  </dialog>
+
+  <dialog id="dlg-pw">
+    <form id="form-pw">
+      <h2>Vælg ny adgangskode</h2>
+      <p class="hint">Mindst 8 tegn.</p>
+      <label class="stack">Ny adgangskode <input name="pw1" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="stack">Gentag adgangskode <input name="pw2" type="password" autocomplete="new-password" minlength="8" required></label>
+      <p id="pw-msg" class="warn-text" role="alert"></p>
+      <div class="row end">
+        <button type="button" class="secondary" id="btn-pw-cancel">Annuller</button>
+        <button>Gem</button>
+      </div>
+    </form>
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>

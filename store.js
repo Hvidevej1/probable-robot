@@ -6,8 +6,10 @@ const Store = (() => {
   const KEY = 'vores-medicin-v1';
   const cfg = window.MEDICIN_CONFIG || {};
   const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase);
+  // Kom man hertil fra mailen "nulstil adgangskode"? (læses før Supabase rydder adressen)
+  const recovery = /type=recovery/.test(location.hash);
   const sb = cloud ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
-    auth: { persistSession: true, autoRefreshToken: true, storageKey: 'vores-medicin-login' },
+    auth: { persistSession: true, autoRefreshToken: true, storageKey: 'vores-medicin-login', flowType: 'implicit' },
   }) : null;
 
   const empty = () => ({
@@ -141,6 +143,16 @@ const Store = (() => {
       data = empty(); localStorage.removeItem(KEY);
     },
     async refresh() { if (cloud) { try { await loadCloud(); } catch { /* bruger det gemte */ } } },
+    recovery,
+    // Sender en mail med et link, hvor man kan vælge en ny adgangskode
+    async resetPassword(email) {
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' });
+      if (error) throw new Error(error.message);
+    },
+    async changePassword(pw) {
+      const { error } = await sb.auth.updateUser({ password: pw });
+      if (error) throw new Error(/should be different/i.test(error.message) ? 'Den nye adgangskode skal være forskellig fra den gamle.' : error.message);
+    },
     async userEmail() { if (!cloud) return null; const { data: s } = await sb.auth.getSession(); return s.session?.user.email || null; },
 
     saveSettings(s) {

@@ -566,6 +566,7 @@
     const email = await Store.userEmail();
     $('#sync-status').textContent = `Fælles liste. Du er logget ind som ${email}. Ændringer ses med det samme på den andens telefon.`;
     $('#btn-logout').hidden = false;
+    $('#btn-change-pw').hidden = false;
   }
   function showApp(on) {
     $('#login').hidden = on;
@@ -585,6 +586,33 @@
       $('#btn-login').disabled = false;
     }
   });
+  // Glemt adgangskode: send en mail med link til at vælge en ny
+  $('#btn-forgot').addEventListener('click', async () => {
+    const email = $('#form-login').email.value.trim();
+    if (!email) { $('#login-msg').textContent = 'Skriv din e-mail først, og tryk så "Glemt adgangskode?" igen.'; return; }
+    $('#btn-forgot').disabled = true;
+    try {
+      await Store.resetPassword(email);
+      $('#login-msg').textContent = 'Tjek din e-mail. Tryk på linket i mailen for at vælge en ny adgangskode. Kig også i spam.';
+    } catch (err) {
+      $('#login-msg').textContent = 'Kunne ikke sende mailen: ' + (err.message || err);
+    } finally { $('#btn-forgot').disabled = false; }
+  });
+
+  // Skift adgangskode (fra Mere, eller efter linket i mailen)
+  const dlgPw = $('#dlg-pw'), formPw = $('#form-pw');
+  function openPw() { formPw.reset(); $('#pw-msg').textContent = ''; dlgPw.showModal(); }
+  $('#btn-change-pw').addEventListener('click', openPw);
+  $('#btn-pw-cancel').addEventListener('click', () => dlgPw.close());
+  formPw.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (formPw.pw1.value !== formPw.pw2.value) { $('#pw-msg').textContent = 'De to adgangskoder er ikke ens.'; return; }
+    try {
+      await Store.changePassword(formPw.pw1.value);
+      dlgPw.close(); toast('Din nye adgangskode er gemt');
+    } catch (err) { $('#pw-msg').textContent = err.message || 'Kunne ikke gemme adgangskoden.'; }
+  });
+
   $('#btn-logout').addEventListener('click', async () => {
     if (!confirm('Log ud på denne enhed?')) return;
     await Store.logout();
@@ -682,6 +710,7 @@
     rerenderAll();
     showSyncStatus();
     startFmkImport();
+    if (Store.recovery) openPw();
   })();
   // Hent det nyeste, når man vender tilbage til appen
   document.addEventListener('visibilitychange', async () => {
