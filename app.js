@@ -55,16 +55,34 @@
   function myPrice(m) {
     const price = parsePrice(m.price);
     if (price === null) return null;
-    if (m.tilskud === false || m.kind === 'handkob') return { pay: price, full: price, tilskud: false };
+    if (m.kind === 'handkob') return { pay: price, full: price, tilskud: false };
+    if (m.tilskud === false) {
+      // Receptmedicin uden offentligt tilskud: "danmark" gruppe 1/2 giver 50 %, gruppe 5 25 % (max 3.000/1.500 kr. pr. år)
+      const g = String(ctrOf(m.person)?.danmark || '');
+      const pct = { '1': 50, '2': 50, '5': 25 }[g] || 0;
+      return { pay: price, full: price, tilskud: false, danmark: Math.round(price * pct) / 100 };
+    }
     const info = ctrOf(m.person);
-    if (!info) return { pay: null, full: price, tilskud: true };
-    return { pay: CTR.copay(price, CTR.activeSaldo(info)), full: price, tilskud: true };
+    if (!info || (info.saldo == null && !info.periodEnd)) return { pay: null, full: price, tilskud: true };
+    const pay = CTR.copay(price, CTR.activeSaldo(info));
+    return { pay, full: price, tilskud: true, danmark: danmarkBack(info.danmark, pay) };
+  }
+  // Sygeforsikringen "danmark" (2026): tilskud af egenbetalingen for medicin med
+  // offentligt tilskud, købt som den billigste pakning. Gruppe 1 og 2: 100 %, gruppe 5: 50 %.
+  // (Dyrere pakning end den billigste: kun en del af merprisen dækkes. Det regner appen ikke med.)
+  function danmarkBack(gruppe, pay) {
+    const pct = { '1': 100, '2': 100, '5': 50 }[String(gruppe || '')];
+    return pct ? Math.round(pay * pct) / 100 : 0;
   }
   function priceText(m) {
     const p = myPrice(m);
     if (!p) return '';
-    if (!p.tilskud) return `Pris: ${CTR.kr(p.full)}`;
+    if (!p.tilskud) return p.danmark ? `Pris ${CTR.kr(p.full)}, “danmark” giver ${CTR.kr(p.danmark)} tilbage. Reelt ${CTR.kr(p.full - p.danmark)}` : `Pris: ${CTR.kr(p.full)}`;
     if (p.pay === null) return `Pris uden tilskud: ${CTR.kr(p.full)} (skriv CTR-saldo under “Mere” for at se jeres pris)`;
+    if (p.danmark) {
+      const net = Math.max(0, p.pay - p.danmark);
+      return `På apoteket ca. ${CTR.kr(p.pay)}, “danmark” giver ${CTR.kr(p.danmark)} tilbage. Reelt ${CTR.kr(net)} (uden tilskud ${CTR.kr(p.full)})`;
+    }
     return `Din pris ca. ${CTR.kr(p.pay)} (uden tilskud ${CTR.kr(p.full)})`;
   }
 
@@ -256,7 +274,7 @@
     const justPicked = med.status === 'hentet' && formMed.dataset.prevStatus && formMed.dataset.prevStatus !== 'hentet';
     if (justPicked && med.tilskud && med.kind !== 'handkob' && med.price && Store.settings.people.includes(med.person)) {
       const ctr = { ...(Store.settings.ctr || {}) };
-      ctr[med.person] = CTR.afterPurchase(ctr[med.person], med.price);
+      ctr[med.person] = { ...CTR.afterPurchase(ctr[med.person], med.price), danmark: ctr[med.person]?.danmark || '' };
       saved(Store.saveSettings({ ctr }));
       toast(`Gemt. CTR-saldo for ${med.person} er nu ${CTR.kr(ctr[med.person].saldo)}`);
     } else toast('Gemt');
@@ -444,6 +462,11 @@
           <label class="stack" style="flex:1">Saldo (kr.)<input data-ctr="saldo" data-i="${i}" inputmode="decimal" value="${esc(info.saldo != null ? String(info.saldo).replace('.', ',') : '')}"></label>
           <label class="stack" style="flex:1">Udløber<input data-ctr="periodEnd" data-i="${i}" type="date" value="${esc(info.periodEnd || '')}"></label>
         </div>
+        <label class="stack">Sygeforsikringen “danmark”
+          <select data-ctr="danmark" data-i="${i}">
+            ${[['', 'Ikke medlem'], ['2', 'Gruppe 2'], ['1', 'Gruppe 1'], ['5', 'Gruppe 5']].map(([v, t]) => `<option value="${v}" ${String(info.danmark || '') === v ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+        </label>
       </div>`;
     }).join('');
   }
@@ -453,9 +476,10 @@
       if (!p) return;
       const saldoRaw = document.querySelector(`[data-ctr=saldo][data-i="${i}"]`).value.trim();
       const end = document.querySelector(`[data-ctr=periodEnd][data-i="${i}"]`).value;
-      if (!saldoRaw && !end) { delete ctr[p]; return; }
+      const danmark = document.querySelector(`[data-ctr=danmark][data-i="${i}"]`).value;
+      if (!saldoRaw && !end && !danmark) { delete ctr[p]; return; }
       const saldo = Number(saldoRaw.replace(/\./g, '').replace(',', '.')) || 0;
-      ctr[p] = { saldo, periodEnd: end, updatedOn: new Date().toISOString().slice(0, 10) };
+      ctr[p] = { saldo, periodEnd: end, updatedOn: new Date().toISOString().slice(0, 10), danmark };
     });
     saved(Store.saveSettings({ ctr }));
     renderList();
@@ -656,7 +680,7 @@
 
     if (data.ctr && data.ctr.saldo != null) {
       const ctr = { ...(Store.settings.ctr || {}) };
-      ctr[person] = { saldo: data.ctr.saldo, periodEnd: data.ctr.periodEnd || '', updatedOn: new Date().toISOString().slice(0, 10), kilde: 'FMK' };
+      ctr[person] = { saldo: data.ctr.saldo, periodEnd: data.ctr.periodEnd || '', updatedOn: new Date().toISOString().slice(0, 10), kilde: 'FMK', danmark: ctr[person]?.danmark || '' };
       Store.saveSettings({ ctr });
       res.ctr = ctr[person];
     }
