@@ -34,6 +34,8 @@ body {
 .top h1 { margin: 0 0 8px; font-size: 1.4rem; }
 .top .greeting { margin: -4px 0 8px; opacity: .9; }
 .top .greeting:empty { display: none; }
+.top .dagens { margin: -6px 0 10px; font-size: .9rem; font-style: italic; opacity: .85; }
+.top .dagens:empty { display: none; }
 .tabs { display: flex; gap: 4px; }
 .tab {
   flex: 1; background: transparent; color: var(--brand-text); border: 0; border-bottom: 4px solid transparent;

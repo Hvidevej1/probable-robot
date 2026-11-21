@@ -575,6 +575,7 @@
       : h < 18 ? 'God eftermiddag' : h < 23 ? 'Godaften' : 'Godnat';
     const name = await Store.userName();
     $('#greeting').textContent = name ? `${g}, ${name}` : g;
+    if (window.dagens) $('#dagens').textContent = window.dagens();
   }
   function showApp(on) {
     if (on) showGreeting();
