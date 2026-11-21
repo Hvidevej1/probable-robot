@@ -142,11 +142,11 @@
         <select name="status"></select>
       </label>
       <label class="stack">Pris for pakken (kr.)
-        <input name="price" inputmode="decimal" placeholder="Pris uden tilskud, fx 245,50">
+        <input name="price" inputmode="decimal" placeholder="Fx 245,50">
       </label>
-      <label class="check"><input type="checkbox" name="tilskud"> Giver tilskud (tæller med i CTR-saldoen)</label>
-      <p id="med-copay" class="hint"></p>
-      <div class="row">
+      <label class="check rx-only"><input type="checkbox" name="tilskud"> Giver tilskud (tæller med i CTR-saldoen)</label>
+      <p id="med-copay" class="hint rx-only"></p>
+      <div class="row rx-only">
         <label class="stack" style="flex:1">Udleveringer tilbage på recepten
           <input name="udleveringer" type="number" min="0" inputmode="numeric">
         </label>

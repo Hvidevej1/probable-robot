@@ -232,6 +232,8 @@
     formMed.udleveringer.value = v.udleveringer === '' || v.udleveringer == null ? '' : v.udleveringer;
     formMed.tilskud.checked = v.tilskud !== undefined ? v.tilskud !== false : v.kind !== 'handkob';
     formMed.dataset.prevStatus = m?.id ? (Store.meds.find(x => x.id === m.id)?.status || '') : '';
+    applyKind();
+    formMed.status.value = v.kind === 'handkob' && v.status === 'bestilt' ? 'bestil' : v.status;
     updateCopayHint();
     dlgMed.showModal();
     if (isNew && !v.name) formMed.name.focus();
@@ -265,7 +267,19 @@
     $('#med-copay').textContent = priceText(m);
   }
   ['price', 'tilskud', 'person'].forEach(k => formMed[k].addEventListener('input', updateCopayHint));
-  formMed.kind.addEventListener('change', () => { formMed.tilskud.checked = formMed.kind.value !== 'handkob'; updateCopayHint(); });
+  // Håndkøb: ingen recept- eller tilskudsfelter, og kun "skal købes" / "købt"
+  function applyKind() {
+    const otc = formMed.kind.value === 'handkob';
+    formMed.classList.toggle('otc', otc);
+    const cur = formMed.status.value;
+    formMed.status.innerHTML = otc
+      ? `<option value="bestil">Skal købes</option><option value="hentet">Købt, haves derhjemme</option>`
+      : ORDER.map(s => `<option value="${s}">${STATUS[s].label}</option>`).join('');
+    formMed.status.value = otc && cur === 'bestilt' ? 'bestil' : cur;
+    if (!formMed.status.value) formMed.status.value = 'bestil';
+    if (otc) { formMed.tilskud.checked = false; formMed.udleveringer.value = ''; formMed.receptUdloeb.value = ''; }
+  }
+  formMed.kind.addEventListener('change', () => { formMed.tilskud.checked = formMed.kind.value !== 'handkob'; applyKind(); updateCopayHint(); });
 
   // Når man vælger et kendt håndkøbsprodukt i navnefeltet, udfyldes styrke og type
   formMed.name.addEventListener('change', () => {
