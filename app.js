@@ -618,7 +618,7 @@
         });
         res.added.push(pick.name);
       }
-      if (open.length === 0 || left === 0) res.empty.push(pick.name);
+      if (existing && (open.length === 0 || left === 0)) res.empty.push(existing.name);
     }
     renderList();
     return res;
