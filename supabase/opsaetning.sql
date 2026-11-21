@@ -76,6 +76,11 @@ create policy "medlemmer" on settings for all to authenticated using (is_member(
 drop policy if exists "medlemmer" on push_subscriptions;
 create policy "medlemmer" on push_subscriptions for all to authenticated using (is_member()) with check (is_member());
 
+-- Nye Supabase-projekter giver ikke selv adgang til tabeller lavet i SQL Editor
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on meds, products, settings, push_subscriptions to authenticated;
+grant execute on function is_member to authenticated;
+
 -- Så den anden telefon får ændringer med det samme
 alter publication supabase_realtime add table meds, products, settings;
 
