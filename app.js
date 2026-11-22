@@ -552,12 +552,45 @@
     const when = r.hver === 1 ? 'hver dag' : `${(HVER[r.hver] || `Hver ${r.hver}. dag`).toLowerCase()}, næste gang ${fmtDate(nextDate(r))}`;
     return `${r.tekst ? r.tekst + ': ' : ''}${what} kl. ${String(r.tid).slice(0, 5)}, ${when}`;
   }
+  // Navn og styrke på den medicin, påmindelsen gælder (fra listen og håndkøb)
+  const pickLabel = x => [x.name, x.strength].filter(Boolean).join(' ');
+  function chosenText(r) {
+    const meds = (r.med_ids || []).map(id => Store.meds.find(m => m.id === id)).filter(Boolean);
+    const prods = (r.produkt_ids || []).map(id => Store.products.find(p => p.id === id)).filter(Boolean);
+    return [...meds, ...prods].map(pickLabel).join(', ');
+  }
+  // Afkrydsningsliste: medicin fra de lister, man kan se, og håndkøbsprodukter
+  function fillPick(r) {
+    const selM = new Set(r.med_ids || []), selP = new Set(r.produkt_ids || []);
+    const owners = Store.owners();
+    const item = (kind, x, sel, sub = '') => `<label class="check" data-search="${esc((pickLabel(x) + ' ' + sub).toLowerCase())}"><input type="checkbox" data-pick="${kind}" value="${esc(x.id)}" ${sel ? 'checked' : ''}> <span>${esc(pickLabel(x))}${sub ? ` <small class="hint">${esc(sub)}</small>` : ''}</span></label>`;
+    const byName = (a, b) => a.name.localeCompare(b.name, 'da');
+    let html = '';
+    for (const o of owners) {
+      const meds = Store.meds.filter(m => (m.owner || '') === o.id).sort(byName);
+      if (!meds.length) continue;
+      const title = owners.length > 1 ? `Medicinlisten: ${o.id === Store.me ? 'min' : o.name}` : 'Fra medicinlisten';
+      html += `<p class="pick-head">${esc(title)}</p>` + meds.map(m => item('med', m, selM.has(m.id))).join('');
+    }
+    // Håndkøb: de valgte først, så resten
+    const prods = [...Store.products].sort((a, b) => (selP.has(b.id) - selP.has(a.id)) || byName(a, b));
+    if (prods.length) html += `<p class="pick-head">Håndkøb</p>` + prods.map(p => item('prod', p, selP.has(p.id), p.pack || '')).join('');
+    $('#paamind-pick').innerHTML = html || '<p class="hint">Der er ingen medicin på listen endnu.</p>';
+    const many = Store.meds.length + Store.products.length > 12;
+    $('#paamind-search').hidden = !many;
+    $('#paamind-search').value = '';
+  }
+  $('#paamind-search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#paamind-pick label[data-search]').forEach(l => { l.hidden = !!q && !l.dataset.search.includes(q); });
+  });
+  const picked = kind => [...document.querySelectorAll(`#paamind-pick input[data-pick="${kind}"]:checked`)].map(i => i.value);
   async function fillReminders() {
     const ul = $('#paamind-list');
     if (!Store.cloud) { ul.innerHTML = '<li class="hint">Påmindelser kræver den fælles liste.</li>'; return; }
     try { reminders = await Store.reminders(); } catch (err) { ul.innerHTML = `<li class="hint">Kunne ikke hente påmindelser: ${esc(err.message)}</li>`; return; }
     ul.innerHTML = reminders.length ? reminders.map(r => `<li class="${r.aktiv ? '' : 'off'}">
-        <label class="check"><input type="checkbox" data-toggle="${esc(r.id)}" ${r.aktiv ? 'checked' : ''} aria-label="Slået til"> <span>${esc(reminderText(r))}</span></label>
+        <label class="check"><input type="checkbox" data-toggle="${esc(r.id)}" ${r.aktiv ? 'checked' : ''} aria-label="Slået til"> <span>${esc(reminderText(r))}${chosenText(r) ? `<br><small class="hint">${esc(chosenText(r))}</small>` : ''}</span></label>
         <button class="secondary small" data-edit="${esc(r.id)}">Ret</button></li>`).join('')
       : '<li class="hint">Ingen påmindelser endnu. Tryk på en knap herunder for at lave en.</li>';
   }
@@ -575,6 +608,7 @@
     if (!formPaamind.hver.value) formPaamind.hver.value = '1';
     formPaamind.start_dato.value = r.start_dato;
     formPaamind.aktiv.checked = r.aktiv !== false;
+    fillPick(r);
     $('#btn-paamind-delete').hidden = !r.id;
     applyHver();
     dlgPaamind.showModal();
@@ -588,6 +622,7 @@
       await Store.saveReminder({
         id: editingReminder?.id, slags: f.slags.value, tekst: f.tekst.value.trim(), tid: f.tid.value,
         hver, start_dato: hver === 1 ? isoDate(new Date()) : (f.start_dato.value || isoDate(new Date())), aktiv: f.aktiv.checked,
+        med_ids: picked('med'), produkt_ids: picked('prod'),
       });
       toast('Påmindelsen er gemt');
     } catch (err) { toast('Kunne ikke gemme påmindelsen: ' + err.message); }

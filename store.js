@@ -304,7 +304,8 @@ const Store = (() => {
       return rows;
     },
     async saveReminder(r) {
-      const row = { slags: r.slags, tekst: r.tekst || null, tid: r.tid, start_dato: r.start_dato, hver: r.hver, aktiv: r.aktiv !== false };
+      const row = { slags: r.slags, tekst: r.tekst || null, tid: r.tid, start_dato: r.start_dato, hver: r.hver, aktiv: r.aktiv !== false,
+        med_ids: r.med_ids || [], produkt_ids: r.produkt_ids || [] };
       const q = r.id ? sb.from('paamindelser').update(row).eq('id', r.id) : sb.from('paamindelser').insert(row);
       const { error } = await q;
       if (error) throw new Error(error.message);

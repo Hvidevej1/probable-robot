@@ -16,6 +16,10 @@ create table if not exists paamindelser (
   created    timestamptz default now()
 );
 
+-- Hvilken medicin påmindelsen gælder (id'er fra medicinlisten og fra håndkøb)
+alter table paamindelser add column if not exists med_ids text[] not null default '{}';
+alter table paamindelser add column if not exists produkt_ids text[] not null default '{}';
+
 alter table paamindelser enable row level security;
 drop policy if exists "egne" on paamindelser;
 create policy "egne" on paamindelser for all to authenticated
@@ -24,7 +28,8 @@ grant select, insert, update, delete on paamindelser to authenticated, service_r
 
 -- Påmindelser, der skal sendes nu: tidspunktet er nået inden for de sidste
 -- 30 minutter, det er en dag, hvor den gælder, og den er ikke sendt i dag.
-create or replace function paamindelser_nu() returns setof paamindelser
+drop function if exists paamindelser_nu();
+create function paamindelser_nu() returns setof paamindelser
 language sql stable security definer set search_path = public as $$
   with nu as (select (now() at time zone 'Europe/Copenhagen') as t)
   select p.* from paamindelser p, nu

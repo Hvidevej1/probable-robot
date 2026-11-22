@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Medicin">
   <script>try{var t=localStorage.getItem('vores-medicin-tema');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
-  <link rel="stylesheet" href="style.css?v=202611221810">
+  <link rel="stylesheet" href="style.css?v=202611221905">
 </head>
 <body>
   <!-- Log ind (kun når den fælles liste er sat op) -->
@@ -252,6 +252,12 @@
       <label class="stack">Navn (valgfrit)
         <input name="tekst" placeholder="Fx Morgen, Aften" maxlength="40">
       </label>
+      <fieldset class="pick">
+        <legend>Hvilken medicin (valgfrit)</legend>
+        <p class="hint">Sæt flueben ved det, påmindelsen gælder. Navnet kommer med i beskeden.</p>
+        <input type="search" id="paamind-search" placeholder="Søg" hidden>
+        <div id="paamind-pick" class="pick-list"></div>
+      </fieldset>
       <label class="stack">Klokken
         <input name="tid" type="time" required>
       </label>
@@ -301,12 +307,12 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=202611221810"></script>
+  <script src="config.js?v=202611221905"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script src="dagens.js?v=202611221810"></script>
-  <script src="ctr.js?v=202611221810"></script>
-  <script src="store.js?v=202611221810"></script>
-  <script src="csv.js?v=202611221810"></script>
-  <script src="app.js?v=202611221810"></script>
+  <script src="dagens.js?v=202611221905"></script>
+  <script src="ctr.js?v=202611221905"></script>
+  <script src="store.js?v=202611221905"></script>
+  <script src="csv.js?v=202611221905"></script>
+  <script src="app.js?v=202611221905"></script>
 </body>
 </html>

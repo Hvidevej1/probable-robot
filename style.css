@@ -285,3 +285,11 @@ body[data-view]:not([data-view="liste"]) .top .greeting, body[data-view]:not([da
   :root[data-theme="hjerte"] .logo svg { animation: beat 1.6s ease-in-out infinite; transform-origin: center; }
 }
 :root[data-theme="hjerte"] .logo svg { fill: currentColor; }
+/* Vælg medicin i en påmindelse */
+fieldset.pick { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px 10px; margin: 10px 0; }
+fieldset.pick legend { font-weight: 600; padding: 0 4px; }
+fieldset.pick input[type=search] { width: 100%; margin-bottom: 6px; }
+.pick-list { max-height: 240px; overflow-y: auto; }
+.pick-list .check { margin: 6px 0; }
+.pick-list .check[hidden] { display: none; }
+.pick-head { font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 10px 0 2px; }

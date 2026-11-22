@@ -54,12 +54,33 @@ async function sendTo(db: ReturnType<typeof createClient>, users: string[], body
   return sent;
 }
 
-type Paamindelse = { id: string; user_id: string; slags: string; tekst: string | null; sendt: string | null };
-function paamindelseText(p: Paamindelse) {
+type Paamindelse = {
+  id: string; user_id: string; slags: string; tekst: string | null; sendt: string | null;
+  med_ids: string[] | null; produkt_ids: string[] | null;
+};
+// Navn og styrke på den valgte medicin. Kun medicin, brugeren selv ejer eller har fuldmagt til.
+async function chosenNames(db: ReturnType<typeof createClient>, p: Paamindelse) {
+  const names: string[] = [];
+  const label = (r: { name: string; strength?: string | null }) => [r.name, r.strength].filter(Boolean).join(" ");
+  if (p.med_ids?.length) {
+    const { data: g } = await db.from("fuldmagt").select("owner").eq("grantee", p.user_id);
+    const owners = [p.user_id, ...(g ?? []).map((r: { owner: string }) => r.owner)];
+    const { data } = await db.from("meds").select("name,strength").in("id", p.med_ids).in("owner", owners);
+    names.push(...(data ?? []).map(label));
+  }
+  if (p.produkt_ids?.length) {
+    const { data } = await db.from("products").select("name,strength").in("id", p.produkt_ids);
+    names.push(...(data ?? []).map(label));
+  }
+  return names;
+}
+async function paamindelseText(db: ReturnType<typeof createClient>, p: Paamindelse) {
   const pre = p.tekst ? `${p.tekst}: ` : "";
-  return p.slags === "doseringsaeske"
-    ? `${pre}I dag skal doseringsæsken fyldes.`
-    : `${pre}Husk at tage din medicin.`;
+  const names = await chosenNames(db, p);
+  if (p.slags === "doseringsaeske") {
+    return `${pre}I dag skal doseringsæsken fyldes.` + (names.length ? ` Med: ${names.join(", ")}.` : "");
+  }
+  return names.length ? `${pre}Husk at tage ${names.join(", ")}.` : `${pre}Husk at tage din medicin.`;
 }
 
 // Appen kalder funktionen fra browseren (prøvebesked), så den skal svare på CORS
@@ -86,7 +107,7 @@ Deno.serve(async (req) => {
       q = p.sendt ? q.eq("sendt", p.sendt) : q.is("sendt", null);
       const { data: claimed } = await q.select("id");
       if (!claimed?.length) continue;
-      sent += await sendTo(db, [p.user_id], paamindelseText(p), "paamindelse-" + p.id);
+      sent += await sendTo(db, [p.user_id], await paamindelseText(db, p), "paamindelse-" + p.id);
     }
     return json({ sent });
   }
