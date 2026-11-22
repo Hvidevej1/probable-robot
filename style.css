@@ -41,6 +41,45 @@
   }
 }
 
+/* Hjerte: dyb vinrød top med korallrødt hjerte, der slår stille og roligt */
+:root[data-theme="hjerte"] {
+  --head-1: #5c1427; --head-2: #8a2337; --head-text: #ffffff; --head-muted: #f6dfe3; --head-soft: rgba(255,255,255,.10);
+  --accent: #ef5a6b; --accent-ink: #b3263b; --accent-soft: #fde8eb; --on-accent: #ffffff;
+  --bg: #fcf6f7; --card: #ffffff; --text: #33222a; --heading: #5c1427; --muted: #725d65; --line: #f0dfe3;
+  --brand: #8a2337; --brand-text: #ffffff;
+  --bar: rgba(255,250,251,.95); --bar-line: #f0dfe3; --bar-text: #725d65; --bar-active: #8a2337;
+  --shadow: 0 1px 2px rgba(92,20,39,.05), 0 6px 18px rgba(92,20,39,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="hjerte"] {
+    --head-1: #2e0a14; --head-2: #4a1222; --head-muted: #ecc9d0;
+    --accent: #ff7a88; --accent-ink: #ff95a1; --accent-soft: #3f1822; --on-accent: #2e0a14;
+    --bg: #1c0d12; --card: #2a1419; --text: #f5e6ea; --heading: #fde8eb; --muted: #c9aab2; --line: #4a2630;
+    --brand: #ff7a88; --brand-text: #2e0a14;
+    --bar: rgba(28,13,18,.95); --bar-line: #4a2630; --bar-text: #c9aab2; --bar-active: #ff95a1;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+  }
+}
+/* Skumring: blå-lilla aftenhimmel med lavendel */
+:root[data-theme="skumring"] {
+  --head-1: #1f1d55; --head-2: #3d2c80; --head-text: #ffffff; --head-muted: #e2defa; --head-soft: rgba(255,255,255,.09);
+  --accent: #9d8cff; --accent-ink: #5b45c9; --accent-soft: #eeebff; --on-accent: #1f1d55;
+  --bg: #f6f5fc; --card: #ffffff; --text: #262540; --heading: #2a2470; --muted: #625f7c; --line: #e3e0f3;
+  --brand: #3d2c80; --brand-text: #ffffff;
+  --bar: rgba(250,249,255,.95); --bar-line: #e3e0f3; --bar-text: #625f7c; --bar-active: #3d2c80;
+  --shadow: 0 1px 2px rgba(31,29,85,.05), 0 6px 18px rgba(31,29,85,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="skumring"] {
+    --head-1: #120f33; --head-2: #241a52; --head-muted: #d6d0f5;
+    --accent-ink: #b8abff; --accent-soft: #2a2550; --on-accent: #120f33;
+    --bg: #100e24; --card: #1b1838; --text: #e9e7f8; --heading: #eeebff; --muted: #a9a4c9; --line: #322d5a;
+    --brand: #9d8cff; --brand-text: #120f33;
+    --bar: rgba(16,14,36,.95); --bar-line: #322d5a; --bar-text: #a9a4c9; --bar-active: #b8abff;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+  }
+}
+
 * { box-sizing: border-box; }
 html { font-size: 18px; }
 body {
@@ -224,12 +263,14 @@ details.panel > :last-child { margin-bottom: 16px; }
 
 /* Temavælger */
 .theme-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.theme-btn { flex-direction: column; gap: 6px; padding: 12px; background: var(--card); color: var(--text); border: 2px solid var(--line); border-radius: 12px; }
+.theme-btn { flex-direction: column; justify-content: flex-start; gap: 6px; padding: 12px; background: var(--card); color: var(--text); border: 2px solid var(--line); border-radius: 12px; }
 .theme-btn small { font-weight: 400; color: var(--muted); font-size: .8rem; }
 .theme-btn.active { border-color: var(--accent); background: var(--accent-soft); }
 .swatch { width: 100%; height: 40px; border-radius: 8px; }
 .sw-hav { background: linear-gradient(135deg, #0f3a4f 0 60%, #3bb59a 60%); }
 .sw-varm { background: linear-gradient(135deg, #f3e3cf 0 60%, #c8643b 60%); }
+.sw-hjerte { background: linear-gradient(135deg, #5c1427 0 60%, #ef5a6b 60%); }
+.sw-skumring { background: linear-gradient(135deg, #1f1d55 0 60%, #9d8cff 60%); }
 .intro { margin-top: 0; }
 
 /* "+ Tilføj" sidder fast i toppen, så den aldrig dækker knapperne på kortene */
@@ -238,3 +279,9 @@ details.panel > :last-child { margin-bottom: 16px; }
 .card .meta.price { color: var(--text); }
 /* Hilsen og dagens ord kun på forsiden; de andre sider får en kort top */
 body[data-view]:not([data-view="liste"]) .top .greeting, body[data-view]:not([data-view="liste"]) .top .dagens { display: none; }
+/* Hjertet i toppen slår roligt i temaet "Hjerte" (ikke hvis telefonen er sat til mindre bevægelse) */
+@keyframes beat { 0%, 60%, 100% { transform: scale(1); } 10% { transform: scale(1.18); } 20% { transform: scale(1); } 30% { transform: scale(1.12); } }
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="hjerte"] .logo svg { animation: beat 1.6s ease-in-out infinite; transform-origin: center; }
+}
+:root[data-theme="hjerte"] .logo svg { fill: currentColor; }
