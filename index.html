@@ -12,8 +12,8 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Medicin">
-  <script>var t='skov';try{var s=localStorage.getItem('vores-medicin-tema');if(s&&s!=='hav')t=s}catch(e){}document.documentElement.dataset.theme=t</script>
-  <link rel="stylesheet" href="style.css?v=202611221930">
+  <script src="tema.js?v=202611221945"></script>
+  <link rel="stylesheet" href="style.css?v=202611221945">
 </head>
 <body>
   <!-- Log ind (kun når den fælles liste er sat op) -->
@@ -34,6 +34,7 @@
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/></svg>
     </span><span>Vores <em>medicin</em></span><button class="add-top" id="btn-add" aria-label="Tilføj medicin">+ Tilføj</button></div>
     <p id="greeting" class="greeting"></p>
+    <p id="season-tag" class="season-tag" hidden></p>
     <p id="dagens" class="dagens"></p>
     <svg class="waves" viewBox="0 0 400 70" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0 38 C60 20 120 56 200 40 S340 18 400 34 V70 H0Z" fill="currentColor" fill-opacity=".10"/>
@@ -100,6 +101,7 @@
           <button type="button" class="theme-btn" data-theme-pick="skov"><span class="swatch sw-skov" aria-hidden="true"></span>Skov<small>Skovgrøn og guld</small></button>
           <button type="button" class="theme-btn" data-theme-pick="hjerte"><span class="swatch sw-hjerte" aria-hidden="true"></span>Hjerte<small>Rød, med hjerte der slår</small></button>
           <button type="button" class="theme-btn" data-theme-pick="skumring"><span class="swatch sw-skumring" aria-hidden="true"></span>Skumring<small>Blå og lilla</small></button>
+          <button type="button" class="theme-btn" data-theme-pick="aar"><span class="swatch sw-aar" aria-hidden="true"></span>Årets gang<small>Skifter med årstider og højtider</small></button>
         </div>
       </details>
       <details class="panel">
@@ -308,12 +310,12 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=202611221930"></script>
+  <script src="config.js?v=202611221945"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script src="dagens.js?v=202611221930"></script>
-  <script src="ctr.js?v=202611221930"></script>
-  <script src="store.js?v=202611221930"></script>
-  <script src="csv.js?v=202611221930"></script>
-  <script src="app.js?v=202611221930"></script>
+  <script src="dagens.js?v=202611221945"></script>
+  <script src="ctr.js?v=202611221945"></script>
+  <script src="store.js?v=202611221945"></script>
+  <script src="csv.js?v=202611221945"></script>
+  <script src="app.js?v=202611221945"></script>
 </body>
 </html>

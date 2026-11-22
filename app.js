@@ -659,12 +659,18 @@
   // ---------- udseende (farvetema, gemmes kun på denne enhed) ----------
   // Hav er gemt til senere: står ikke i listen, men farverne findes stadig i style.css.
   // Sæt "hav: '#0f3a4f'," ind her og knappen i index.html igen for at vise det.
-  const THEMES = { skov: '#17321f', hjerte: '#5c1427', skumring: '#1f1d55' };
+  const THEMES = { skov: '#17321f', hjerte: '#5c1427', skumring: '#1f1d55', aar: '' };
+  const SEASON_COLOR = { jul: '#7a1220', nytaar: '#0e1230', vinter: '#24405e', fastelavn: '#5a2a82', paaske: '#4b6b2a', foraar: '#2f6b4a', sommer: '#0c5b85', sankthans: '#3a1d4a', efteraar: '#3e3a1c' };
   const DEFAULT_THEME = 'skov';
   function applyTheme(t) {
-    if (!THEMES[t]) t = DEFAULT_THEME;
+    if (!(t in THEMES)) t = DEFAULT_THEME;
     document.documentElement.dataset.theme = t;
-    document.querySelector('meta[name="theme-color"]').content = THEMES[t];
+    const season = window.Tema ? window.Tema.season() : 'vinter';
+    document.documentElement.dataset.season = season;
+    document.querySelector('meta[name="theme-color"]').content = t === 'aar' ? SEASON_COLOR[season] : THEMES[t];
+    const tag = $('#season-tag'), info = window.Tema && window.Tema.SEASONS[season];
+    tag.hidden = t !== 'aar' || !info;
+    if (info) tag.textContent = `${info.emoji} ${info.label}`;
     document.querySelectorAll('[data-theme-pick]').forEach(b => b.classList.toggle('active', b.dataset.themePick === t));
   }
   let savedTheme = DEFAULT_THEME;

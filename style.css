@@ -80,6 +80,26 @@
   }
 }
 
+/* Årets gang: farverne skifter selv med årstider og højtider (se tema.js) */
+:root[data-theme="aar"][data-season="jul"] { --head-1: #7a1220; --head-2: #a01c2c; --accent: #e8c15a; --accent-ink: #8a1a24; --accent-soft: #fbf1d9; --on-accent: #7a1220; --heading: #6b1220; --brand: #1f5133; --brand-text: #fff; --bar-active: #1f5133; --bg: #fcf8f3; }
+:root[data-theme="aar"][data-season="nytaar"] { --head-1: #0e1230; --head-2: #262b5c; --accent: #e6c56b; --accent-ink: #6e5410; --accent-soft: #f7f0dc; --on-accent: #0e1230; --heading: #1a1f4a; --brand: #262b5c; --brand-text: #fff; --bar-active: #262b5c; --bg: #f7f7fb; }
+:root[data-theme="aar"][data-season="vinter"] { --head-1: #24405e; --head-2: #3d6489; --accent: #a9dcf5; --accent-ink: #2f5f86; --accent-soft: #e7f3fb; --on-accent: #24405e; --heading: #24405e; --brand: #2f5f86; --brand-text: #fff; --bar-active: #2f5f86; --bg: #f5f8fb; }
+:root[data-theme="aar"][data-season="fastelavn"] { --head-1: #5a2a82; --head-2: #8a3fae; --accent: #f6a623; --accent-ink: #7a3a9c; --accent-soft: #f6ecfb; --on-accent: #5a2a82; --heading: #4d2470; --brand: #6b2f94; --brand-text: #fff; --bar-active: #6b2f94; --bg: #faf6fc; }
+:root[data-theme="aar"][data-season="paaske"] { --head-1: #4b6b2a; --head-2: #6d8f3a; --accent: #f2cf3a; --accent-ink: #4f7024; --accent-soft: #fbf6d6; --on-accent: #4b6b2a; --heading: #3e5a20; --brand: #4f7024; --brand-text: #fff; --bar-active: #4f7024; --bg: #fafbf3; }
+:root[data-theme="aar"][data-season="foraar"] { --head-1: #2f6b4a; --head-2: #4f9a6a; --accent: #f29bb5; --accent-ink: #2f6b4a; --accent-soft: #fde9ef; --on-accent: #2f6b4a; --heading: #24553a; --brand: #2f6b4a; --brand-text: #fff; --bar-active: #2f6b4a; --bg: #f7faf7; }
+:root[data-theme="aar"][data-season="sommer"] { --head-1: #0c5b85; --head-2: #1883b5; --accent: #ffc94a; --accent-ink: #0c5b85; --accent-soft: #fff4d6; --on-accent: #0c5b85; --heading: #0c4d72; --brand: #0c5b85; --brand-text: #fff; --bar-active: #0c5b85; --bg: #f5f9fc; }
+:root[data-theme="aar"][data-season="sankthans"] { --head-1: #3a1d4a; --head-2: #b8502c; --accent: #ffb347; --accent-ink: #a3401c; --accent-soft: #fff0de; --on-accent: #3a1d4a; --heading: #5a2a1a; --brand: #a3401c; --brand-text: #fff; --bar-active: #a3401c; --bg: #fcf8f5; }
+:root[data-theme="aar"][data-season="efteraar"] { --head-1: #3e3a1c; --head-2: #6b6228; --accent: #d9a62e; --accent-ink: #6b5a14; --accent-soft: #f7f0d6; --on-accent: #3e3a1c; --heading: #3e3a1c; --brand: #5a5220; --brand-text: #fff; --bar-active: #5a5220; --bg: #f9f8f2; }
+:root[data-theme="aar"] { --head-text: #ffffff; --head-muted: #f1f1f1; --head-soft: rgba(255,255,255,.10); }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="aar"][data-season] {
+    --bg: #12161c; --card: #1c222b; --text: #e8ebef; --heading: #f3f5f7; --muted: #a9b1bc; --line: #2e3640;
+    --accent-ink: var(--accent); --accent-soft: #262d37; --brand: var(--accent); --brand-text: #12161c;
+    --bar: rgba(18,22,28,.95); --bar-line: #2e3640; --bar-text: #a9b1bc; --bar-active: var(--accent);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+  }
+}
+
 * { box-sizing: border-box; }
 html { font-size: 18px; }
 body {
@@ -270,6 +290,7 @@ details.panel > :last-child { margin-bottom: 16px; }
 .sw-hav { background: linear-gradient(135deg, #0f3a4f 0 60%, #3bb59a 60%); }
 .sw-skov { background: linear-gradient(135deg, #17321f 0 60%, #e2b33c 60%); }
 .sw-hjerte { background: linear-gradient(135deg, #5c1427 0 60%, #ef5a6b 60%); }
+.sw-aar { background: linear-gradient(90deg, #7a1220 0 25%, #2f6b4a 25% 50%, #0c5b85 50% 75%, #6b6228 75%); }
 .sw-skumring { background: linear-gradient(135deg, #1f1d55 0 60%, #9d8cff 60%); }
 .intro { margin-top: 0; }
 
@@ -293,3 +314,5 @@ fieldset.pick input[type=search] { width: 100%; margin-bottom: 6px; }
 .pick-list .check { margin: 6px 0; }
 .pick-list .check[hidden] { display: none; }
 .pick-head { font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 10px 0 2px; }
+.season-tag { display: inline-block; margin: 6px 0 0; padding: 3px 12px; border-radius: 99px; font-size: .85rem; font-weight: 600; background: var(--head-soft); color: var(--head-text); }
+body[data-view]:not([data-view="liste"]) .top .season-tag { display: none; }
