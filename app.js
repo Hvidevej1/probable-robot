@@ -137,8 +137,10 @@
   function showView(name) {
     document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.view === name));
     document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== 'view-' + name);
+    document.body.dataset.view = name;
     if (name === 'handkob') renderProducts();
     if (name === 'indstillinger') { fillSettings(); showSyncStatus(); }
+    if (name === 'paamind') fillReminders();
     window.scrollTo(0, 0);
   }
 
@@ -196,12 +198,11 @@
     return `<article class="card s-${eff}">
       <div class="head"><button class="name linklike" data-act="edit" data-id="${m.id}" title="Detaljer">${esc(m.name)}</button></div>
       <div class="meta">${esc(meta)}</div>
-      <div class="meta">${esc(label)}${m.runsOut ? ' · ' + esc(runsOutText(days)) + ` (${esc(fmtDate(m.runsOut))})` : ''}</div>
+      ${m.runsOut ? `<div class="meta">${esc(runsOutText(days))} (${esc(fmtDate(m.runsOut))})</div>` : ''}
       ${autoFlag ? `<div class="warn">Snart tom. Husk at ${otc ? 'købe ny' : 'bestille hos lægen'}.</div>` : ''}
       ${rx ? `<div class="meta ${rx.warn ? 'warn' : ''}">${esc(rx.text)}</div>` : ''}
       ${priceText(m) ? `<div class="meta price">${esc(priceText(m))}</div>` : ''}
       ${m.note ? `<div class="meta">${esc(m.note)}</div>` : ''}
-      <div class="meta links">${otc ? '' : `<a class="lookup" href="https://fmk-online.dk" target="_blank" rel="noopener noreferrer">Se i FMK</a> · `}${lookupLink(m.name)}</div>
       <div class="actions">${actions}</div>
     </article>`;
   }
@@ -274,6 +275,7 @@
     applyKind();
     formMed.status.value = v.kind === 'handkob' && v.status === 'bestilt' ? 'bestil' : v.status;
     updateCopayHint();
+    $('#med-links').innerHTML = isNew ? '' : (v.kind !== 'handkob' ? `<a class="lookup" href="https://fmk-online.dk" target="_blank" rel="noopener noreferrer">Se i FMK</a> · ` : '') + lookupLink(v.name);
     dlgMed.showModal();
     if (isNew && !v.name) formMed.name.focus();
   }
@@ -614,10 +616,26 @@
     const btn = $('#btn-paamind-test'); btn.disabled = true;
     try {
       const n = await Store.testPush();
-      toast(n ? 'Prøven er sendt. Den kommer om et øjeblik.' : 'Ingen telefoner fik prøven. Slå push-beskeder til længere nede først.');
+      toast(n ? 'Prøven er sendt. Den kommer om et øjeblik.' : 'Ingen telefoner fik prøven. Slå først push-beskeder til under Mere → Push-beskeder.');
     } catch (err) { toast('Kunne ikke sende prøven: ' + err.message); }
     btn.disabled = false;
   });
+
+  // ---------- udseende (farvetema, gemmes kun på denne enhed) ----------
+  const THEMES = { hav: '#0f3a4f', varm: '#f6ece0' };
+  function applyTheme(t) {
+    if (!THEMES[t]) t = 'hav';
+    document.documentElement.dataset.theme = t;
+    document.querySelector('meta[name="theme-color"]').content = THEMES[t];
+    document.querySelectorAll('[data-theme-pick]').forEach(b => b.classList.toggle('active', b.dataset.themePick === t));
+  }
+  let savedTheme = 'hav';
+  try { savedTheme = localStorage.getItem('vores-medicin-tema') || 'hav'; } catch {}
+  applyTheme(savedTheme);
+  document.querySelectorAll('[data-theme-pick]').forEach(b => b.addEventListener('click', () => {
+    applyTheme(b.dataset.themePick);
+    try { localStorage.setItem('vores-medicin-tema', b.dataset.themePick); } catch {}
+  }));
 
   function fillSettings() {
     fillReminders();
@@ -740,6 +758,7 @@
     $('#login').hidden = on;
     document.querySelector('header.top').hidden = !on;
     document.querySelector('main').hidden = !on;
+    document.querySelector('.bottombar').hidden = !on;
   }
   $('#form-login').addEventListener('submit', async e => {
     e.preventDefault();
