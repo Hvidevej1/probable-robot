@@ -6,7 +6,7 @@ self.addEventListener('push', e => {
   let msg = { title: 'Vores medicin', body: 'Der er nyt på medicinlisten.' };
   try { msg = { ...msg, ...e.data.json() }; } catch { /* brug standardtekst */ }
   e.waitUntil(self.registration.showNotification(msg.title, {
-    body: msg.body, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'medicin', renotify: true,
+    body: msg.body, icon: 'icon-192.png', badge: 'icon-192.png', tag: msg.tag || 'medicin', renotify: true,
   }));
 });
 

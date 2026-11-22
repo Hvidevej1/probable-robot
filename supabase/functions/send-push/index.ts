@@ -5,6 +5,10 @@
 // udefra højst udløse en besked om noget, der faktisk lige er sket.
 // Hver time kaldes den også med { remind: true }: alt, der har stået som
 // "skal afhentes" i 3 dage uden at være hentet, giver én ny påmindelse.
+// Hvert minut kaldes den med { paamindelser: true }, når en påmindelse om at
+// tage medicin eller fylde doseringsæsken skal sendes (se paamindelser.sql).
+// Den går kun til brugerens egne telefoner.
+// Med { test: true } og brugerens login sendes en prøve til brugerens egne telefoner.
 // Beskeden går kun til ejeren af medicinen og dem, ejeren har givet fuldmagt.
 // Kræver hemmelighederne VAPID_PUBLIC_KEY og VAPID_PRIVATE_KEY.
 // "Verify JWT" skal være slået FRA for denne funktion.
@@ -29,14 +33,14 @@ async function nameOf(db: ReturnType<typeof createClient>, owner: string) {
   return (data?.user?.user_metadata?.name as string) || "";
 }
 
-async function sendTo(db: ReturnType<typeof createClient>, users: string[], body: string) {
+async function sendTo(db: ReturnType<typeof createClient>, users: string[], body: string, tag = "medicin") {
   webpush.setVapidDetails(
     "https://medicin.hrc-fotos.dk",
     Deno.env.get("VAPID_PUBLIC_KEY")!,
     Deno.env.get("VAPID_PRIVATE_KEY")!,
   );
   const { data: subs } = await db.from("push_subscriptions").select("*").in("user_id", users);
-  const payload = JSON.stringify({ title: "Vores medicin", body });
+  const payload = JSON.stringify({ title: "Vores medicin", body, tag });
   let sent = 0;
   for (const s of subs ?? []) {
     try {
@@ -50,12 +54,51 @@ async function sendTo(db: ReturnType<typeof createClient>, users: string[], body
   return sent;
 }
 
-const json = (o: unknown) => new Response(JSON.stringify(o), { headers: { "Content-Type": "application/json" } });
+type Paamindelse = { id: string; user_id: string; slags: string; tekst: string | null; sendt: string | null };
+function paamindelseText(p: Paamindelse) {
+  const pre = p.tekst ? `${p.tekst}: ` : "";
+  return p.slags === "doseringsaeske"
+    ? `${pre}I dag skal doseringsæsken fyldes.`
+    : `${pre}Husk at tage din medicin.`;
+}
+
+// Appen kalder funktionen fra browseren (prøvebesked), så den skal svare på CORS
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+const json = (o: unknown) => new Response(JSON.stringify(o), { headers: { ...CORS, "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {
-  let body: { id?: string; remind?: boolean } = {};
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  let body: { id?: string; remind?: boolean; paamindelser?: boolean; test?: boolean } = {};
   try { body = await req.json(); } catch { /* tomt kald */ }
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  // Påmindelser om at tage medicin / fylde doseringsæsken
+  if (body.paamindelser) {
+    const { data: due } = await db.rpc("paamindelser_nu");
+    let sent = 0;
+    for (const p of (due ?? []) as Paamindelse[]) {
+      // Markér som sendt først (kun hvis ingen andre har gjort det), så den aldrig sendes to gange
+      let q = db.from("paamindelser").update({ sendt: new Date().toISOString() }).eq("id", p.id);
+      q = p.sendt ? q.eq("sendt", p.sendt) : q.is("sendt", null);
+      const { data: claimed } = await q.select("id");
+      if (!claimed?.length) continue;
+      sent += await sendTo(db, [p.user_id], paamindelseText(p), "paamindelse-" + p.id);
+    }
+    return json({ sent });
+  }
+
+  // Prøvebesked til den, der er logget ind
+  if (body.test) {
+    const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    const { data } = await db.auth.getUser(token);
+    if (!data?.user) return new Response("Ikke logget ind", { status: 401, headers: CORS });
+    const sent = await sendTo(db, [data.user.id], "Prøve: Sådan ser og lyder en påmindelse fra appen.", "proeve");
+    return json({ sent });
+  }
 
   // Påmindelse: står stadig som "skal afhentes" efter 3 dage
   if (body.remind) {

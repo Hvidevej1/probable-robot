@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Medicin">
-  <link rel="stylesheet" href="style.css?v=202611212355">
+  <link rel="stylesheet" href="style.css?v=202611221730">
 </head>
 <body>
   <!-- Log ind (kun når den fælles liste er sat op) -->
@@ -80,6 +80,18 @@
     <!-- MERE -->
     <section id="view-indstillinger" class="view" hidden>
       <h2>Påmindelser</h2>
+      <p class="hint">Få en besked med telefonens normale lyd, når du skal tage din medicin eller fylde doseringsæsken. Påmindelserne er dine egne og kommer kun på din telefon. Push-beskeder skal være slået til (længere nede).</p>
+      <ul id="paamind-list" class="plain paamind-list"></ul>
+      <div class="row">
+        <button id="btn-paamind-medicin" class="secondary">+ Tag medicin</button>
+        <button id="btn-paamind-aeske" class="secondary">+ Doseringsæske</button>
+      </div>
+      <div class="row">
+        <button id="btn-paamind-test" class="secondary">Send en prøve nu</button>
+      </div>
+      <p class="hint">Tip: Vil du også have et blink, når beskeden kommer? På iPhone: Indstillinger → Tilgængelighed → Lyd/visuelt → slå “LED-blink ved beskeder” til.</p>
+
+      <h2>Bestilling</h2>
       <label class="stack">Mind mig om at bestille, når der er så mange dage tilbage
         <input id="remind-days" type="number" min="1" max="60">
       </label>
@@ -201,6 +213,42 @@
     <div class="row end"><button id="btn-scan-close" class="secondary">Luk</button></div>
   </dialog>
 
+  <!-- Dialog: påmindelse -->
+  <dialog id="dlg-paamind">
+    <form method="dialog" id="form-paamind">
+      <h2 id="dlg-paamind-title">Påmindelse</h2>
+      <label class="stack">Hvad skal du mindes om
+        <select name="slags">
+          <option value="medicin">Tag medicin</option>
+          <option value="doseringsaeske">Fyld doseringsæsken</option>
+        </select>
+      </label>
+      <label class="stack">Navn (valgfrit)
+        <input name="tekst" placeholder="Fx Morgen, Aften" maxlength="40">
+      </label>
+      <label class="stack">Klokken
+        <input name="tid" type="time" required>
+      </label>
+      <label class="stack">Hvor tit
+        <select name="hver">
+          <option value="1">Hver dag</option>
+          <option value="7">Hver uge</option>
+          <option value="14">Hver 14. dag</option>
+        </select>
+      </label>
+      <label class="stack" id="paamind-start-wrap">Første gang
+        <input name="start_dato" type="date">
+      </label>
+      <label class="check"><input type="checkbox" name="aktiv" checked> Slået til</label>
+      <div class="row end">
+        <button type="button" class="danger" id="btn-paamind-delete" hidden>Slet</button>
+        <span class="spacer"></span>
+        <button value="cancel" formnovalidate class="secondary">Annullér</button>
+        <button value="save">Gem</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="dlg-fmk">
     <h2>Opdateret fra FMK</h2>
     <div id="fmk-result"></div>
@@ -227,12 +275,12 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=202611212355"></script>
+  <script src="config.js?v=202611221730"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script src="dagens.js?v=202611212355"></script>
-  <script src="ctr.js?v=202611212355"></script>
-  <script src="store.js?v=202611212355"></script>
-  <script src="csv.js?v=202611212355"></script>
-  <script src="app.js?v=202611212355"></script>
+  <script src="dagens.js?v=202611221730"></script>
+  <script src="ctr.js?v=202611221730"></script>
+  <script src="store.js?v=202611221730"></script>
+  <script src="csv.js?v=202611221730"></script>
+  <script src="app.js?v=202611221730"></script>
 </body>
 </html>

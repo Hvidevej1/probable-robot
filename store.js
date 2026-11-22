@@ -296,6 +296,30 @@ const Store = (() => {
       if (cloud) await sb.from('push_subscriptions').delete().eq('endpoint', endpoint);
     },
 
+    // Påmindelser om at tage medicin / fylde doseringsæsken (kun ens egne)
+    async reminders() {
+      if (!cloud) return [];
+      const { data: rows, error } = await sb.from('paamindelser').select('*').eq('user_id', me).order('tid');
+      if (error) throw new Error(error.message);
+      return rows;
+    },
+    async saveReminder(r) {
+      const row = { slags: r.slags, tekst: r.tekst || null, tid: r.tid, start_dato: r.start_dato, hver: r.hver, aktiv: r.aktiv !== false };
+      const q = r.id ? sb.from('paamindelser').update(row).eq('id', r.id) : sb.from('paamindelser').insert(row);
+      const { error } = await q;
+      if (error) throw new Error(error.message);
+    },
+    async deleteReminder(rid) {
+      const { error } = await sb.from('paamindelser').delete().eq('id', rid);
+      if (error) throw new Error(error.message);
+    },
+    // Sender en prøvebesked til ens egne telefoner
+    async testPush() {
+      const { data: res, error } = await sb.functions.invoke('send-push', { body: { test: true } });
+      if (error) throw new Error(error.message);
+      return res?.sent || 0;
+    },
+
     exportJSON() { return JSON.stringify(data, null, 2); },
     importJSON(text) {
       const parsed = JSON.parse(text);

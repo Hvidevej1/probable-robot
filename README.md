@@ -25,6 +25,10 @@ Kræver den fælles liste. På iPhone skal appen ligge på hjemmeskærmen.
 2. Læg funktionen `supabase/functions/send-push` op under Edge Functions, slå "Verify JWT" fra, og sæt hemmelighederne `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` og `PUSH_SECRET`.
 3. Ret og kør `supabase/push.sql`.
 
+## Påmindelser om medicin
+Under "Mere" → "Påmindelser" kan hver bruger lave sine egne påmindelser: "Tag medicin" (fx hver dag kl. 8) og "Fyld doseringsæsken" (fx hver 14. dag). De kommer som push-beskeder på brugerens egne telefoner. Appen viser kun tidspunkter og regner aldrig på doser.
+Opsætning: kør `supabase/paamindelser.sql` og læg den nye udgave af `send-push` op.
+
 ## Persondata
 Der må aldrig lægges medicinlister, sikkerhedskopier eller andre personlige oplysninger i dette repository. Opslag på min.medicin.dk sender kun produktets navn.
 

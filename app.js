@@ -532,7 +532,95 @@
     fillFuldmagt(); fillCtrFields(); fillPersonSelects(); renderList();
   });
 
+  // ---------- påmindelser om at tage medicin / fylde doseringsæsken ----------
+  // Appen viser kun tidspunkter. Den regner aldrig på doser; dosis står i FMK.
+  let reminders = [];
+  const HVER = { 1: 'Hver dag', 7: 'Hver uge', 14: 'Hver 14. dag' };
+  const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  function nextSunday() { const d = new Date(); d.setDate(d.getDate() + ((7 - d.getDay()) % 7 || 7)); return isoDate(d); }
+  // Næste gang en påmindelse med "hver X. dag" kommer (i dag eller senere)
+  function nextDate(r) {
+    const start = new Date(r.start_dato + 'T00:00:00'), today = new Date(); today.setHours(0, 0, 0, 0);
+    if (start >= today) return r.start_dato;
+    const n = Math.round((today - start) / 86400000), add = (r.hver - n % r.hver) % r.hver;
+    today.setDate(today.getDate() + add); return isoDate(today);
+  }
+  function reminderText(r) {
+    const what = r.slags === 'doseringsaeske' ? 'Fyld doseringsæsken' : 'Tag medicin';
+    const when = r.hver === 1 ? 'hver dag' : `${(HVER[r.hver] || `Hver ${r.hver}. dag`).toLowerCase()}, næste gang ${fmtDate(nextDate(r))}`;
+    return `${r.tekst ? r.tekst + ': ' : ''}${what} kl. ${String(r.tid).slice(0, 5)}, ${when}`;
+  }
+  async function fillReminders() {
+    const ul = $('#paamind-list');
+    if (!Store.cloud) { ul.innerHTML = '<li class="hint">Påmindelser kræver den fælles liste.</li>'; return; }
+    try { reminders = await Store.reminders(); } catch (err) { ul.innerHTML = `<li class="hint">Kunne ikke hente påmindelser: ${esc(err.message)}</li>`; return; }
+    ul.innerHTML = reminders.length ? reminders.map(r => `<li class="${r.aktiv ? '' : 'off'}">
+        <label class="check"><input type="checkbox" data-toggle="${esc(r.id)}" ${r.aktiv ? 'checked' : ''} aria-label="Slået til"> <span>${esc(reminderText(r))}</span></label>
+        <button class="secondary small" data-edit="${esc(r.id)}">Ret</button></li>`).join('')
+      : '<li class="hint">Ingen påmindelser endnu. Tryk på en knap herunder for at lave en.</li>';
+  }
+  const dlgPaamind = $('#dlg-paamind'), formPaamind = $('#form-paamind');
+  let editingReminder = null;
+  function applyHver() { $('#paamind-start-wrap').hidden = formPaamind.hver.value === '1'; }
+  formPaamind.hver.addEventListener('change', applyHver);
+  function openReminder(r) {
+    editingReminder = r.id ? r : null;
+    $('#dlg-paamind-title').textContent = r.id ? 'Ret påmindelse' : 'Ny påmindelse';
+    formPaamind.slags.value = r.slags;
+    formPaamind.tekst.value = r.tekst || '';
+    formPaamind.tid.value = String(r.tid).slice(0, 5);
+    formPaamind.hver.value = String(r.hver);
+    if (!formPaamind.hver.value) formPaamind.hver.value = '1';
+    formPaamind.start_dato.value = r.start_dato;
+    formPaamind.aktiv.checked = r.aktiv !== false;
+    $('#btn-paamind-delete').hidden = !r.id;
+    applyHver();
+    dlgPaamind.showModal();
+  }
+  $('#btn-paamind-medicin').addEventListener('click', () => openReminder({ slags: 'medicin', tid: '08:00', hver: 1, start_dato: isoDate(new Date()) }));
+  $('#btn-paamind-aeske').addEventListener('click', () => openReminder({ slags: 'doseringsaeske', tid: '10:00', hver: 14, start_dato: nextSunday() }));
+  dlgPaamind.addEventListener('close', async () => {
+    if (dlgPaamind.returnValue !== 'save') return;
+    const f = formPaamind, hver = Number(f.hver.value) || 1;
+    try {
+      await Store.saveReminder({
+        id: editingReminder?.id, slags: f.slags.value, tekst: f.tekst.value.trim(), tid: f.tid.value,
+        hver, start_dato: hver === 1 ? isoDate(new Date()) : (f.start_dato.value || isoDate(new Date())), aktiv: f.aktiv.checked,
+      });
+      toast('Påmindelsen er gemt');
+    } catch (err) { toast('Kunne ikke gemme påmindelsen: ' + err.message); }
+    fillReminders();
+  });
+  $('#btn-paamind-delete').addEventListener('click', async () => {
+    if (!editingReminder || !confirm('Slette denne påmindelse?')) return;
+    dlgPaamind.close();
+    try { await Store.deleteReminder(editingReminder.id); toast('Påmindelsen er slettet'); }
+    catch (err) { toast('Kunne ikke slette: ' + err.message); }
+    fillReminders();
+  });
+  $('#paamind-list').addEventListener('click', e => {
+    const id = e.target.dataset.edit;
+    if (id) openReminder(reminders.find(r => r.id === id));
+  });
+  $('#paamind-list').addEventListener('change', async e => {
+    const id = e.target.dataset.toggle;
+    const r = id && reminders.find(x => x.id === id);
+    if (!r) return;
+    try { await Store.saveReminder({ ...r, aktiv: e.target.checked }); toast(e.target.checked ? 'Slået til' : 'Slået fra'); }
+    catch (err) { toast('Kunne ikke gemme: ' + err.message); }
+    fillReminders();
+  });
+  $('#btn-paamind-test').addEventListener('click', async () => {
+    const btn = $('#btn-paamind-test'); btn.disabled = true;
+    try {
+      const n = await Store.testPush();
+      toast(n ? 'Prøven er sendt. Den kommer om et øjeblik.' : 'Ingen telefoner fik prøven. Slå push-beskeder til længere nede først.');
+    } catch (err) { toast('Kunne ikke sende prøven: ' + err.message); }
+    btn.disabled = false;
+  });
+
   function fillSettings() {
+    fillReminders();
     fillCtrFields();
     fillFuldmagt();
     showPushStatus();
