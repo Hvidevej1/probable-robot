@@ -552,12 +552,16 @@
     const when = r.hver === 1 ? 'hver dag' : `${(HVER[r.hver] || `Hver ${r.hver}. dag`).toLowerCase()}, næste gang ${fmtDate(nextDate(r))}`;
     return `${r.tekst ? r.tekst + ': ' : ''}${what} kl. ${String(r.tid).slice(0, 5)}, ${when}`;
   }
-  // Navn og styrke på den medicin, påmindelsen gælder (fra listen og håndkøb)
-  const pickLabel = x => [x.name, x.strength].filter(Boolean).join(' ');
+  // Navn, styrke og FMK's dosering på den medicin, påmindelsen gælder.
+  // Pakningsstørrelse (fx "250 stk.") vises aldrig, så den ikke forveksles med hvor mange man skal tage.
+  // Doseringen vises præcis som i FMK og regnes eller ændres aldrig.
+  const noPack = st => String(st || '').split(',').map(t => t.trim())
+    .filter(t => t && !/\bstk\b|\bpk\b|pakning|\d\s*x\s*\d|\bx\s*\d/i.test(t)).join(', ');
+  const pickLabel = x => [x.name, noPack(x.strength)].filter(Boolean).join(' ') + (x.dosering ? ` – ${x.dosering}` : '');
   function chosenText(r) {
     const meds = (r.med_ids || []).map(id => Store.meds.find(m => m.id === id)).filter(Boolean);
     const prods = (r.produkt_ids || []).map(id => Store.products.find(p => p.id === id)).filter(Boolean);
-    return [...meds, ...prods].map(pickLabel).join(', ');
+    return [...meds, ...prods].map(pickLabel).join('; ');
   }
   // Afkrydsningsliste: medicin fra de lister, man kan se, og håndkøbsprodukter
   function fillPick(r) {
@@ -574,7 +578,7 @@
     }
     // Håndkøb: de valgte først, så resten
     const prods = [...Store.products].sort((a, b) => (selP.has(b.id) - selP.has(a.id)) || byName(a, b));
-    if (prods.length) html += `<p class="pick-head">Håndkøb</p>` + prods.map(p => item('prod', p, selP.has(p.id), p.pack || '')).join('');
+    if (prods.length) html += `<p class="pick-head">Håndkøb</p>` + prods.map(p => item('prod', p, selP.has(p.id))).join('');
     $('#paamind-pick').innerHTML = html || '<p class="hint">Der er ingen medicin på listen endnu.</p>';
     const many = Store.meds.length + Store.products.length > 12;
     $('#paamind-search').hidden = !many;
@@ -875,6 +879,7 @@
       const pick = (open.length ? open : list).reduce((a, b) => (b.gyldigTil > a.gyldigTil ? b : a));
       const fields = { udleveringer: left, receptUdloeb: open.length ? pick.gyldigTil : '' };
       if (pick.varenr) fields.varenr = pick.varenr;
+      fields.dosering = pick.dosering || '';   // præcis som i FMK
       const existing = Store.meds.find(m => (m.owner || '') === owner && normName(m.name) === k && m.kind !== 'handkob');
       if (existing) {
         Store.upsertMed({ id: existing.id, ...fields });

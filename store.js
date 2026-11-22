@@ -54,6 +54,7 @@ const Store = (() => {
     recept_udloeb: m.receptUdloeb || null, udleveringer: m.udleveringer === '' || m.udleveringer == null ? null : Number(m.udleveringer),
     varenr: m.varenr || null, tilskudspris: m.tilskudspris === '' || m.tilskudspris == null ? null : Number(m.tilskudspris), pris_opdateret: m.prisOpdateret || null,
     billigst_navn: m.billigstNavn || null, billigst_varenr: m.billigstVarenr || null, billigst_pris: m.billigstPris === '' || m.billigstPris == null ? null : Number(m.billigstPris),
+    dosering: m.dosering || null,
   });
   const rowToMed = r => ({
     id: r.id, name: r.name, strength: r.strength || '', owner: r.owner || '', kind: r.kind, status: r.status,
@@ -61,7 +62,7 @@ const Store = (() => {
     price: r.price ?? '', tilskud: r.tilskud !== false,
     receptUdloeb: r.recept_udloeb || '', udleveringer: r.udleveringer ?? '',
     varenr: r.varenr || '', tilskudspris: r.tilskudspris ?? '', prisOpdateret: r.pris_opdateret || '',
-    billigstNavn: r.billigst_navn || '', billigstVarenr: r.billigst_varenr || '', billigstPris: r.billigst_pris ?? '',
+    billigstNavn: r.billigst_navn || '', billigstVarenr: r.billigst_varenr || '', billigstPris: r.billigst_pris ?? '', dosering: r.dosering || '',
   });
   const prodToRow = p => ({ id: p.id, name: p.name, strength: p.strength || null, pack: p.pack || null, price: p.price || null, varenr: p.varenr || null, ean: p.ean || null });
   const rowToProd = r => ({ id: r.id, name: r.name, strength: r.strength || '', pack: r.pack || '', price: r.price || '', varenr: r.varenr || '', ean: r.ean || '' });
