@@ -2,7 +2,7 @@
 // Læser kun det, der står på siden (recepter og CTR-saldo), og sender det til
 // appen i et nyt vindue. Intet sendes andre steder hen.
 (async () => {
-  const APP = 'https://vores-medicin.vercel.app';
+  const APP = 'https://medicin.hrc-fotos.dk';
   if (location.hostname !== 'fmk-online.dk') { alert('Åbn fmk-online.dk og log ind først, og tryk så på knappen igen.'); return; }
   // Appen åbnes i et lille vindue ved siden af, så FMK-fanen bliver i forgrunden.
   // (En fane i baggrunden arbejder meget langsomt i Chrome.)

@@ -31,7 +31,7 @@ async function nameOf(db: ReturnType<typeof createClient>, owner: string) {
 
 async function sendTo(db: ReturnType<typeof createClient>, users: string[], body: string) {
   webpush.setVapidDetails(
-    "https://vores-medicin.vercel.app",
+    "https://medicin.hrc-fotos.dk",
     Deno.env.get("VAPID_PUBLIC_KEY")!,
     Deno.env.get("VAPID_PRIVATE_KEY")!,
   );
