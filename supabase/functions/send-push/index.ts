@@ -58,14 +58,19 @@ type Paamindelse = {
   id: string; user_id: string; slags: string; tekst: string | null; sendt: string | null;
   med_ids: string[] | null; produkt_ids: string[] | null;
 };
-// Navn og styrke på den valgte medicin. Kun medicin, brugeren selv ejer eller har fuldmagt til.
+// Navn, styrke og FMK's dosering på den valgte medicin. Kun medicin, brugeren selv ejer eller har
+// fuldmagt til. Pakningsstørrelse (fx "250 stk.") tages aldrig med, så den ikke forveksles med
+// hvor mange man skal tage. Doseringen står præcis som i FMK og regnes eller ændres aldrig.
+const noPack = (st?: string | null) => String(st || "").split(",").map((t) => t.trim())
+  .filter((t) => t && !/\bstk\b|\bpk\b|pakning|\d\s*x\s*\d|\bx\s*\d/i.test(t)).join(", ");
 async function chosenNames(db: ReturnType<typeof createClient>, p: Paamindelse) {
   const names: string[] = [];
-  const label = (r: { name: string; strength?: string | null }) => [r.name, r.strength].filter(Boolean).join(" ");
+  const label = (r: { name: string; strength?: string | null; dosering?: string | null }) =>
+    [r.name, noPack(r.strength)].filter(Boolean).join(" ") + (r.dosering ? ` – ${r.dosering}` : "");
   if (p.med_ids?.length) {
     const { data: g } = await db.from("fuldmagt").select("owner").eq("grantee", p.user_id);
     const owners = [p.user_id, ...(g ?? []).map((r: { owner: string }) => r.owner)];
-    const { data } = await db.from("meds").select("name,strength").in("id", p.med_ids).in("owner", owners);
+    const { data } = await db.from("meds").select("name,strength,dosering").in("id", p.med_ids).in("owner", owners);
     names.push(...(data ?? []).map(label));
   }
   if (p.produkt_ids?.length) {
@@ -78,9 +83,9 @@ async function paamindelseText(db: ReturnType<typeof createClient>, p: Paamindel
   const pre = p.tekst ? `${p.tekst}: ` : "";
   const names = await chosenNames(db, p);
   if (p.slags === "doseringsaeske") {
-    return `${pre}I dag skal doseringsæsken fyldes.` + (names.length ? ` Med: ${names.join(", ")}.` : "");
+    return `${pre}I dag skal doseringsæsken fyldes.` + (names.length ? ` Med: ${names.join("; ")}.` : "");
   }
-  return names.length ? `${pre}Husk at tage ${names.join(", ")}.` : `${pre}Husk at tage din medicin.`;
+  return names.length ? `${pre}Husk at tage: ${names.join("; ")}.` : `${pre}Husk at tage din medicin.`;
 }
 
 // Appen kalder funktionen fra browseren (prøvebesked), så den skal svare på CORS
