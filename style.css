@@ -1,4 +1,4 @@
-/* Farvetemaer. "Hav" følger Hans' designmanual (navy + teal).
+/* Farvetemaer. Grundfarverne herunder er temaet "Hav" (gemt til senere, vises ikke i valget). Det følger Hans' designmanual (navy + teal).
    Alle farver hentes herfra, så et tema kun skal ændres ét sted. */
 :root {
   --head-1: #0f3a4f; --head-2: #155a63; --head-text: #ffffff; --head-muted: #dfe8ee; --head-soft: rgba(255,255,255,.08);

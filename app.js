@@ -657,15 +657,18 @@
   });
 
   // ---------- udseende (farvetema, gemmes kun på denne enhed) ----------
-  const THEMES = { hav: '#0f3a4f', skov: '#17321f', hjerte: '#5c1427', skumring: '#1f1d55' };
+  // Hav er gemt til senere: står ikke i listen, men farverne findes stadig i style.css.
+  // Sæt "hav: '#0f3a4f'," ind her og knappen i index.html igen for at vise det.
+  const THEMES = { skov: '#17321f', hjerte: '#5c1427', skumring: '#1f1d55' };
+  const DEFAULT_THEME = 'skov';
   function applyTheme(t) {
-    if (!THEMES[t]) t = 'hav';
+    if (!THEMES[t]) t = DEFAULT_THEME;
     document.documentElement.dataset.theme = t;
     document.querySelector('meta[name="theme-color"]').content = THEMES[t];
     document.querySelectorAll('[data-theme-pick]').forEach(b => b.classList.toggle('active', b.dataset.themePick === t));
   }
-  let savedTheme = 'hav';
-  try { savedTheme = localStorage.getItem('vores-medicin-tema') || 'hav'; } catch {}
+  let savedTheme = DEFAULT_THEME;
+  try { savedTheme = localStorage.getItem('vores-medicin-tema') || DEFAULT_THEME; } catch {}
   applyTheme(savedTheme);
   document.querySelectorAll('[data-theme-pick]').forEach(b => b.addEventListener('click', () => {
     applyTheme(b.dataset.themePick);

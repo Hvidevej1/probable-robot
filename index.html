@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vores medicin</title>
-  <meta name="theme-color" content="#0f3a4f">
+  <meta name="theme-color" content="#17321f">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
@@ -12,8 +12,8 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Medicin">
-  <script>try{var t=localStorage.getItem('vores-medicin-tema');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
-  <link rel="stylesheet" href="style.css?v=202611221905">
+  <script>var t='skov';try{var s=localStorage.getItem('vores-medicin-tema');if(s&&s!=='hav')t=s}catch(e){}document.documentElement.dataset.theme=t</script>
+  <link rel="stylesheet" href="style.css?v=202611221930">
 </head>
 <body>
   <!-- Log ind (kun når den fælles liste er sat op) -->
@@ -95,7 +95,8 @@
         <summary>Udseende</summary>
         <p class="hint">Vælg de farver, du bedst kan lide. Det gælder kun på denne telefon eller computer.</p>
         <div class="theme-pick">
-          <button type="button" class="theme-btn" data-theme-pick="hav"><span class="swatch sw-hav" aria-hidden="true"></span>Hav<small>Mørkeblå og grøn</small></button>
+          <!-- Temaet Hav er gemt til senere (farverne står stadig i style.css). Sæt knappen ind igen for at vise det:
+          <button type="button" class="theme-btn" data-theme-pick="hav"><span class="swatch sw-hav" aria-hidden="true"></span>Hav<small>Mørkeblå og grøn</small></button> -->
           <button type="button" class="theme-btn" data-theme-pick="skov"><span class="swatch sw-skov" aria-hidden="true"></span>Skov<small>Skovgrøn og guld</small></button>
           <button type="button" class="theme-btn" data-theme-pick="hjerte"><span class="swatch sw-hjerte" aria-hidden="true"></span>Hjerte<small>Rød, med hjerte der slår</small></button>
           <button type="button" class="theme-btn" data-theme-pick="skumring"><span class="swatch sw-skumring" aria-hidden="true"></span>Skumring<small>Blå og lilla</small></button>
@@ -307,12 +308,12 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=202611221905"></script>
+  <script src="config.js?v=202611221930"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script src="dagens.js?v=202611221905"></script>
-  <script src="ctr.js?v=202611221905"></script>
-  <script src="store.js?v=202611221905"></script>
-  <script src="csv.js?v=202611221905"></script>
-  <script src="app.js?v=202611221905"></script>
+  <script src="dagens.js?v=202611221930"></script>
+  <script src="ctr.js?v=202611221930"></script>
+  <script src="store.js?v=202611221930"></script>
+  <script src="csv.js?v=202611221930"></script>
+  <script src="app.js?v=202611221930"></script>
 </body>
 </html>
