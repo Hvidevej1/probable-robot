@@ -622,7 +622,7 @@
   });
 
   // ---------- udseende (farvetema, gemmes kun på denne enhed) ----------
-  const THEMES = { hav: '#0f3a4f', varm: '#f6ece0', hjerte: '#5c1427', skumring: '#1f1d55' };
+  const THEMES = { hav: '#0f3a4f', skov: '#17321f', hjerte: '#5c1427', skumring: '#1f1d55' };
   function applyTheme(t) {
     if (!THEMES[t]) t = 'hav';
     document.documentElement.dataset.theme = t;

@@ -1,4 +1,4 @@
-/* Farvetemaer. "Hav" følger Hans' designmanual (navy + teal). "Varm" er lys sand med terrakotta.
+/* Farvetemaer. "Hav" følger Hans' designmanual (navy + teal).
    Alle farver hentes herfra, så et tema kun skal ændres ét sted. */
 :root {
   --head-1: #0f3a4f; --head-2: #155a63; --head-text: #ffffff; --head-muted: #dfe8ee; --head-soft: rgba(255,255,255,.08);
@@ -22,25 +22,25 @@
     --green: #8fd6a6; --green-bg: #17301f; --blue: #a9c6f5; --blue-bg: #1b2a40;
   }
 }
-:root[data-theme="varm"] {
-  --head-1: #fbf4ea; --head-2: #f3e3cf; --head-text: #3b2418; --head-muted: #6b5040; --head-soft: rgba(255,255,255,.6);
-  --accent: #c8643b; --accent-ink: #a34a25; --accent-soft: #f8e6da; --on-accent: #ffffff;
-  --bg: #fcf9f4; --card: #ffffff; --text: #33261f; --heading: #4a2a1c; --muted: #6f6158; --line: #ece1d5;
-  --brand: #a34a25; --brand-text: #ffffff;
-  --bar: rgba(255,252,247,.95); --bar-line: #ece1d5; --bar-text: #6f6158; --bar-active: #a34a25;
-  --shadow: 0 1px 2px rgba(74,42,28,.05), 0 6px 18px rgba(74,42,28,.07);
+/* Skov: dyb skovgrøn top med guld, som sollys mellem træerne */
+:root[data-theme="skov"] {
+  --head-1: #17321f; --head-2: #2b5233; --head-text: #ffffff; --head-muted: #e1ecdf; --head-soft: rgba(255,255,255,.09);
+  --accent: #e2b33c; --accent-ink: #8a6410; --accent-soft: #f8f0d8; --on-accent: #17321f;
+  --bg: #f5f7f2; --card: #ffffff; --text: #233026; --heading: #1f4429; --muted: #5d6b5f; --line: #e0e7dc;
+  --brand: #2b5233; --brand-text: #ffffff;
+  --bar: rgba(250,252,248,.95); --bar-line: #e0e7dc; --bar-text: #5d6b5f; --bar-active: #2b5233;
+  --shadow: 0 1px 2px rgba(23,50,31,.05), 0 6px 18px rgba(23,50,31,.08);
 }
 @media (prefers-color-scheme: dark) {
-  :root[data-theme="varm"] {
-    --head-1: #2a1d17; --head-2: #3a271d; --head-text: #fbeee3; --head-muted: #d9c3b4; --head-soft: rgba(255,255,255,.06);
-    --accent: #e08a5f; --accent-ink: #f0a47d; --accent-soft: #3d2a20; --on-accent: #2a1d17;
-    --bg: #1d1511; --card: #2a1f19; --text: #f1e6dd; --heading: #fbeee3; --muted: #c2b0a3; --line: #45342a;
-    --brand: #e08a5f; --brand-text: #2a1d17;
-    --bar: rgba(29,21,17,.95); --bar-line: #45342a; --bar-text: #c2b0a3; --bar-active: #f0a47d;
+  :root[data-theme="skov"] {
+    --head-1: #0d1f13; --head-2: #183320; --head-muted: #cfdfcc;
+    --accent: #ebc35a; --accent-ink: #f0cf74; --accent-soft: #33301a; --on-accent: #0d1f13;
+    --bg: #0e1a11; --card: #17271b; --text: #e6efe4; --heading: #eef5ec; --muted: #a7b8a6; --line: #2c4331;
+    --brand: #ebc35a; --brand-text: #0d1f13;
+    --bar: rgba(14,26,17,.95); --bar-line: #2c4331; --bar-text: #a7b8a6; --bar-active: #f0cf74;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
   }
 }
-
 /* Hjerte: dyb vinrød top med korallrødt hjerte, der slår stille og roligt */
 :root[data-theme="hjerte"] {
   --head-1: #5c1427; --head-2: #8a2337; --head-text: #ffffff; --head-muted: #f6dfe3; --head-soft: rgba(255,255,255,.10);
@@ -268,7 +268,7 @@ details.panel > :last-child { margin-bottom: 16px; }
 .theme-btn.active { border-color: var(--accent); background: var(--accent-soft); }
 .swatch { width: 100%; height: 40px; border-radius: 8px; }
 .sw-hav { background: linear-gradient(135deg, #0f3a4f 0 60%, #3bb59a 60%); }
-.sw-varm { background: linear-gradient(135deg, #f3e3cf 0 60%, #c8643b 60%); }
+.sw-skov { background: linear-gradient(135deg, #17321f 0 60%, #e2b33c 60%); }
 .sw-hjerte { background: linear-gradient(135deg, #5c1427 0 60%, #ef5a6b 60%); }
 .sw-skumring { background: linear-gradient(135deg, #1f1d55 0 60%, #9d8cff 60%); }
 .intro { margin-top: 0; }
