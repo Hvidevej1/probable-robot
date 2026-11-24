@@ -34,9 +34,13 @@
     .top h1 { font-size: 1.15rem; margin: 0; font-weight: 800; letter-spacing: -.01em; }
     .top h1 small { display: block; font-size: .78rem; font-weight: 500; color: var(--top-dæmpet); }
     .indlejret .top { display: none; }
+    .indlejret main { padding: 4px 0 8px; }
+    .indlejret #kort { height: 540px; min-height: 0; }
+    @media (max-width: 860px) { .indlejret #kort { height: 360px; } }
+    .indlejret .kort-boks { position: static; }
     main { max-width: 1180px; margin: 0 auto; padding: 16px; }
     .bjælke { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-    .bjælke h2 { margin: 0; font-size: 1.25rem; font-weight: 800; flex: 1 1 auto; min-width: 0; }
+    .bjælke h2 { margin: 0; font-size: clamp(1.1rem, 4.6vw, 1.4rem); font-weight: 800; flex: 1 1 auto; min-width: 0; letter-spacing: -.01em; }
     .dagknapper { display: flex; gap: 6px; }
     .dagknapper button { font: inherit; font-weight: 600; font-size: .88rem; border: 1px solid var(--kant); background: var(--flade); color: var(--tekst); border-radius: 99px; padding: 7px 13px; cursor: pointer; }
     .dagknapper button:disabled { opacity: .4; cursor: default; }
@@ -45,6 +49,8 @@
     @keyframes puls { 70% { box-shadow: 0 0 0 7px rgba(31,159,76,0); } 100% { box-shadow: 0 0 0 0 rgba(31,159,76,0); } }
     .tal { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .tal span { background: var(--flade); border: 1px solid var(--kant); border-radius: 99px; padding: 5px 11px; font-size: .86rem; font-weight: 600; }
+    .tal .alle { background: var(--top); color: var(--top-tekst); border-color: var(--top); }
+    @media (max-width: 520px) { .dagknapper { width: 100%; } .dagknapper button { flex: 1; } .h { padding: 11px 12px; grid-template-columns: 36px minmax(0, 1fr); } .ikon { width: 36px; height: 36px; font-size: 1.15rem; } }
     .gitter { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
     @media (max-width: 860px) { .gitter { grid-template-columns: minmax(0, 1fr); } }
     .kort-boks { background: var(--flade); border-radius: var(--radius); box-shadow: var(--skygge); overflow: hidden; position: sticky; top: 12px; }
@@ -100,6 +106,6 @@
     </div>
     <p class="fod">Placeringer er omtrentlige og viser kun by eller område. © <a href="https://hrc-fotos.dk" target="_top">HRC-Fotos.dk</a></p>
   </main>
-  <script src="doegn.js?v=1"></script>
+  <script src="doegn.js?v=2"></script>
 </body>
 </html>

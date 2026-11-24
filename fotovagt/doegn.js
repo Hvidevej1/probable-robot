@@ -27,6 +27,18 @@
   }).addTo(kort);
   kort.fitBounds([[54.56, 8.07], [57.75, 12.69]]);
   const lag = L.layerGroup().addTo(kort);
+  // Kortet kan være skjult eller 0 px højt, når det laves (indlejret, lazy iframe). Tilpas, når det får sin størrelse,
+  // så længe brugeren ikke selv har flyttet kortet.
+  let brugerFlyttet = false, sidstePkt = [];
+  for (const ev of ['pointerdown', 'wheel']) kort.getContainer().addEventListener(ev, () => { brugerFlyttet = true; }, { passive: true });
+  const tilpas = () => {
+    kort.invalidateSize();
+    if (brugerFlyttet) return;
+    if (sidstePkt.length > 1) kort.fitBounds(sidstePkt, { padding: [30, 30], maxZoom: 10, animate: false });
+    else if (sidstePkt.length === 1) kort.setView(sidstePkt[0], 10, { animate: false });
+    else kort.fitBounds([[54.56, 8.07], [57.75, 12.69]], { animate: false });
+  };
+  new ResizeObserver(tilpas).observe(kort.getContainer());
   const markører = new Map();
   let førsteVisning = true;
 
@@ -55,7 +67,7 @@
     // Antal pr. kategori
     const antal = {};
     for (const h of hs) antal[h.kategori] = (antal[h.kategori] || 0) + 1;
-    $('#tal').innerHTML = Object.entries(antal).sort((a, b) => b[1] - a[1])
+    $('#tal').innerHTML = (hs.length ? `<span class="alle">${hs.length} i alt</span>` : '') + Object.entries(antal).sort((a, b) => b[1] - a[1])
       .map(([k, n]) => `<span>${IKON[k] || '📍'} ${n} ${esc(k === 'Andet' ? 'andet' : k.toLowerCase())}</span>`).join('');
     // Liste
     $('#liste').innerHTML = hs.length ? hs.map(h => `
@@ -84,12 +96,13 @@
       m.on('click', () => vælg(h.id, false));
       m.addTo(lag); markører.set(h.id, m); pkt.push([h.lat, h.lon]);
     }
-    if (førsteVisning && pkt.length) { kort.fitBounds(pkt, { padding: [30, 30], maxZoom: 10 }); førsteVisning = false; }
+    sidstePkt = pkt;
+    if (førsteVisning) { tilpas(); førsteVisning = false; }
     sendHøjde();
   }
 
   function vælg(id, zoom = true) {
-    valgt = id; tegn();
+    valgt = id; brugerFlyttet = true; tegn();
     const m = markører.get(id);
     if (m && zoom) { kort.setView(m.getLatLng(), Math.max(kort.getZoom(), 10)); m.openPopup(); }
     if (!zoom) document.querySelector(`.h[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -101,7 +114,7 @@
   }
   new ResizeObserver(sendHøjde).observe(document.body);
 
-  const skift = n => { dag = n === 0 ? iDag() : flyt(dag, n); valgt = null; førsteVisning = true; kort.fitBounds([[54.56, 8.07], [57.75, 12.69]]); hent(); };
+  const skift = n => { dag = n === 0 ? iDag() : flyt(dag, n); valgt = null; førsteVisning = true; brugerFlyttet = false; hent(); };
   $('#forrige').onclick = () => skift(-1);
   $('#naeste').onclick = () => skift(1);
   $('#idag').onclick = () => skift(0);
