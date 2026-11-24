@@ -126,5 +126,9 @@ console.log('  kort nyt:', kortNyt.titel, '|', kortNyt.adresse, '|', kortNyt.kat
 tjek('TV2 "kort nyt": titlen er overskriften, ikke "TV2Nord.dk"', /^Mand fik ildebefindende/.test(kortNyt.titel));
 tjek('TV2 "kort nyt": byen tages fra linket (Brønderslev)', kortNyt.adresse === 'Brønderslev' && kortNyt.cirka);
 tjek('Afspillerens knaptekst fjernes', !/Lyt til artiklen/.test(kortNyt.tekst));
+const isl = m => parseBesked({ app: 'PF-Upload', title: '🚒 ' + m, message: `🔥 ISL-Forespørgsel\nBeredskab: ${m === 'Jægerspris' ? 'Frederiksborg Brand og Redning' : 'Brand & Redning Køge'}\nStation: ${m}\n24-11-2026 22:17` });
+tjek('ISL-Forespørgsel fra "Frederiksborg Brand og Redning" er Brand', isl('Jægerspris').kategori === 'Brand');
+tjek('ISL-Forespørgsel fra Allerød og St. Lellinge holdes adskilt (forskellig station)', !findMatch(isl('St. Lellinge'), [aktiv({ ...isl('Allerød'), lat: 55.87, lon: 12.36 })]));
+tjek('Samme ISL-Forespørgsel fra samme station lægges sammen', !!findMatch(isl('Allerød'), [aktiv({ ...isl('Allerød'), lat: 55.87, lon: 12.36 })]));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

@@ -18,7 +18,7 @@
 const KATEGORIER = [
   ['Forsyning', /vandafbrydelse|varmeafbrydelse|strømafbrydelse|fjernvarme|vandledning|elnet|ledningsbrud|\bforsyning\b/i],
   // Redningskoder fra beredskabet (fx "Redn.-Silo/Brønd") vinder over 🔥, som alle beredskabsbeskeder har
-  ['Redning', /\bredn\.|(?<!&\s?)\bredning\b|\bsilo\b|brønd|drukn|person i vand(?:et)?|fastklemt|vandredning|dyreredning/i],
+  ['Redning', /\bredn\.|(?<!(?:&|\bog)\s?)\bredning\b|\bsilo\b|brønd|drukn|person i vand(?:et)?|fastklemt|vandredning|dyreredning/i],
   ['Brand', /🔥|🚒|\bABA\d*|bygn\.?\s?brand|brand(?!væsen)|\bild\b|røg|eksplosion|brænd|skorsten|sprøjte|tankvogn|\bass\.|\bassistance\b/i],
   ['Trafik', /🚗|🚙|🚘|trafik|færdsel|uheld|ulykke|påkørsel|motorvej|frontal|lastbil|(?:^|[\s,.])kø(?=$|[\s,.])|\bE\d{2}\b|spærret|vejarbejde|dyr på vejen/i],
   ['Politi', /🚓|👮|efterlys|varetægt|voldtægt|politi(?! og redning)|anholdt|skud|skyd|knivstik|røveri|indbrud|vold|drab|bevæbnet|aktion/i],
@@ -259,7 +259,7 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     adresse,
     kategori: /politi$/i.test(rentitel)
       ? (findKategori(indhold.slice(0, 2).join(' ')) === 'Andet' ? 'Politi' : findKategori(indhold.slice(0, 2).join(' ')))
-      : findKategori(rentitel, indhold.slice(0, 2).join(' '), tekst.replace(/brandvæsen/gi, '')),
+      : findKategori(rentitel, indhold.slice(0, 2).join(' '), tekst.replace(/^.*\bberedskab:.*$/gim, '').replace(/brandvæsen|brand (?:og|&) redning/gi, '')),
     prioritet: Number.isFinite(+priority) ? +priority : 0,
     url: bedsteLink,
     app: app || null,
@@ -303,6 +303,9 @@ const nøgle = s => renEmoji(s).toLowerCase().replace(KODE_FORKLARING, '').repla
 const adrNøgle = a => /\d/.test(a || '') ? String(a).toLowerCase().replace(/[^a-z0-9æøå]/g, '') : '';
 const fællesStart = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i; };
 
+// Stationen i den første melding ("Station: Allerød")
+const stationAf = h => (String(h.tekst || '').split('\n').filter(l => !l.startsWith('— ')).map(renEmoji)
+  .find(l => /^station:/i.test(l)) || '').replace(/^station:\s*/i, '').trim().toLowerCase();
 const gadeAf = h => findGade([h.adresse || '', ...String(h.tekst || '').split('\n').map(renEmoji)]).toLowerCase();
 const pressemeddelelse = u => (String(u || '').match(/pressemeddelelse\/(\d+)/) || [])[1] || '';
 
@@ -332,7 +335,9 @@ export function findMatch(ny, aktive, nu = Date.now()) {
     const a = nøgle(h.titel), kort = Math.min(a.length, n.length), fælles = fællesStart(a, n);
     // (næsten ens kun for koder med tal, fx forvanskede "Assistance VB V-1 /-`Q" – ikke for "Færdselsuheld …")
     const sammeTitel = (kort >= 6 && fælles === kort) || (fælles >= 10 && fælles >= 0.8 * kort && /\d/.test(a.slice(0, fælles)));
-    if (sammeTitel && !(afstand > (præcis ? 2 : 25))) return h;
+    const hs = stationAf(h), ns = String(ny.station || '').trim().toLowerCase();
+    const andenStation = hs && ns && hs !== ns;
+    if (sammeTitel && !andenStation && !(afstand > (præcis ? 2 : 25))) return h;
     if (præcis && (afstand < 0.1 || (afstand < 0.3 && ny.kategori === h.kategori))) return h;
   }
   // Lægehelikopter: læg den ind i den nærmeste aktive hændelse inden for 3 km (5 km hvis den kun er cirka)

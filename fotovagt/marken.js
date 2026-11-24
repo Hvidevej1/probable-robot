@@ -1,7 +1,7 @@
 // Marken: fotografens telefon. Kort og liste over hændelser, tag en hændelse, meld status.
 import { store } from './store.js';
 import {
-  STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
+  STATUS, H_STATUS, KATEGORI_IKON, ikonFor, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
@@ -42,7 +42,7 @@ function tegnOpgave() {
   const nav = navigationsLink(h);
   el.innerHTML = `
     <div class="opgave-hoved">
-      <span class="kat">${KATEGORI_IKON[h.kategori] || '📍'}</span>
+      <span class="kat">${ikonFor(h)}</span>
       <div>
         <p class="lille">Din opgave · taget kl. ${klokken(h.taget_tid)}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>
         <h2>${esc(h.titel)}</h2>
@@ -65,7 +65,7 @@ function kort_(h) {
   const min = h.taget_af === mig.id;
   return `
     <article class="h-kort h-${h.status}${min ? ' min' : ''}" data-id="${h.id}">
-      <span class="kat">${KATEGORI_IKON[h.kategori] || '📍'}</span>
+      <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
         <h3>${esc(h.titel)}</h3>
         <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
@@ -168,7 +168,7 @@ function tegnTilbud() {
     return `
       <div class="tilbud-boks" data-tilbud="${t.id}">
         <div class="tilbud-top"><span class="tilbud-mærke">📩 Tilbud til dig</span><span class="tilbud-tid" data-udloeber="${t.udloeber}">${nedtælling(t.udloeber)}</span></div>
-        <div class="opgave-hoved"><span class="kat">${KATEGORI_IKON[h.kategori] || '📍'}</span>
+        <div class="opgave-hoved"><span class="kat">${ikonFor(h)}</span>
           <div><h2>${esc(h.titel)}</h2>
             <p class="adresse">${esc(h.adresse || '')}${t.afstand_km != null ? ` · <b>${kmTekst(t.afstand_km)} fra dig</b>` : ''}</p></div></div>
         <div class="knap-række">
@@ -218,7 +218,7 @@ function visHaendelse(id, åbn = true) {
   const min = h.taget_af === mig.id;
   const dlg = $('#dlg-haendelse');
   gentegnMedFormular(dlg.querySelector('.ark-indhold'), `
-    <div class="ark-top"><span class="kat stor">${KATEGORI_IKON[h.kategori] || '📍'}</span>
+    <div class="ark-top"><span class="kat stor">${ikonFor(h)}</span>
       <button class="luk" data-luk aria-label="Luk">✕</button></div>
     <h2>${esc(h.titel)}</h2>
     <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${d != null ? ` · ${kmTekst(d)} væk` : ''}</p>

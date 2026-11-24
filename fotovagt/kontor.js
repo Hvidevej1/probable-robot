@@ -2,7 +2,7 @@
 import { store } from './store.js';
 import { parseBesked } from './supabase/functions/pushover/parse.js';
 import {
-  STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, set,
+  STATUS, H_STATUS, KATEGORI_IKON, ikonFor, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, set,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm, nedtælling,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
@@ -71,7 +71,7 @@ function tegnFotografer() {
         <div class="foto-info">
           <b>${esc(p.navn)}</b>${aktiveSos().some(x => x.bruger === p.id) ? ' <span class="sos-maerke">SOS</span>' : ''}
           <span class="lille"><span class="status-tekst" style="--c:${st.farve}">${st.tekst}</span> · ${siden(p.status_tid)}${gammel ? ` · <span class="advarsel">ikke set i ${siden(p.sidst_set) || 'lang tid'}</span>` : ''}</span>
-          ${h ? `<button class="link opgave-link" data-zoom="${h.id}">${KATEGORI_IKON[h.kategori] || '📍'} ${esc(h.titel)}</button>` : ''}
+          ${h ? `<button class="link opgave-link" data-zoom="${h.id}">${ikonFor(h)} ${esc(h.titel)}</button>` : ''}
         </div>
         <div class="foto-knapper">
           ${p.telefon ? `<a class="ikon-knap" href="tel:${esc(p.telefon)}" title="Ring til ${esc(p.navn)}">📞</a>` : ''}
@@ -106,7 +106,7 @@ function haendelseKort(h) {
   const taget = h.taget_af ? P(h.taget_af) : null;
   return `
     <article class="h-kort h-${h.status}${valgtId === h.id ? ' valgt' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
-      <span class="kat">${KATEGORI_IKON[h.kategori] || '📍'}</span>
+      <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
@@ -177,7 +177,7 @@ function tegnTidslinje() {
   const dlg = $('#dlg-tidslinje'), h = H(tidslinjeId);
   if (!h || !dlg.open) return;
   gentegnMedFormular(dlg.querySelector('.ark-indhold'), `
-    <div class="ark-top"><span class="kat stor">${KATEGORI_IKON[h.kategori] || '📍'}</span><button class="luk" data-luk-tl aria-label="Luk">✕</button></div>
+    <div class="ark-top"><span class="kat stor">${ikonFor(h)}</span><button class="luk" data-luk-tl aria-label="Luk">✕</button></div>
     <h2>${esc(h.titel)}</h2>
     <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${h.cirka ? ' (ca.)' : ''}</p>
     <p class="lille">Modtaget kl. ${klokken(h.oprettet)} · ${H_STATUS[h.status]}${h.taget_af ? ` · ${esc(navn(h.taget_af))}` : ''}</p>

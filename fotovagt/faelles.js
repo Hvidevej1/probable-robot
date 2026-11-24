@@ -14,6 +14,8 @@ export const H_STATUS = {
 export const KATEGORI_IKON = {
   Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Miljø: '☣️', Vejr: '🌧️', Forsyning: '🔧', Andet: '📍',
 };
+// Ikonet for en hændelse: kategorien, men indsatsleder-opgaver (ISL) får en brandmand
+export const ikonFor = h => /^\s*(?:ISL\b|indsatsleder)/i.test(h?.titel || '') ? '🧑‍🚒' : (KATEGORI_IKON[h?.kategori] || '📍');
 // Seneste live opdatering, der er lagt ind i hændelsen ("— kl. 19:42 PF-Upload: …")
 export function senesteOpdatering(h) {
   const l = String(h?.tekst || '').split('\n').filter(x => x.startsWith('— ')).pop();
@@ -203,7 +205,7 @@ export function lavKort(el) {
 }
 
 export function haendelsesIkon(h, valgt = false) {
-  const ikon = KATEGORI_IKON[h.kategori] || KATEGORI_IKON.Andet;
+  const ikon = ikonFor(h);
   return L.divIcon({
     className: '',
     html: `<div class="pin pin-${h.status}${valgt ? ' valgt' : ''}${h.status === 'ny' ? ' puls' : ''}${h.cirka ? ' cirka' : ''}"><span>${ikon}</span></div>`,
