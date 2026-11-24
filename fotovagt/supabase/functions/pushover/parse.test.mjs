@@ -121,5 +121,10 @@ const redn = parseBesked({ title: '🔥 Redn.-Silo/Brønd', message: '🔥 Redn.
 tjek('"Redn.-Silo/Brønd" bliver Redning (ikke Brand)', redn.kategori === 'Redning');
 const bygn = parseBesked({ title: '🔥 Bygn.brand-Villa', message: '🔥 Bygn.brand-Villa\nBeredskab: Midtjysk Brand & Redning\nStation: Ørum', app: 'Mast' });
 tjek('Bygningsbrand med "Brand & Redning" i teksten er stadig Brand', bygn.kategori === 'Brand');
+const kortNyt = parseBesked({ app: 'PF-Upload', title: 'TV2Nord.dk', url: 'https://www.tv2nord.dk/kort-nyt/broenderslev/mand-fik-ildebefindende-under-madlavning-vakse-naboer-reddet-ham-ud-af-braendende-hus-72030', message: 'Mand fik ildebefindende under madlavning - vakse naboer reddet ham ud af brændende hus\nLyt til artiklen Stop afspilningen Genoptag afspilning En nordjysk mand i fik et ildebefindende under madlavningen tirsdag aften.' });
+console.log('  kort nyt:', kortNyt.titel, '|', kortNyt.adresse, '|', kortNyt.kategori);
+tjek('TV2 "kort nyt": titlen er overskriften, ikke "TV2Nord.dk"', /^Mand fik ildebefindende/.test(kortNyt.titel));
+tjek('TV2 "kort nyt": byen tages fra linket (Brønderslev)', kortNyt.adresse === 'Brønderslev' && kortNyt.cirka);
+tjek('Afspillerens knaptekst fjernes', !/Lyt til artiklen/.test(kortNyt.tekst));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

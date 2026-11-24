@@ -87,11 +87,15 @@ function findGade(L) {
   return '';
 }
 
+const SEKTION = /^(?:nyheder|artikel|video|live|sport|kort-nyt|kortnyt|breaking|seneste|nyt|indland|regionalt|112|krimi|trafik|politi|vejr)$/i;
 // Regionale TV-stationers links har kommunen først i stien: tv2ostjylland.dk/aarhus/…, tvsyd.dk/kolding/…
 export function byFraLink(links) {
   for (const u of links || []) {
-    const m = String(u).match(/^https?:\/\/(?:www\.)?(?:tv2[a-z]*|tvsyd|tvmidtvest|tv2fyn|tv2nord|tv2east|tv2kosmopol|lorry)\.dk\/([a-zæøå-]+)\//i);
-    if (m && !/^(?:nyheder|artikel|video|live|sport)$/i.test(m[1])) return m[1].split('-').map(o => o[0].toUpperCase() + o.slice(1)).join(' ');
+    const m = String(u).match(/^https?:\/\/(?:www\.)?(?:tv2[a-z]*|tvsyd|tvmidtvest|tv2fyn|tv2nord|tv2east|tv2kosmopol|lorry)\.dk\/(.+)$/i);
+    if (!m) continue;
+    const dele = m[1].split(/[/?#]/).slice(0, -1);   // sidste del er selve artiklen
+    const by = dele.find(d => /^[a-zæøå-]+$/i.test(d) && !SEKTION.test(d));
+    if (by) return by.replace(/oe/g, 'ø').replace(/ae/g, 'æ').split('-').map(o => o[0].toUpperCase() + o.slice(1)).join(' ');
   }
   return '';
 }
@@ -185,7 +189,7 @@ export function findKategori(...tekster) {
 
 // Linjer, der ikke er selve meldingen (bruges ikke til titel)
 const METALINJE = /^(?:beredskab|station|adresse|lokation|featureid|se placering|se på google|detekteret kl|forventes at vare|læs mere|postnummer|by:|type:|berørte|årsag|start:|forventet slut|netselskab|akut:)|^\d{2}-\d{2}-\d{4}|^https?:\/\/|^ai-detektion/i;
-const GENERISK_TITEL = /^(?:trafikmelding|1-1-2.*|112.*|alarm|besked|breaking|.*\bpoliti)$/i;
+const GENERISK_TITEL = /^(?:trafikmelding|1-1-2.*|112.*|alarm|besked|breaking|nyhed(?:er)?|.*\bpoliti|(?:www\.)?[a-z0-9æøå-]+\.dk)$/i;
 const NYHEDSKILDE = /^(?:breaking:?\s*)?[A-Za-z0-9æøå-]+\.dk:\s*/i;
 const VEJLINJE = /^(?:E\d{1,3}|Rute\s?\d+|M\d{1,2}\b)|motorvej/i;
 
@@ -194,7 +198,7 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
   let html = String(message || '');
   const links = [...html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)].map(m => afkod(m[1]));
   html = html.replace(/<br\s*\/?>|<\/p>|<\/div>/gi, '\n').replace(/<\/?[a-z][^>]*>/gi, ' ');
-  const alle = afkod(html).split('\n').map(l => l.replace(/[ \t]+/g, ' ').trim());
+  const alle = afkod(html).split('\n').map(l => l.replace(/Lyt til artiklen\s*Stop afspilningen\s*Genoptag afspilning\s*/gi, '').replace(/[ \t]+/g, ' ').trim());
   links.push(...(alle.join(' ').match(/https?:\/\/[^\s<>"]+/g) || []));
   if (url) links.unshift(url);
 
