@@ -130,5 +130,7 @@ const isl = m => parseBesked({ app: 'PF-Upload', title: '🚒 ' + m, message: `�
 tjek('ISL-Forespørgsel fra "Frederiksborg Brand og Redning" er Brand', isl('Jægerspris').kategori === 'Brand');
 tjek('ISL-Forespørgsel fra Allerød og St. Lellinge holdes adskilt (forskellig station)', !findMatch(isl('St. Lellinge'), [aktiv({ ...isl('Allerød'), lat: 55.87, lon: 12.36 })]));
 tjek('Samme ISL-Forespørgsel fra samme station lægges sammen', !!findMatch(isl('Allerød'), [aktiv({ ...isl('Allerød'), lat: 55.87, lon: 12.36 })]));
+const nakskov = parseBesked({ app: 'PF-Upload', title: '👮🏼‍♂️ Midt- og Vestsjællands Politi', message: 'Vi er nu færdige med vores foreløbige undersøgelser i området ved Bredgade i forbindelse med det mistænkelige dødsfald.\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15309885/mistaenkeligt-dodsfald-i-nakskov-vidner-soges?lang=da#sm-15310548' });
+tjek('Politiets opfølgning: byen findes i linket (Bredgade, Nakskov)', nakskov.adresse === 'Bredgade, Nakskov');
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

@@ -9,6 +9,11 @@
   if (q.get('tema') === 'lys' || q.get('tema') === 'mørk') document.documentElement.dataset.theme = q.get('tema') === 'lys' ? 'light' : 'dark';
 
   const IKON = { Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Miljø: '☣️', Vejr: '🌧️', Forsyning: '🔧', Andet: '📍' };
+  const FARVE = { Brand: 'var(--brand)', Trafik: 'var(--trafik)', Politi: 'var(--politi)', Redning: 'var(--redning)', Miljø: 'var(--miljø)', Vejr: 'var(--vejr)', Forsyning: 'var(--forsyning)', Andet: 'var(--andet)' };
+  // Lægehelikopter og indsatsleder (ISL) får deres eget ikon
+  const ikon = h => h.ikon === 'helikopter' ? '🚁' : h.ikon === 'isl' ? '🧑‍🚒' : (IKON[h.kategori] || '📍');
+  const farve = k => FARVE[k] || FARVE.Andet;
+  const langDag = d => new Date(d + 'T12:00:00Z').toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
   const TZ = 'Europe/Copenhagen';
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const kl = iso => new Date(iso).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
@@ -52,9 +57,11 @@
       if (!r.ok) throw new Error('Svar ' + r.status);
       data = await r.json();
       tegn();
-      $('#opdateret').innerHTML = `<span class="live"></span><span>${dag === iDag() ? 'Opdateres automatisk · ' : ''}senest hentet kl. ${kl(new Date().toISOString())}</span>`;
+      const o = $('#opdateret');
+      o.className = dag === iDag() ? 'live' : 'live gammel';
+      o.textContent = dag === iDag() ? `Live · opdateret ${kl(new Date().toISOString())}` : 'Arkiv';
     } catch {
-      $('#opdateret').innerHTML = '<span>Kunne ikke hente døgnrapporten lige nu. Prøver igen om lidt.</span>';
+      const o = $('#opdateret'); o.className = 'live gammel'; o.textContent = 'Kan ikke hente lige nu – prøver igen';
     }
   }
 
@@ -65,22 +72,24 @@
     for (const k of [...filter]) if (!alle.some(h => h.kategori === k)) filter.delete(k);
     const hs = filter.size ? alle.filter(h => filter.has(h.kategori)) : alle;
     const vis = filter.size ? `${hs.length} af ${alle.length}` : `${alle.length}`;
-    $('#dag-titel').textContent = `${dagTekst(dag)[0].toUpperCase()}${dagTekst(dag).slice(1)} · ${vis} hændelse${alle.length === 1 ? '' : 'r'}`;
+    const dt = langDag(dag);
+    $('#dag-titel').textContent = `${dag === iDag() ? 'I dag, ' : dag === flyt(iDag(), -1) ? 'I går, ' : ''}${dag === iDag() || dag === flyt(iDag(), -1) ? dt : dt[0].toUpperCase() + dt.slice(1)} · ${vis} hændelse${alle.length === 1 ? '' : 'r'}`;
     $('#naeste').disabled = dag >= iDag();
     $('#idag').disabled = dag === iDag();
     $('#forrige').disabled = dag <= flyt(iDag(), -60);
     // Antal pr. kategori
     const antal = {};
     for (const h of alle) antal[h.kategori] = (antal[h.kategori] || 0) + 1;
-    $('#tal').innerHTML = (alle.length ? `<button type="button" class="filter${filter.size ? '' : ' valgt'}" data-kat="" aria-pressed="${!filter.size}">${alle.length} i alt</button>` : '')
+    $('#tal').innerHTML = !alle.length ? '' : `<span class="filtre-navn">Filtrér</span>`
+      + `<button type="button" class="filter${filter.size ? '' : ' valgt'}" data-kat="" aria-pressed="${!filter.size}" style="--k: var(--accent)">Alle <b>${alle.length}</b></button>`
       + Object.entries(antal).sort((a, b) => b[1] - a[1])
-        .map(([k, n]) => `<button type="button" class="filter${filter.has(k) ? ' valgt' : ''}" data-kat="${esc(k)}" aria-pressed="${filter.has(k)}" title="Vis kun ${esc(k.toLowerCase())}">${IKON[k] || '📍'} ${n} ${esc(k === 'Andet' ? 'andet' : k.toLowerCase())}</button>`).join('');
+        .map(([k, n]) => `<button type="button" class="filter${filter.has(k) ? ' valgt' : ''}" data-kat="${esc(k)}" aria-pressed="${filter.has(k)}" style="--k: ${farve(k)}" title="Vis kun ${esc(k.toLowerCase())}">${IKON[k] || '📍'} ${esc(k === 'Andet' ? 'Andet' : k)} <b>${n}</b></button>`).join('');
     // Liste
     $('#liste').innerHTML = hs.length ? hs.map(h => `
-      <article class="h${valgt === h.id ? ' valgt' : ''}" data-id="${h.id}" tabindex="0">
-        <div class="ikon" aria-hidden="true">${IKON[h.kategori] || '📍'}</div>
+      <article class="h${valgt === h.id ? ' valgt' : ''}" data-id="${h.id}" tabindex="0" style="--k: ${farve(h.kategori)}">
+        <div class="ikon" aria-hidden="true">${ikon(h)}</div>
         <div>
-          <h3>${esc(h.overskrift)} <span class="tid">kl. ${kl(h.tid)}</span></h3>
+          <h3>${esc(h.overskrift)}</h3>
           ${h.sted ? `<p class="sted">${esc(h.sted)}</p>` : ''}
           <div class="mærker">
             <span class="mærke ${h.status === 'aktiv' ? 'aktiv' : ''}">${h.status === 'aktiv' ? 'I gang' : 'Afsluttet'}</span>
@@ -88,6 +97,7 @@
           </div>
           ${h.kommentarer?.length ? `<ul class="kommentarer">${h.kommentarer.map(k => `<li><time>${kl(k.tid)}</time>${esc(k.tekst)}</li>`).join('')}</ul>` : ''}
         </div>
+        <span class="tid">${kl(h.tid)}</span>
       </article>`).join('')
       : `<div class="tom">${filter.size ? 'Ingen hændelser i det valgte filter.' : dag === iDag() ? 'Ingen hændelser endnu i dag.' : 'Ingen hændelser denne dag.'}</div>`;
     // Kort
@@ -96,13 +106,18 @@
     for (const h of hs) {
       if (h.lat == null) continue;
       const m = L.marker([h.lat, h.lon], {
-        icon: L.divIcon({ className: '', html: `<div class="pin ${h.status === 'aktiv' ? '' : 'afsluttet'}${valgt === h.id ? ' valgt' : ''}">${IKON[h.kategori] || '📍'}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] }),
+        icon: L.divIcon({ className: '', html: `<div class="pin ${h.status === 'aktiv' ? '' : 'afsluttet'}${valgt === h.id ? ' valgt' : ''}" style="--k: ${farve(h.kategori)}">${ikon(h)}</div>`, iconSize: [36, 36], iconAnchor: [18, 18] }),
         zIndexOffset: h.status === 'aktiv' ? 500 : 0,
       }).bindPopup(`<b>${esc(h.overskrift)}</b><br>${esc(h.sted || '')}<br><small>kl. ${kl(h.tid)} · ${h.status === 'aktiv' ? 'I gang' : 'Afsluttet'}</small>`);
       m.on('click', () => vælg(h.id, false));
       m.addTo(lag); markører.set(h.id, m); pkt.push([h.lat, h.lon]);
     }
     sidstePkt = pkt;
+    // Hændelser uden placering (fx en pressemeddelelse uden by) står kun i listen – sig det på kortet
+    const uden = hs.length - pkt.length, tom = $('#kort-tom');
+    tom.hidden = !(hs.length && !pkt.length);
+    tom.querySelector('span').textContent = hs.length === 1 ? 'Hændelsen har ingen placering på kortet – se listen' : 'De valgte hændelser har ingen placering på kortet – se listen';
+    if (uden && pkt.length) kort.attributionControl.setPrefix(`${uden} uden placering`); else kort.attributionControl.setPrefix('');
     if (førsteVisning) { tilpas(); førsteVisning = false; }
     sendHøjde();
   }

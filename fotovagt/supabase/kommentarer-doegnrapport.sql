@@ -160,6 +160,8 @@ language sql stable security definer set search_path = public as $$
         'id', left(md5(h.id::text), 12),
         'tid', h.oprettet,
         'kategori', coalesce(h.kategori, 'Andet'),
+        'ikon', case when h.titel ~* 'helikopter' then 'helikopter'
+                     when h.titel ~* '^\s*(ISL\M|indsatsleder)' then 'isl' end,
         'overskrift', coalesce(nullif(trim(h.offentlig_titel), ''),
           case coalesce(h.kategori, 'Andet') when 'Andet' then 'Hændelse' else h.kategori end),
         'sted', coalesce(h.omraade, offentlig_adresse(h.adresse)),

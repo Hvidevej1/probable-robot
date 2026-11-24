@@ -14,8 +14,9 @@ export const H_STATUS = {
 export const KATEGORI_IKON = {
   Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Miljø: '☣️', Vejr: '🌧️', Forsyning: '🔧', Andet: '📍',
 };
-// Ikonet for en hændelse: kategorien, men indsatsleder-opgaver (ISL) får en brandmand
-export const ikonFor = h => /^\s*(?:ISL\b|indsatsleder)/i.test(h?.titel || '') ? '🧑‍🚒' : (KATEGORI_IKON[h?.kategori] || '📍');
+// Ikonet for en hændelse: kategorien, men lægehelikopter får en helikopter og indsatsleder-opgaver (ISL) en brandmand
+export const ikonFor = h => /helikopter/i.test(h?.titel || '') ? '🚁'
+  : /^\s*(?:ISL\b|indsatsleder)/i.test(h?.titel || '') ? '🧑‍🚒' : (KATEGORI_IKON[h?.kategori] || '📍');
 // Seneste live opdatering, der er lagt ind i hændelsen ("— kl. 19:42 PF-Upload: …")
 export function senesteOpdatering(h) {
   const l = String(h?.tekst || '').split('\n').filter(x => x.startsWith('— ')).pop();

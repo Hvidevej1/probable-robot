@@ -92,6 +92,12 @@ const SEKTION = /^(?:nyheder|artikel|video|live|sport|kort-nyt|kortnyt|breaking|
 export function byFraLink(links) {
   for (const u of links || []) {
     const m = String(u).match(/^https?:\/\/(?:www\.)?(?:tv2[a-z]*|tvsyd|tvmidtvest|tv2fyn|tv2nord|tv2east|tv2kosmopol|lorry)\.dk\/(.+)$/i);
+    // Politiets pressemeddelelser (via.ritzau.dk/pressemeddelelse/123/mistaenkeligt-dodsfald-i-nakskov-…): byen står efter "-i-"
+    const pm = String(u).match(/ritzau\.dk\/pressemeddelelse\/\d+\/([a-z0-9-]+)/i);
+    const iBy = pm && [...pm[1].matchAll(/-(?:i|ved|nær|naer)-([a-z]{3,}(?:-(?:s|n|v|c|nord|syd|oest|vest))?)(?=-|$)/gi)].pop();
+    if (iBy && !/^(?:forbindelse|bil|lejlighed|hus|huset|bolig|butik|nat|morges|aftes|weekenden|dag|gaar|omraadet|sagen)$/i.test(iBy[1])) {
+      return iBy[1].replace(/oe/g, 'ø').replace(/ae/g, 'æ').split('-').map(o => o[0].toUpperCase() + o.slice(1)).join(' ');
+    }
     if (!m) continue;
     const dele = m[1].split(/[/?#]/).slice(0, -1);   // sidste del er selve artiklen
     const by = dele.find(d => /^[a-zæøå-]+$/i.test(d) && !SEKTION.test(d));

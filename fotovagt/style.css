@@ -552,3 +552,18 @@ body.marken .skift { flex: none; }
 .rapport-navn { margin: 18px 0 2px; font-size: 1.05rem; scroll-margin-top: 10px; }
 .rapport-navn small { color: var(--dæmpet); font-weight: 500; font-size: .82rem; }
 .tom-rapport { color: var(--dæmpet); padding: 12px 0; }
+
+.rapport-hoved { display: flex; align-items: center; gap: 12px; background: var(--top); color: var(--top-tekst); border-radius: var(--radius-s); padding: 12px 14px; margin: 6px 0 12px; }
+.rapport-hoved img { border-radius: 10px; }
+.rapport-hoved b { display: block; font-size: 1.1rem; }
+.rapport-hoved span { color: var(--top-dæmpet); font-size: .86rem; }
+.rapport-kpi { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 640px) { .rapport-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rapport-kpi div { background: var(--flade2); border: 1px solid var(--kant); border-radius: var(--radius-s); padding: 10px 12px; border-left: 4px solid var(--ledig); }
+.rapport-kpi div:nth-child(2) { border-left-color: var(--ankommet); }
+.rapport-kpi div:nth-child(3) { border-left-color: var(--optaget); }
+.rapport-kpi div:nth-child(4) { border-left-color: var(--pause); }
+.rapport-kpi b { display: block; font-size: 1.35rem; font-weight: 800; }
+.rapport-kpi b small { font-size: .8rem; color: var(--dæmpet); font-weight: 600; }
+.rapport-kpi span { color: var(--dæmpet); font-size: .8rem; }
+.rapport-tabel tr.nul td { color: var(--dæmpet); }

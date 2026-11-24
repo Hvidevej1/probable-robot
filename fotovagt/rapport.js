@@ -1,4 +1,4 @@
-// Fotografrapport for kontoret: hvilke hændelser hver fotograf har kørt på i en periode.
+// Indsatsrapport for kontoret: hvilke hændelser hver fotograf har kørt på i en periode.
 // Kan hentes som PDF (jsPDF, indlæses først når den skal bruges) og som CSV, der åbner i Excel.
 import { store } from './store.js';
 import { esc, $, toast, prøv } from './faelles.js';
@@ -55,6 +55,10 @@ async function byg(fra, til, foto) {
     if (!grupper.has(h.taget_af)) grupper.set(h.taget_af, { id: h.taget_af, navn: navn(h.taget_af), rækker: [] });
     grupper.get(h.taget_af).rækker.push(r);
   }
+  // Alle fotografer kommer med, også nye og dem uden opgaver i perioden
+  if (!foto) for (const p of store.state.profiler.filter(p => p.rolle === 'foto')) {
+    if (!grupper.has(p.id)) grupper.set(p.id, { id: p.id, navn: p.navn, rækker: [] });
+  }
   const liste = [...grupper.values()].map(g => {
     g.rækker.sort((a, b) => a.h.oprettet.localeCompare(b.h.oprettet));
     const medTid = g.rækker.filter(r => r.min != null);
@@ -67,25 +71,43 @@ async function byg(fra, til, foto) {
   return data;
 }
 
+const TITEL = 'Indsatsrapport', UNDERTITEL = 'Opgaver pr. fotograf';
 const periodeTekst = d => d.fra === d.til ? dato(dagStart(d.fra).toISOString()) : `${dato(dagStart(d.fra).toISOString())} – ${dato(dagStart(d.til).toISOString())}`;
+const nøgletal = d => {
+  const aktive = d.grupper.filter(g => g.sum.antal);
+  const min = aktive.reduce((s, g) => s + (g.sum.min || 0), 0);
+  return { antal: aktive.reduce((s, g) => s + g.sum.antal, 0), fotografer: aktive.length, i_alt: d.grupper.length,
+    ankommet: aktive.reduce((s, g) => s + g.sum.ankommet, 0), min: aktive.some(g => g.sum.min != null) ? min : null };
+};
 
 function visning(d) {
-  if (!d.grupper.length) return '<p class="tom-rapport">Ingen fotografer har kørt på hændelser i perioden.</p>';
-  const total = d.grupper.reduce((s, g) => s + g.sum.antal, 0);
+  const n = nøgletal(d);
+  if (!d.grupper.length) return '<p class="tom-rapport">Der er ingen fotografer endnu.</p>';
   return `
+    <div class="rapport-hoved">
+      <img src="icon-192.png" alt="" width="40" height="40">
+      <div><b>${TITEL}</b><span>${UNDERTITEL} · ${periodeTekst(d)}</span></div>
+    </div>
+    <div class="rapport-kpi">
+      <div><b>${n.antal}</b><span>hændelser</span></div>
+      <div><b>${n.fotografer}<small> af ${n.i_alt}</small></b><span>fotografer kørte</span></div>
+      <div><b>${n.ankommet}</b><span>ankommet på stedet</span></div>
+      <div><b>${varighed(n.min) || '–'}</b><span>tid på opgaver</span></div>
+    </div>
     <table class="rapport-tabel oversigt">
       <thead><tr><th>Fotograf</th><th>Hændelser</th><th>Ankommet</th><th>Afsluttet</th><th>Tid på opgaver</th></tr></thead>
-      <tbody>${d.grupper.map(g => `<tr><td><a href="#r-${g.id}">${esc(g.navn)}</a></td><td>${g.sum.antal}</td><td>${g.sum.ankommet}</td><td>${g.sum.afsluttet}</td><td>${varighed(g.sum.min)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td>I alt</td><td>${total}</td><td colspan="3"></td></tr></tfoot>
+      <tbody>${d.grupper.map(g => `<tr class="${g.sum.antal ? '' : 'nul'}"><td>${g.sum.antal ? `<a href="#r-${g.id}">${esc(g.navn)}</a>` : esc(g.navn)}</td><td>${g.sum.antal}</td><td>${g.sum.ankommet}</td><td>${g.sum.afsluttet}</td><td>${varighed(g.sum.min) || '–'}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>I alt</td><td>${n.antal}</td><td>${n.ankommet}</td><td colspan="2"></td></tr></tfoot>
     </table>
-    ${d.grupper.map(g => `
+    ${d.grupper.filter(g => g.sum.antal).map(g => `
       <h3 class="rapport-navn" id="r-${g.id}">${esc(g.navn)} <small>${g.sum.antal} hændelse${g.sum.antal === 1 ? '' : 'r'} · ${varighed(g.sum.min) || '–'}</small></h3>
       <div class="rapport-rul"><table class="rapport-tabel">
         <thead><tr><th>Dato</th><th>Kl.</th><th>Hændelse</th><th>Sted</th><th>Taget</th><th>Ankom</th><th>Slut</th><th>Tid</th><th>Status</th></tr></thead>
         <tbody>${g.rækker.map(r => `<tr>
           <td>${r.dato}</td><td>${r.kl}</td><td><b>${esc(r.titel)}</b><br><small>${esc(r.kategori)}${r.note ? ` · ${esc(r.note)}` : ''}</small></td>
           <td>${esc(r.sted)}</td><td>${r.taget}</td><td>${r.ankommet}</td><td>${r.afsluttet}</td><td>${varighed(r.min)}</td><td>${esc(r.status)}</td></tr>`).join('')}</tbody>
-      </table></div>`).join('')}`;
+      </table></div>`).join('')}
+    ${n.antal ? '' : '<p class="tom-rapport">Ingen fotografer har kørt på hændelser i perioden.</p>'}`;
 }
 
 // ---------- PDF ----------
@@ -94,66 +116,107 @@ function hentScript(src) {
   return new Promise((ok, fejl) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => fejl(new Error('PDF-værktøjet kunne ikke hentes.')); document.head.append(s); });
 }
 const indlæsPdf = () => pdfKlar ||= hentScript('vendor/jspdf-2.5.2/jspdf.umd.min.js').then(() => hentScript('vendor/jspdf-2.5.2/jspdf.plugin.autotable.min.js'));
-const filnavn = (d, ext) => `fotografrapport_${d.fra}${d.fra === d.til ? '' : '_til_' + d.til}.${ext}`;
+const filnavn = (d, ext) => `indsatsrapport_${d.fra}${d.fra === d.til ? '' : '_til_' + d.til}.${ext}`;
 // Standardskrifterne i PDF kan ikke vise emojis
 const ren = s => String(s ?? '').replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, '').replace(/\s{2,}/g, ' ').trim();
+async function billede(src) {
+  const r = await fetch(src); const b = await r.blob();
+  return new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(b); });
+}
+const KAT_FARVE = { Brand: [255, 90, 31], Trafik: [232, 52, 58], Politi: [47, 111, 228], Redning: [245, 158, 11], Miljø: [22, 163, 74], Vejr: [14, 165, 233], Forsyning: [139, 92, 246], Andet: [140, 140, 150] };
 
 async function lavPdf(d) {
   await indlæsPdf();
+  const logo = await billede('hrc-fotos-logo.png').catch(() => null);
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const B = doc.internal.pageSize.getWidth(), M = 12;
-  const mørk = [28, 28, 33], grå = [91, 101, 118], accent = [47, 128, 255];
+  doc.setProperties({ title: `${TITEL} ${periodeTekst(d)}`, author: 'HRC-Fotos', creator: 'Fotovagt' });
+  const B = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 14;
+  const mørk = [28, 28, 33], tekst = [18, 23, 34], grå = [91, 101, 118], lys = [244, 246, 249], kant = [225, 230, 238], accent = [47, 128, 255];
+  const farver = [[31, 159, 76], [47, 128, 255], [232, 52, 58], [255, 194, 26]];
+  // Sidehoved: mørkt bånd med logo, titel og periode + logoets fire farver som en tynd stribe
   const top = () => {
-    doc.setFillColor(...mørk); doc.rect(0, 0, B, 18, 'F');
-    doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-    doc.text('Fotografrapport', M, 11.5);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    doc.text(`HRC-Fotos · ${periodeTekst(d)}`, B - M, 11.5, { align: 'right' });
+    doc.setFillColor(...mørk); doc.rect(0, 0, B, 22, 'F');
+    farver.forEach((f, i) => { doc.setFillColor(...f); doc.rect(i * B / 4, 22, B / 4, 1.2, 'F'); });
+    if (logo) doc.addImage(logo, 'PNG', M, 4.5, 26.4, 13.6, 'hrclogo', 'FAST');
+    const x = M + (logo ? 32 : 0);
+    doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+    doc.text(TITEL, x, 11.5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(185, 188, 198);
+    doc.text(UNDERTITEL, x, 16.5);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255);
+    doc.text(periodeTekst(d), B - M, 11.5, { align: 'right' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(185, 188, 198);
+    doc.text(`Lavet ${dato(d.lavet.toISOString())} kl. ${kl(d.lavet.toISOString())}`, B - M, 16.5, { align: 'right' });
   };
   top();
-  let y = 27;
-  doc.setTextColor(...grå); doc.setFontSize(9);
-  doc.text(`Periode: ${periodeTekst(d)}   ·   Lavet ${dato(d.lavet.toISOString())} kl. ${kl(d.lavet.toISOString())}   ·   Hændelser, hvor fotografen tog eller fik opgaven`, M, y);
-  y += 6;
-  const total = d.grupper.reduce((s, g) => s + g.sum.antal, 0);
+  let y = 31;
+  // Nøgletal som fire kort
+  const n = nøgletal(d);
+  const kort = [[String(n.antal), 'hændelser'], [`${n.fotografer} af ${n.i_alt}`, 'fotografer kørte'], [String(n.ankommet), 'ankommet på stedet'], [varighed(n.min) || '–', 'tid på opgaver']];
+  const kb = (B - 2 * M - 3 * 5) / 4;
+  kort.forEach(([tal, navn], i) => {
+    const x = M + i * (kb + 5);
+    doc.setFillColor(...lys); doc.setDrawColor(...kant); doc.roundedRect(x, y, kb, 19, 2.5, 2.5, 'FD');
+    doc.setFillColor(...farver[i]); doc.rect(x, y + 3, 1.2, 13, 'F');
+    doc.setTextColor(...tekst); doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text(tal, x + 6, y + 10);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...grå); doc.text(navn, x + 6, y + 15.5);
+  });
+  y += 27;
   const fælles = {
-    theme: 'grid', margin: { left: M, right: M, top: 24 },
-    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 1.8, lineColor: [223, 228, 236], lineWidth: 0.2, textColor: [18, 23, 34], overflow: 'linebreak' },
-    headStyles: { fillColor: [234, 238, 244], textColor: [18, 23, 34], fontStyle: 'bold' },
+    theme: 'plain', margin: { left: M, right: M, top: 30, bottom: 14 },
+    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 2, bottom: 2, left: 2.2, right: 2.2 }, textColor: tekst, overflow: 'linebreak', lineColor: kant },
+    headStyles: { fillColor: mørk, textColor: 255, fontStyle: 'bold', fontSize: 8 },
     alternateRowStyles: { fillColor: [248, 250, 252] },
+    bodyStyles: { lineWidth: { bottom: 0.2 } },
     didDrawPage: () => top(),
   };
+  doc.setTextColor(...tekst); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('Oversigt', M, y); y += 2.5;
   doc.autoTable({
     ...fælles, startY: y,
     head: [['Fotograf', 'Hændelser', 'Ankommet', 'Afsluttet', 'Tid på opgaver']],
     body: d.grupper.map(g => [ren(g.navn), g.sum.antal, g.sum.ankommet, g.sum.afsluttet, varighed(g.sum.min) || '–']),
-    foot: [['I alt', total, '', '', '']],
-    footStyles: { fillColor: [234, 238, 244], textColor: [18, 23, 34], fontStyle: 'bold' },
-    columnStyles: { 0: { cellWidth: 70 } }, tableWidth: 180,
+    foot: [['I alt', n.antal, n.ankommet, '', varighed(n.min) || '–']],
+    footStyles: { fillColor: lys, textColor: tekst, fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 80 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+    tableWidth: 190,
+    didParseCell: c => {
+      if (c.column.index > 0) c.cell.styles.halign = 'right';
+      if (c.section === 'body' && !d.grupper[c.row.index].sum.antal) c.cell.styles.textColor = [160, 166, 178];
+    },
   });
-  y = doc.lastAutoTable.finalY + 9;
-  for (const g of d.grupper) {
-    if (y > doc.internal.pageSize.getHeight() - 30) { doc.addPage(); y = 27; }
-    doc.setTextColor(...accent); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-    doc.text(ren(g.navn), M, y);
-    doc.setTextColor(...grå); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    doc.text(`${g.sum.antal} hændelse${g.sum.antal === 1 ? '' : 'r'} · ${g.sum.ankommet} ankommet · tid på opgaver ${varighed(g.sum.min) || '–'}`, M + doc.getTextWidth(ren(g.navn)) * 12 / 9 + 4, y);
+  y = doc.lastAutoTable.finalY + 10;
+  for (const g of d.grupper.filter(g => g.sum.antal)) {
+    if (y > H - 40) { doc.addPage(); y = 31; }
+    // Fotografens bånd
+    doc.setFillColor(...lys); doc.roundedRect(M, y - 5.5, B - 2 * M, 9, 2, 2, 'F');
+    doc.setFillColor(...accent); doc.rect(M, y - 5.5, 1.4, 9, 'F');
+    doc.setTextColor(...tekst); doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5);
+    doc.text(ren(g.navn), M + 5, y);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...grå);
+    doc.text(`${g.sum.antal} hændelse${g.sum.antal === 1 ? '' : 'r'}   ·   ${g.sum.ankommet} ankommet   ·   ${g.sum.afsluttet} afsluttet   ·   tid på opgaver ${varighed(g.sum.min) || '–'}`, B - M - 3, y, { align: 'right' });
     doc.autoTable({
-      ...fælles, startY: y + 3,
-      head: [['Dato', 'Kl.', 'Hændelse', 'Kategori', 'Sted', 'Taget', 'Ankom.', 'Slut', 'Tid', 'Status', 'Note / kommentarer']],
-      body: g.rækker.map(r => [r.dato, r.kl, ren(r.titel), r.kategori, ren(r.sted), r.taget, r.ankommet, r.afsluttet, varighed(r.min), r.status, ren(r.note)]),
-      columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: 11 }, 2: { cellWidth: 52 }, 3: { cellWidth: 18 }, 4: { cellWidth: 46 },
-        5: { cellWidth: 13 }, 6: { cellWidth: 15 }, 7: { cellWidth: 13 }, 8: { cellWidth: 17 }, 9: { cellWidth: 21 } },
+      ...fælles, startY: y + 5,
+      head: [['', 'Dato', 'Kl.', 'Hændelse', 'Sted', 'Taget', 'Ankom.', 'Slut', 'Tid', 'Status', 'Note / kommentarer']],
+      body: g.rækker.map(r => ['', r.dato, r.kl, `${ren(r.titel)}\n${r.kategori}`, ren(r.sted), r.taget, r.ankommet, r.afsluttet, varighed(r.min), r.status, ren(r.note)]),
+      columnStyles: { 0: { cellWidth: 2.5, cellPadding: 0 }, 1: { cellWidth: 19 }, 2: { cellWidth: 13 }, 3: { cellWidth: 56 }, 4: { cellWidth: 48 },
+        5: { cellWidth: 13 }, 6: { cellWidth: 15 }, 7: { cellWidth: 13 }, 8: { cellWidth: 17 }, 9: { cellWidth: 22 } },
+      // Farvet streg i kategoriens farve foran hver hændelse
+      didDrawCell: c => {
+        if (c.section !== 'body' || c.column.index !== 0) return;
+        doc.setFillColor(...(KAT_FARVE[g.rækker[c.row.index].kategori] || KAT_FARVE.Andet));
+        doc.rect(c.cell.x, c.cell.y + 0.6, 1.4, c.cell.height - 1.2, 'F');
+      },
     });
-    y = doc.lastAutoTable.finalY + 10;
+    y = doc.lastAutoTable.finalY + 12;
   }
-  if (!d.grupper.length) { doc.setTextColor(...grå); doc.text('Ingen fotografer har kørt på hændelser i perioden.', M, y + 4); }
+  if (!n.antal) { doc.setTextColor(...grå); doc.setFontSize(10); doc.text('Ingen fotografer har kørt på hændelser i perioden.', M, y + 2); }
   const sider = doc.internal.getNumberOfPages();
   for (let i = 1; i <= sider; i++) {
-    doc.setPage(i); doc.setFontSize(8); doc.setTextColor(...grå);
-    doc.text('© HRC-Fotos.dk · Fotovagt', M, doc.internal.pageSize.getHeight() - 6);
-    doc.text(`Side ${i} af ${sider}`, B - M, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
+    doc.setPage(i); doc.setDrawColor(...kant); doc.line(M, H - 10, B - M, H - 10);
+    doc.setFontSize(7.5); doc.setTextColor(...grå); doc.setFont('helvetica', 'normal');
+    doc.text('© HRC-Fotos.dk · Fotovagt · Intern rapport – indeholder adresser', M, H - 6);
+    doc.text(`Side ${i} af ${sider}`, B - M, H - 6, { align: 'right' });
   }
   doc.save(filnavn(d, 'pdf'));
 }
@@ -177,7 +240,7 @@ export function åbnRapport() {
     dlg = document.createElement('dialog'); dlg.id = 'dlg-rapport'; dlg.className = 'ark bred rapport-dialog';
     dlg.innerHTML = `
       <div class="ark-indhold">
-        <div class="ark-top"><h2>📄 Fotografrapport</h2><button class="luk" data-luk-rapport aria-label="Luk">✕</button></div>
+        <div class="ark-top"><h2>📄 Indsatsrapport</h2><button class="luk" data-luk-rapport aria-label="Luk">✕</button></div>
         <p class="hint">Hvilke hændelser hver fotograf har kørt på i en periode. Hent den som PDF, eller som CSV til Excel.</p>
         <div class="rapport-perioder">
           <button type="button" class="secondary" data-periode="idag">I dag</button>
@@ -207,8 +270,8 @@ export function åbnRapport() {
       $('#rapport-visning').innerHTML = '<p class="hint">Henter …</p>';
       const ok = await prøv(async () => {
         const d = await byg(f.fra.value, f.til.value, f.foto.value || null);
-        $('#rapport-visning').innerHTML = `<p class="rapport-periode"><b>${periodeTekst(d)}</b>${f.foto.value ? ` · ${esc(f.foto.selectedOptions[0].textContent)}` : ''}</p>${visning(d)}`;
-        dlg.querySelector('.rapport-knapper').hidden = !d.grupper.length;
+        $('#rapport-visning').innerHTML = visning(d);
+        dlg.querySelector('.rapport-knapper').hidden = !d.grupper.some(g => g.sum.antal);
       });
       if (!ok) $('#rapport-visning').innerHTML = '';
     };
