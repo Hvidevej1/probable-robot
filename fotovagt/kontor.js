@@ -106,7 +106,7 @@ function tilbudLinjer(h) {
 function haendelseKort(h) {
   const taget = h.taget_af ? P(h.taget_af) : null;
   return `
-    <article class="h-kort h-${h.status}${valgtId === h.id ? ' valgt' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
+    <article class="h-kort h-${h.status}${valgtId === h.id ? ' valgt' : ''}${nyeKommentarer(h) ? ' har-ny-kommentar' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
@@ -124,7 +124,8 @@ function haendelseKort(h) {
             <button class="secondary" data-luk="${h.id}" data-s="annulleret">Annullér</button>`
             : `<button class="secondary" data-luk="${h.id}" data-s="ny">Genåbn</button>`}
           <button class="secondary" data-ret="${h.id}">Ret</button>
-          <button class="secondary" data-kommentarer="${h.id}">💬${kommentarerTil(h.id).length ? ` ${kommentarerTil(h.id).length}` : ' Kommentér'}</button>
+          ${(n => n ? `<button class="ny-kommentar-knap" data-kommentarer="${h.id}">💬 ${n} ny${n > 1 ? 'e' : ''}</button>`
+            : `<button class="secondary" data-kommentarer="${h.id}">💬${kommentarerTil(h.id).length ? ` ${kommentarerTil(h.id).length}` : ' Kommentér'}</button>`)(nyeKommentarer(h))}
         </div>
       </div>
     </article>`;
@@ -171,6 +172,17 @@ function vælg(id, zoom = true) {
 }
 
 // ---------------------------------------------------------------------------------
+// Ulæste kommentarer: kommentarer fra andre, som kontoret ikke har set endnu
+const LÆST = 'fotovagt-kommentarer-set';
+const læst = (() => { try { return JSON.parse(localStorage.getItem(LÆST)) || {}; } catch { return {}; } })();
+const nyeKommentarer = h => kommentarerTil(h.id).filter(k => k.bruger !== mig?.id && k.oprettet > (læst[h.id] || '')).length;
+function markérLæst(id) {
+  const ks = kommentarerTil(id); if (!ks.length) return;
+  læst[id] = ks[ks.length - 1].oprettet;
+  try { localStorage.setItem(LÆST, JSON.stringify(læst)); } catch { /* ok */ }
+}
+
+// ---------------------------------------------------------------------------------
 // Tidslinje og kommentarer
 let tidslinjeId = null;
 function tegnTidslinje() {
@@ -184,7 +196,7 @@ function tegnTidslinje() {
     ${tidslinjeHtml(h)}`);
 }
 function åbnTidslinje(id) {
-  tidslinjeId = id;
+  tidslinjeId = id; markérLæst(id); tegnHaendelser();
   const dlg = $('#dlg-tidslinje');
   if (!dlg.open) dlg.showModal();
   tegnTidslinje();
@@ -493,10 +505,21 @@ async function start() {
     if (s.nyHaendelse) { bip(); toast(`Ny hændelse: ${s.nyHaendelse.titel}`, 'ny'); }
     if (s.nyKommentar) {
       const k = s.nyKommentar, h = H(k.haendelse_id);
-      toast(`💬 ${navn(k.bruger)}${h ? ` på "${h.titel}"` : ''}: ${k.tekst.slice(0, 100)}`, 'ny');
+      bip();
+      toast(`💬 ${navn(k.bruger)}${k.offentlig ? ' (🌐 døgnrapport)' : ''}${h ? ` på "${h.titel}"` : ''}: ${k.tekst.slice(0, 100)}`, 'ny');
+      // Står tidslinjen åben på den hændelse, er kommentaren set
+      if ($('#dlg-tidslinje').open && tidslinjeId === k.haendelse_id) markérLæst(k.haendelse_id);
+      // Fanen er ikke fremme: vis en besked på computeren
+      if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
+        try { new Notification(`💬 ${navn(k.bruger)}${k.offentlig ? ' · 🌐 døgnrapport' : ''}`, { body: `${h?.titel || ''}: ${k.tekst.slice(0, 120)}`, icon: 'icon-192.png', tag: 'k-' + k.id }); } catch { /* ok */ }
+      }
+      document.title = `💬 Ny kommentar – Fotovagt`;
+      setTimeout(() => { if (!aktiveSos().length) document.title = 'Fotovagt – kontoret'; }, 15000);
+      tegnHaendelser();
     }
     tegnTidslinje();
   });
+  if (!Object.keys(læst).length) { for (const h of S().haendelser) markérLæst(h.id); }
   tegn();
   hentPoStatus();
 
@@ -549,10 +572,15 @@ async function start() {
     else await prøv(async () => { await abonnérPush(); await store.testPush().catch(() => {}); }, 'Push er slået til. Der kommer en prøve.');
     pushTekst();
   };
+  // Fra push om en kommentar: kontor.html?h=<id> åbner tidslinjen
+  const hLink = new URLSearchParams(location.search).get('h');
+  if (hLink) { history.replaceState(null, '', location.pathname + (store.demo ? '?demo' : '')); setTimeout(() => { if (H(hLink)) { vælg(hLink); åbnTidslinje(hLink); } }, 400); }
   const sosLink = new URLSearchParams(location.search).get('sos');
   if (sosLink) { history.replaceState(null, '', location.pathname + (store.demo ? '?demo' : '')); setTimeout(() => visSos(sosLink), 300); }
   navigator.serviceWorker?.addEventListener('message', e => {
-    const id = e.data?.åbn && new URL(e.data.åbn, location.href).searchParams.get('sos'); if (id) visSos(id);
+    const q = e.data?.åbn && new URL(e.data.åbn, location.href).searchParams;
+    if (q?.get('sos')) visSos(q.get('sos'));
+    if (q?.get('h') && H(q.get('h'))) { vælg(q.get('h')); åbnTidslinje(q.get('h')); }
   });
 
   $('#btn-auto').onclick = async () => {

@@ -330,7 +330,7 @@ async function start() {
     if (k) {
       const h = s.haendelser.find(x => x.id === k.haendelse_id);
       const min = k.haendelse_id === s.mig?.haendelse_id;
-      if (h && (min || åbenId === h.id)) {
+      if (h && (min || åbenId === h.id || s.mig?.rolle === 'kontor')) {
         if (min && pref.get('lyd', true)) bip();
         const af = s.profiler.find(p => p.id === k.bruger)?.navn || 'Kontoret';
         toast(`💬 ${af}${min ? ' (din opgave)' : ''}: ${k.tekst.slice(0, 120)}`, min ? 'ny' : '');

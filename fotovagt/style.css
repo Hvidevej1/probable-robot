@@ -612,3 +612,8 @@ body.marken .skift { flex: none; }
   body.kontor .brand > span:last-child { display: none; }
   body.kontor #btn-ny { padding: 8px 10px; }
 }
+
+/* Nye kommentarer på kontoret */
+.ny-kommentar-knap { background: var(--ankommet); color: #fff; border-color: var(--ankommet); animation: ny-k 1.6s ease-in-out 3; }
+@keyframes ny-k { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ankommet) 30%, transparent); } }
+.h-kort.har-ny-kommentar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ankommet) 60%, transparent), var(--skygge); }

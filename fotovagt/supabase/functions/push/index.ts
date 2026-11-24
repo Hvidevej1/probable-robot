@@ -9,7 +9,7 @@
 //   sos_set     -> den der trykkede SOS: "Din SOS er set af …"
 //   sos_paa_vej -> den der trykkede SOS: "Anna (5 km væk) kører til dig"
 // Med { tilbud }: tilbud om en opgave til den nærmeste fotograf (se tilbud.sql), "Tag den / Nej tak" i appen
-// Med { kommentar }: ny kommentar på en opgave -> fotografen, der har opgaven (hvis en anden skrev den)
+// Med { kommentar }: ny kommentar -> kontoret og fotografen, der har opgaven (ikke den, der skrev den)
 // Med { test: true } og brugerens login sendes en prøve til brugerens egne telefoner.
 //
 // Nøglesættet til push (VAPID) laver funktionen selv første gang og gemmer i tabellen intern.
@@ -155,17 +155,31 @@ async function tilbud(id: string) {
   }) };
 }
 
-// Ny kommentar: push til fotografen, der har opgaven (ikke til den, der selv skrev)
+// Ny kommentar: push til kontoret og til fotografen, der har opgaven (ikke til den, der selv skrev)
 async function kommentar(id: string) {
   const { data: k } = await db.from("kommentarer").select("*").eq("id", id).single();
   if (!k || k.push_sendt || Date.now() - new Date(k.oprettet).getTime() > NYLIG) return { sendt: 0 };
   await db.from("kommentarer").update({ push_sendt: true }).eq("id", id);
   const { data: h } = await db.from("haendelser").select("*").eq("id", k.haendelse_id).single();
-  if (!h || !h.taget_af || h.taget_af === k.bruger || !["taget", "ankommet"].includes(h.status)) return { sendt: 0 };
+  if (!h) return { sendt: 0 };
   const { data: af } = await db.from("profiles").select("navn").eq("id", k.bruger).single();
-  return { sendt: await send([h.taget_af], {
-    title: `💬 ${af?.navn ?? "Kontoret"}: ${h.titel}`, body: String(k.tekst).slice(0, 180), tag: `${h.id}-k-${id}`, url: `./?h=${h.id}`,
-  }) };
+  const navn = af?.navn ?? "Kontoret";
+  const tekst = String(k.tekst).slice(0, 170);
+  let sendt = 0;
+  // Kontoret: alle kommentarer, og det står tydeligt, når den kommer på døgnrapporten
+  const { data: kontor } = await db.from("profiles").select("id").eq("rolle", "kontor").neq("id", k.bruger ?? "00000000-0000-0000-0000-000000000000");
+  const kontorIds = (kontor ?? []).map((p) => p.id);
+  if (kontorIds.length) {
+    sendt += await send(kontorIds, {
+      title: `💬 ${navn}${k.offentlig ? " · 🌐 døgnrapport" : ""}`, body: `${h.titel}: ${tekst}`,
+      tag: `${h.id}-k-${id}-kontor`, url: `./kontor.html?h=${h.id}`,
+    });
+  }
+  // Fotografen på opgaven
+  if (h.taget_af && h.taget_af !== k.bruger && !kontorIds.includes(h.taget_af) && ["taget", "ankommet"].includes(h.status)) {
+    sendt += await send([h.taget_af], { title: `💬 ${navn}: ${h.titel}`, body: tekst, tag: `${h.id}-k-${id}`, url: `./?h=${h.id}` });
+  }
+  return { sendt };
 }
 
 Deno.serve(async (req) => {
