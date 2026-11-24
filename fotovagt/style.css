@@ -586,7 +586,12 @@ body.marken .skift { flex: none; }
 .inv-række small { color: var(--dæmpet); }
 
 /* ---------- Kort holder sig inden for sin ramme (zoomknapper lægger sig ikke over toppen) ---------- */
-.kort, .mini-kort, #kort { position: relative; z-index: 0; isolation: isolate; }
+/* (ingen position her: Markens kort er absolut placeret og skal fylde hele fladen) */
+.kort, .mini-kort { z-index: 0; isolation: isolate; }
+.kort-panel .kort, .mini-kort { position: relative; }
+/* Siden må aldrig kunne skubbes til siden på telefonen */
+html, body { overflow-x: hidden; max-width: 100%; }
+body.marken #app { overflow: hidden; }
 
 /* ---------- Kontorets top: menu på telefon/smal skærm ---------- */
 .top-menu { display: contents; }

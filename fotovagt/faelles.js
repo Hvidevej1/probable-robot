@@ -203,7 +203,7 @@ export function lavKort(el) {
   for (const ev of ['pointerdown', 'wheel']) el.addEventListener(ev, () => { rørt = true; }, { passive: true });
   kort.vis = (pkt, maxZoom = 12) => {
     kort._sidste = [pkt, maxZoom];
-    if (!pkt.length || !el.offsetHeight) return;
+    if (!pkt.length || !el.offsetHeight || !el.offsetWidth) return;   // kortet er skjult: vent til det får en størrelse
     if (pkt.length > 1) kort.fitBounds(pkt, { padding: [40, 40], maxZoom, animate: false });
     else kort.setView(pkt[0], maxZoom, { animate: false });
   };
