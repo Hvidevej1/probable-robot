@@ -416,3 +416,31 @@ dialog.sos-dialog::backdrop { background: var(--sos); }
 .status-tekst[style*="--pause"] { color: var(--pause-tekst) !important; }
 .toast.ny, .tæller { background: var(--ny); }
 .login { background: radial-gradient(900px 500px at 15% -10%, rgba(47, 128, 255, .28) 0%, transparent 60%), radial-gradient(800px 480px at 110% 110%, rgba(255, 194, 26, .16) 0%, transparent 55%), var(--top); }
+
+/* ---------------- Tilbud om opgaver ---------------- */
+#tilbud-omraade:empty { display: none; }
+#tilbud-omraade { padding: 10px 12px; background: color-mix(in srgb, var(--ankommet) 14%, var(--bg)); display: grid; gap: 10px; }
+.tilbud-boks { background: var(--flade); border: 2px solid var(--ankommet); border-radius: 18px; padding: 14px 16px; box-shadow: 0 8px 26px color-mix(in srgb, var(--ankommet) 30%, transparent); animation: tilbud-ind 320ms cubic-bezier(.2, .9, .3, 1.2) both; }
+@keyframes tilbud-ind { from { opacity: 0; transform: translateY(-8px) scale(.97); } }
+.tilbud-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tilbud-mærke { background: var(--ankommet); color: #fff; font-weight: 800; font-size: .8rem; padding: 4px 10px; border-radius: 99px; letter-spacing: .02em; }
+.tilbud-tid { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 1.3rem; color: var(--ankommet); }
+.tilbud-boks .knap-række > .stor-knap { flex: 1 1 160px; min-height: 52px; }
+.tilbud-linje { margin: 6px 0 0; font-size: .86rem; color: var(--ankommet); font-weight: 600; }
+.tilbud-linje span { font-variant-numeric: tabular-nums; }
+.tilbud-forslag { margin: 6px 0 0; font-size: .84rem; color: var(--dæmpet); }
+.tilbud-forslag .link { font-size: inherit; margin-left: 6px; }
+.tilbud-alarm { margin: 6px 0 0; font-weight: 800; color: var(--optaget); }
+.h-kort.blink { border-color: var(--optaget); animation: kort-blink 1s ease-in-out infinite; }
+@keyframes kort-blink { 50% { background: color-mix(in srgb, var(--optaget) 16%, var(--flade)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--optaget) 35%, transparent); } }
+.top-knapper .slukket { opacity: .6; text-decoration: line-through; }
+/* Kolleger i marken */
+.kolleger { background: var(--flade); border: 1px solid var(--kant); border-radius: var(--radius); padding: 4px 10px; margin-bottom: 10px; }
+.kollega { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--kant); }
+.kollega:last-child { border-bottom: 0; }
+.kollega.offline { opacity: .55; }
+.kollega-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+@media (prefers-reduced-motion: reduce) { .h-kort.blink { animation: none; } }
+@media (max-width: 1499px) { .nøgletal .tal:nth-child(4) { display: none; } }
+@media (min-width: 900px) and (max-width: 1279px) { .nøgletal .tal:nth-child(3) { display: none; } }
+@media (min-width: 900px) and (max-width: 1279px) { body.kontor .top { gap: 8px; } .top-knapper { gap: 6px; } .top-knapper button { padding: 9px 10px; } }

@@ -8,6 +8,7 @@
 //   sos         -> alle på kontoret + fotografer inden for 20 km (navn, telefon og afstand i beskeden)
 //   sos_set     -> den der trykkede SOS: "Din SOS er set af …"
 //   sos_paa_vej -> den der trykkede SOS: "Anna (5 km væk) kører til dig"
+// Med { tilbud }: tilbud om en opgave til den nærmeste fotograf (se tilbud.sql), "Tag den / Nej tak" i appen
 // Med { test: true } og brugerens login sendes en prøve til brugerens egne telefoner.
 //
 // Nøglesættet til push (VAPID) laver funktionen selv første gang og gemmer i tabellen intern.
@@ -25,7 +26,7 @@ const IKON: Record<string, string> = { Brand: "🔥", Trafik: "🚗", Politi: "�
 const seneste = (tekst: string | null) =>
   (String(tekst ?? "").split("\n").filter((l) => l.startsWith("— ")).pop() ?? "").slice(2).replace(/^kl\. \d\d[.:]\d\d [^:]+: /, "");
 
-type Besked = { title: string; body: string; tag: string; url: string; sos?: boolean };
+type Besked = { title: string; body: string; tag: string; url: string; sos?: boolean; ttl?: number };
 const SOS_RADIUS_KM = 20;
 const km = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) =>
   Math.hypot((a.lat - b.lat) * 111.2, (a.lon - b.lon) * 111.2 * Math.cos(a.lat * Math.PI / 180));
@@ -49,7 +50,7 @@ async function send(brugere: string[], besked: Besked) {
   for (const s of subs ?? []) {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(besked),
-        { TTL: besked.sos ? 3600 : 600, urgency: "high" });
+        { TTL: besked.ttl ?? (besked.sos ? 3600 : 600), urgency: "high" });
       sendt++;
     } catch (e) {
       const kode = (e as { statusCode?: number }).statusCode;
@@ -138,6 +139,21 @@ async function sos(id: string, slags: string) {
   return { sendt: 0 };
 }
 
+// Tilbud om en opgave: push til fotografen med afstand og svarfrist
+async function tilbud(id: string) {
+  const { data: t } = await db.from("tilbud").select("*").eq("id", id).single();
+  if (!t || t.svar || new Date(t.udloeber).getTime() < Date.now()) return { sendt: 0 };
+  const { data: h } = await db.from("haendelser").select("*").eq("id", t.haendelse_id).single();
+  if (!h || h.status !== "ny") return { sendt: 0 };
+  const sek = Math.max(0, Math.round((new Date(t.udloeber).getTime() - Date.now()) / 1000));
+  const km = t.afstand_km != null ? `${String(Math.round(t.afstand_km * 10) / 10).replace(".", ",")} km fra dig` : "";
+  return { sendt: await send([t.fotograf], {
+    title: `📩 Tilbud: ${IKON[h.kategori] ?? "📍"} ${h.titel}`,
+    body: [km, h.adresse, `svar inden ${sek} sek.`].filter(Boolean).join(" · "),
+    tag: `tilbud-${id}`, url: `./?tilbud=${id}`, sos: true, ttl: sek,
+  }) };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const body = await req.json().catch(() => ({}));
@@ -150,6 +166,7 @@ Deno.serve(async (req) => {
       return json({ ok: true, sendt });
     }
     if (body.init) { await nøgler(); return json({ ok: true }); }   // laver nøglesættet, hvis det mangler
+    if (body.tilbud) return json({ ok: true, ...(await tilbud(String(body.tilbud))) });
     if (body.sos && body.slags) return json({ ok: true, ...(await sos(String(body.sos), String(body.slags))) });
     if (!body.id || !body.slags) return json({ ok: false }, 400);
     return json({ ok: true, ...(await håndtér(String(body.id), String(body.slags))) });

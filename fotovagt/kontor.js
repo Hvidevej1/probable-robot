@@ -4,7 +4,7 @@ import { parseBesked } from './supabase/functions/pushover/parse.js';
 import {
   STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, set,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
-  pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm,
+  pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm, nedtælling,
 } from './faelles.js';
 
 let sLag;
@@ -17,11 +17,20 @@ const STATUS_ORDEN = { ledig: 0, ankommet: 1, optaget: 2, pause: 3, offline: 4 }
 
 // ---------------------------------------------------------------------------------
 function tegn() {
-  tegnSos();
+  tegnSos(); tjekBlink();
   tegnNøgletal(); tegnFotografer(); tegnHaendelser(); tegnLog(); tegnKort();
 }
 
 // SOS: rød boks øverst med navn, telefon og placering; alarmen lyder, indtil nogen har trykket "Set"
+let kendteBlink = new Set();
+function tjekBlink() {
+  const nu = S().haendelser.filter(h => h.status === 'ny' && h.tilbud_status === 'ingen_svar').map(h => h.id);
+  if (nu.some(id => !kendteBlink.has(id))) { bip(); setTimeout(bip, 700); toast('⚠️ En opgave er ikke taget – tildel manuelt', 'fejl'); }
+  kendteBlink = new Set(nu);
+  const knap = $('#btn-auto');
+  if (knap) { const til = S().indst?.auto_tilbud !== false; knap.textContent = til ? '📩 Auto: til' : '📩 Auto: fra'; knap.classList.toggle('slukket', !til); }
+}
+
 function tegnSos() {
   const aktive = aktiveSos();
   $('#sos-omraade').innerHTML = aktive.map(s => sosBoks(s, { kontor: true })).join('');
@@ -72,16 +81,37 @@ function tegnFotografer() {
   }).join('') : '<p class="tom">Ingen fotografer endnu. Opret dem i Supabase under Authentication.</p>';
 }
 
+// Tilbud: hvem har fået det, hvem har sagt nej, og nærmeste ledige som forslag
+function tilbudLinjer(h) {
+  if (!['ny'].includes(h.status)) return '';
+  const tilb = (S().tilbud || []).filter(t => t.haendelse_id === h.id).sort((a, b) => a.nr - b.nr);
+  const åbent = tilb.find(t => !t.svar && new Date(t.udloeber) > new Date());
+  const nej = tilb.filter(t => t.svar === 'nej' || t.svar === 'udloebet');
+  let html = '';
+  if (h.tilbud_status === 'ingen_svar') html += `<p class="tilbud-alarm">⚠️ Ingen svar på tilbud – tildel manuelt</p>`;
+  if (åbent) html += `<p class="tilbud-linje">📩 Tilbudt <b>${esc(navn(åbent.fotograf))}</b>${åbent.afstand_km != null ? ` (${kmTekst(åbent.afstand_km)})` : ''} · <span data-udloeber="${åbent.udloeber}">${nedtælling(åbent.udloeber)}</span> tilbage</p>`;
+  if (nej.length) html += `<p class="lille">${nej.map(t => `${esc(navn(t.fotograf))}: ${t.svar === 'nej' ? 'nej tak' : 'intet svar'}`).join(' · ')}</p>`;
+  // Forslag: nærmeste ledige (trin 1)
+  if (h.lat != null && !åbent) {
+    const maks = S().indst?.max_km || 35;
+    const f = S().profiler.filter(p => p.rolle === 'foto' && p.status === 'ledig' && p.lat != null && !p.haendelse_id)
+      .map(p => ({ p, d: km(p, h) })).filter(x => x.d <= maks).sort((a, b) => a.d - b.d)[0];
+    if (f) html += `<p class="tilbud-forslag">Nærmeste ledige: <b>${esc(f.p.navn)}</b>, ${kmTekst(f.d)} <button class="link" data-giv="${h.id}" data-til="${f.p.id}">Giv opgaven til ${esc(f.p.navn)}</button></p>`;
+  }
+  return html;
+}
+
 function haendelseKort(h) {
   const taget = h.taget_af ? P(h.taget_af) : null;
   return `
-    <article class="h-kort h-${h.status}${valgtId === h.id ? ' valgt' : ''}" data-id="${h.id}">
+    <article class="h-kort h-${h.status}${valgtId === h.id ? ' valgt' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
       <span class="kat">${KATEGORI_IKON[h.kategori] || '📍'}</span>
       <div class="h-tekst">
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}</p>
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)} · taget kl. ${klokken(h.taget_tid)}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
+        ${tilbudLinjer(h)}
         ${senesteOpdatering(h) ? `<p class="opdatering"><span>🔄 ${esc(senesteOpdatering(h))}</span></p>` : ''}
         ${h.note ? `<p class="lille note">Note: ${esc(h.note)}</p>` : ''}
         <div class="h-knapper">
@@ -378,10 +408,11 @@ async function start() {
 
   // Klik overalt på siden (lister, kort-popups)
   document.body.addEventListener('click', e => {
-    const t = e.target.closest('[data-tildel],[data-luk],[data-ret],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
+    const t = e.target.closest('[data-giv],[data-tildel],[data-luk],[data-ret],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
     if (!t || t.closest('dialog')) return;
     const d = t.dataset;
     if (d.tildel) return åbnTildel(d.tildel);
+    if (d.giv) return prøv(() => store.tildel(d.giv, d.til), `Opgaven er givet til ${navn(d.til)}.`);
     if (d.luk) {
       const h = H(d.luk);
       const spørg = { afsluttet: 'Afslut', annulleret: 'Annullér', ny: 'Genåbn' }[d.s];
@@ -428,6 +459,13 @@ async function start() {
   navigator.serviceWorker?.addEventListener('message', e => {
     const id = e.data?.åbn && new URL(e.data.åbn, location.href).searchParams.get('sos'); if (id) visSos(id);
   });
+
+  $('#btn-auto').onclick = async () => {
+    const til = S().indst?.auto_tilbud !== false;
+    if (til && !confirm('Slå automatiske tilbud fra? Nye opgaver skal så tildeles manuelt.')) return;
+    await prøv(() => store.sætAutoTilbud(!til), til ? 'Automatiske tilbud er slået fra.' : 'Automatiske tilbud er slået til.');
+  };
+  kendteBlink = new Set(S().haendelser.filter(h => h.status === 'ny' && h.tilbud_status === 'ingen_svar').map(h => h.id));
 
   $('#btn-ny').onclick = () => åbnRet();
   $('#btn-find').onclick = findAdresse;

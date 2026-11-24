@@ -6,7 +6,7 @@ import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './s
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey) && !/[?&]demo\b/.test(location.search);
 const lyttere = new Set();
-const state = { haendelser: [], profiler: [], log: [], sos: [], mig: null };
+const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], indst: {}, mig: null };
 const fejlTekst = e => (e && (e.message || e.error_description)) || String(e);
 const ændret = () => lyttere.forEach(f => f(state));
 
@@ -32,14 +32,17 @@ function supabaseBackend() {
 
   async function hentAlt() {
     const døgn = new Date(Date.now() - 24 * 3600e3).toISOString();
-    const [h, p, l, s] = await Promise.all([
+    const [h, p, l, s, t, ind] = await Promise.all([
       sb.from('haendelser').select('*').or(`status.in.(ny,taget,ankommet),oprettet.gt.${døgn}`).order('oprettet', { ascending: false }).limit(300),
       sb.from('profiles').select('*').order('navn'),
       sb.from('logbog').select('*').order('tid', { ascending: false }).limit(150),
       sb.from('sos').select('*').or(`aktiv.eq.true,start.gt.${døgn}`).order('start', { ascending: false }).limit(50),
+      sb.from('tilbud').select('*').gt('sendt', døgn).order('sendt', { ascending: false }).limit(200),
+      sb.from('indstillinger').select('*').eq('id', 1).maybeSingle(),
     ]);
     for (const r of [h, p, l, s]) if (r.error) throw new Error(r.error.message);
     state.haendelser = h.data; state.profiler = p.data; state.log = l.data; state.sos = s.data;
+    state.tilbud = t.data || []; state.indst = ind.data || {};
     state.mig = state.profiler.find(x => x.id === state.mig?.id) || state.mig;
     ændret();
   }
@@ -63,6 +66,14 @@ function supabaseBackend() {
         if (e.eventType === 'DELETE') state.sos = state.sos.filter(x => x.id !== e.old.id);
         else { const ny = !state.sos.some(x => x.id === e.new.id); upsertListe(state.sos, e.new); if (ny) state.nySos = e.new; }
         ændret(); state.nySos = null;
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tilbud' }, e => {
+        if (e.eventType === 'DELETE') state.tilbud = state.tilbud.filter(x => x.id !== e.old.id);
+        else { const ny = !state.tilbud.some(x => x.id === e.new.id); upsertListe(state.tilbud, e.new); if (ny && e.new.fotograf === state.mig?.id) state.nytTilbud = e.new; }
+        ændret(); state.nytTilbud = null;
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'indstillinger' }, e => {
+        if (e.new) state.indst = { ...state.indst, ...e.new }; ændret();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'logbog' }, e => {
         state.log.unshift(e.new); state.log.length = Math.min(state.log.length, 150); ændret();
@@ -125,6 +136,9 @@ function supabaseBackend() {
     sosStop: () => rpc('sos_stop'),
     sosKvitter: id => rpc('sos_kvitter', { s: id }),
     sosPåVej: id => rpc('sos_paa_vej', { s: id }),
+    // Tilbud om opgaver
+    svarTilbud: (id, ja) => rpc('svar_tilbud', { t: id, ja }),
+    sætAutoTilbud: til => rpc('saet_auto_tilbud', { til }),
     sosAfslut: id => rpc('sos_afslut', { s: id }),
     // Push-beskeder til den låste telefon
     async pushNøgle() {
@@ -189,9 +203,13 @@ function demoBackend() {
       { id: 2, tid: minSiden(15), bruger: 'f2', haendelse_id: 'h2', handling: 'tog hændelsen' },
       { id: 1, tid: minSiden(18), bruger: null, haendelse_id: 'h2', handling: 'ny hændelse fra pushover' },
     ];
-    return { haendelser, profiler, log, sos: [], pushover: { forbundet: false, kun_apps: null, ignorer: ['(Bus)'] } };
+    return { haendelser, profiler, log, sos: [], tilbud: [], indst: { ...DEMO_INDST }, pushover: { forbundet: false, kun_apps: null, ignorer: ['(Bus)'] } };
   }
 
+  // ?demo&hurtig giver korte tider, så tilbud kan afprøves uden at vente
+  const DEMO_INDST = /[?&]hurtig\b/.test(location.search)
+    ? { auto_tilbud: true, tilbud_sek: 6, blink_sek: 12, max_km: 35, pos_max_min: 30, kategorier_fra: ['Forsyning'] }
+    : { auto_tilbud: true, tilbud_sek: 60, blink_sek: 120, max_km: 35, pos_max_min: 30, kategorier_fra: ['Forsyning'] };
   let db;
   const læs = () => { try { db = JSON.parse(localStorage.getItem(NØGLE)) || frø(); } catch { db = frø(); } };
   const gem = () => {
@@ -202,12 +220,16 @@ function demoBackend() {
     state.haendelser = [...db.haendelser].sort((a, b) => b.oprettet.localeCompare(a.oprettet));
     state.profiler = [...db.profiler].sort((a, b) => a.navn.localeCompare(b.navn));
     state.log = db.log.slice(0, 150);
+    db.tilbud ||= []; db.indst = { ...DEMO_INDST, ...(db.indst || {}) };
+    const førTilbud = new Set(state.tilbud.map(x => x.id));
+    state.tilbud = [...db.tilbud]; state.indst = db.indst;
+    state.nytTilbud = state.tilbud.find(x => !førTilbud.has(x.id) && x.fotograf === state.mig?.id && !x.svar) || null;
     db.sos ||= [];
     const førSos = new Set(state.sos.map(x => x.id));
     state.sos = [...db.sos].sort((a, b) => b.start.localeCompare(a.start));
     state.nySos = state.sos.find(x => !førSos.has(x.id) && x.aktiv && x.bruger !== state.mig?.id) || null;
     if (state.mig) state.mig = db.profiler.find(p => p.id === state.mig.id) || state.mig;
-    state.nyHaendelse = nyH; ændret(); state.nyHaendelse = null; state.nySos = null;
+    state.nyHaendelse = nyH; ændret(); state.nyHaendelse = null; state.nySos = null; state.nytTilbud = null;
   };
   const udefra = () => {
     const før = new Set(db.haendelser.map(h => h.id)); læs();
@@ -218,6 +240,47 @@ function demoBackend() {
   læs();
 
   const mig = () => db.profiler.find(p => p.id === state.mig?.id);
+
+  // Tilbudsmotor i demoen (samme regler som tilbud.sql). Kører kun i kontorets fane.
+  const kmD = (a, b) => Math.hypot((a.lat - b.lat) * 111.2, (a.lon - b.lon) * 111.2 * Math.cos(a.lat * Math.PI / 180));
+  const sidsteOpgave = id => db.haendelser.filter(h => h.taget_af === id && h.taget_tid).map(h => h.taget_tid).sort().pop() || '';
+  function demoNæste(h) {
+    const ind = db.indst;
+    const kand = db.profiler.filter(p => p.rolle === 'foto' && p.status === 'ledig' && p.lat != null && !p.haendelse_id
+      && !db.tilbud.some(t => t.haendelse_id === h.id && t.fotograf === p.id) && kmD(h, p) <= ind.max_km)
+      .sort((a, b) => Math.floor(kmD(h, a) / 2) - Math.floor(kmD(h, b) / 2) || sidsteOpgave(a.id).localeCompare(sidsteOpgave(b.id)) || kmD(h, a) - kmD(h, b));
+    const f = kand[0];
+    if (!f) return false;
+    db.tilbud.unshift({ id: uid(), haendelse_id: h.id, fotograf: f.id, nr: db.tilbud.filter(t => t.haendelse_id === h.id).length + 1,
+      afstand_km: kmD(h, f), sendt: nu(), udloeber: new Date(Date.now() + ind.tilbud_sek * 1000).toISOString(), svar: null });
+    log(h.id, `tilbød opgaven til ${f.navn} (${kmD(h, f).toFixed(1)} km)`, null);
+    return true;
+  }
+  function demoTilbudTjek() {
+    if (state.mig?.rolle !== 'kontor') return;
+    læs(); db.tilbud ||= []; db.indst = { ...DEMO_INDST, ...(db.indst || {}) };
+    let ændring = false; const ind = db.indst;
+    for (const t of db.tilbud) if (!t.svar && new Date(t.udloeber) < new Date()) { t.svar = 'udloebet'; ændring = true; }
+    for (const h of db.haendelser) {
+      if (h.status !== 'ny') {
+        for (const t of db.tilbud) if (t.haendelse_id === h.id && !t.svar) { t.svar = 'lukket'; ændring = true; }
+        if (h.tilbud_status === 'afventer' || h.tilbud_status === 'ingen_svar') { h.tilbud_status = 'taget'; ændring = true; }
+        continue;
+      }
+      // (kun hændelser oprettet efter start – ikke de indbyggede eksempler)
+      if (h.tilbudKlar && !h.tilbud_status && h.lat != null && !h.cirka && ind.auto_tilbud && !ind.kategorier_fra.includes(h.kategori) && !/pressemeddelelse/.test(h.url || '')) {
+        h.tilbud_status = 'afventer'; h.tilbud_start = nu(); ændring = true;
+        if (!demoNæste(h)) h.tilbud_status = 'ingen_svar';
+      } else if (h.tilbud_status === 'afventer') {
+        if (Date.now() - new Date(h.tilbud_start) >= ind.blink_sek * 1000) {
+          for (const t of db.tilbud) if (t.haendelse_id === h.id && !t.svar) t.svar = 'lukket';
+          h.tilbud_status = 'ingen_svar'; log(h.id, 'ingen tog tilbuddet – kontoret skal tildele', null); ændring = true;
+        } else if (!db.tilbud.some(t => t.haendelse_id === h.id && !t.svar)) { if (demoNæste(h)) ændring = true; }
+      }
+    }
+    if (ændring) gem();
+  }
+  setInterval(demoTilbudTjek, 1500);
   const H = id => db.haendelser.find(h => h.id === id);
   const P = id => db.profiler.find(p => p.id === id);
   const log = (h, handling, bruger = state.mig?.id) => db.log.unshift({ id: Date.now(), tid: nu(), bruger, haendelse_id: h, handling });
@@ -241,6 +304,22 @@ function demoBackend() {
     async hentAlt() { læs(); spejl(); },
     nulstil() { localStorage.removeItem(NØGLE); læs(); gem(); },
     async pushNøgle() { return ''; },
+    svarTilbud: kør((id, ja) => {
+      const t = db.tilbud.find(x => x.id === id && x.fotograf === mig().id);
+      if (!t) throw new Error('Tilbuddet findes ikke.');
+      if (t.svar || new Date(t.udloeber) < new Date()) throw new Error('Tilbuddet er udløbet eller lukket.');
+      if (ja) {
+        const m = mig(), h = H(t.haendelse_id);
+        if (m.haendelse_id) throw new Error('Du har allerede en opgave. Afslut eller slip den først.');
+        if (!h || h.status !== 'ny') throw new Error('Hændelsen er allerede taget af en anden.');
+        Object.assign(h, { status: 'taget', taget_af: m.id, taget_tid: nu(), tilbud_status: 'taget' });
+        Object.assign(m, { haendelse_id: h.id, status: 'optaget', status_tid: nu() });
+        for (const x of db.tilbud) if (x.haendelse_id === h.id && !x.svar) x.svar = 'lukket';
+        t.svar = 'ja'; log(h.id, 'tog hændelsen');
+      } else { t.svar = 'nej'; log(t.haendelse_id, 'sagde nej tak til tilbuddet'); }
+      t.svar_tid = nu();
+    }),
+    sætAutoTilbud: kør(til => { kontor(); db.indst = { ...db.indst, auto_tilbud: til }; log(null, til ? 'slog automatiske tilbud til' : 'slog automatiske tilbud fra'); }),
     sosStart: kør((la, lo, noej) => {
       const m = mig(); db.sos ||= [];
       let s = db.sos.find(x => x.bruger === m.id && x.aktiv);
@@ -330,7 +409,7 @@ function demoBackend() {
     ret: kør((id, felter) => { kontor(); Object.assign(H(id), felter); }),
     retFotograf: kør((id, felter) => { kontor(); Object.assign(P(id), felter); }),
     opret: kør(felter => {
-      const h = { id: uid(), oprettet: nu(), kilde: 'manuel', status: 'ny', prioritet: 0, kategori: 'Andet', ...felter };
+      const h = { id: uid(), oprettet: nu(), kilde: 'manuel', status: 'ny', prioritet: 0, kategori: 'Andet', tilbudKlar: true, ...felter };
       db.haendelser.unshift(h);
       log(h.id, h.kilde === 'manuel' ? 'oprettede hændelsen' : 'ny hændelse fra ' + h.kilde, h.kilde === 'manuel' ? state.mig?.id : null);
     }),

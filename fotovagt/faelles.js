@@ -285,6 +285,13 @@ export async function logInd({ kunKontor = false } = {}) {
   });
 }
 
+// Nedtælling: elementer med data-udloeber="<ISO-tid>" viser m:ss tilbage
+export function nedtælling(iso) {
+  const s = Math.max(0, Math.round((new Date(iso) - Date.now()) / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+setInterval(() => document.querySelectorAll('[data-udloeber]').forEach(el => { el.textContent = nedtælling(el.dataset.udloeber); }), 1000);
+
 // I demo (?demo i adressen) beholder links mellem Marken og Kontor demo-tilstanden
 if (/[?&]demo\b/.test(location.search)) {
   document.querySelectorAll('a[href="index.html"], a[href="kontor.html"]').forEach(a => { a.href = a.getAttribute('href') + '?demo'; });

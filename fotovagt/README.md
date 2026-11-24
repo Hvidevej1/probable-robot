@@ -111,8 +111,23 @@ Opsætning:
 - Position deles kun, når fotografen selv slår det til under sin profil.
 - Kortet er OpenStreetMap og kræver ingen nøgle.
 
+## Automatiske tilbud til nærmeste fotograf
+- **Ny hændelse med præcis placering:** tilbud til den nærmeste **ledige** fotograf med frisk position (højst 30 min gammel) inden for **35 km**. Tilbuddet kommer som push og som en stor blå boks i appen med "Tag den" / "Nej tak" og en nedtælling.
+- **Nej tak eller intet svar inden 60 sekunder:** tilbuddet går videre til den næstnærmeste.
+- **Ved lige afstand (±2 km):** den, der har ventet længst siden sin sidste opgave, får tilbuddet først.
+- **Ikke taget inden for 2 minutter**, eller ingen inden for 35 km: opgaven **blinker på kontoret** med "Ingen svar – tildel manuelt" og en alarmlyd.
+- **Ingen automatiske tilbud** for cirka-placeringer, kategorien Forsyning og politiets pressemeddelelser.
+- **På kontoret:** "📩 Auto" i toppen slår automatikken til og fra. Hver hændelse viser, hvem den er tilbudt, hvem der har sagt nej, og forslaget "Nærmeste ledige: … – Giv opgaven til …".
+- **Indstillinger** står i tabellen `indstillinger`: svartid, blinktid, maks. afstand, positionsalder og kategorier.
+- Opsætning: `supabase/tilbud.sql`.
+
+## Kolleger
+Fotograferne kan se hinanden:
+- **På kortet:** kolleger, der deler position, med deres initialer.
+- **Under Hændelser → Kolleger:** navn, status, afstand, aktuel opgave og telefon.
+
 ## Videre arbejde
-- `PLAN-auto-tildeling.md`: plan for automatisk tildeling til nærmeste fotograf.
+- `PLAN-auto-tildeling.md`: plan for automatisk tildeling. **Trin 1 (forslag) og trin 2 (tilbud) er bygget.** Trin 3 (fuld automatik) er ikke.
 
 ## Filer
 - `index.html`, `marken.js`: siden til marken
@@ -122,6 +137,7 @@ Opsætning:
 - `supabase/opsaetning.sql`: tabeller, adgangsregler og funktionerne tag/meld status/afslut/slip/tildel
 - `supabase/push.sql`: push-beskeder (telefoner og hvornår der sendes)
 - `supabase/functions/push/`: Edge Function, der sender push-beskeder
+- `supabase/tilbud.sql`: automatiske tilbud til nærmeste fotograf
 - `supabase/pushover-cron.sql`: henter Pushover hvert 15. sekund og sætter gamle fotografer offline
 - `supabase/functions/pushover/`: Edge Function og beskedparser
 - `vendor/`: Leaflet 1.9.4 (kort) og supabase-js 2.119.0

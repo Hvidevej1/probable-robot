@@ -3,7 +3,7 @@ import { store } from './store.js';
 import {
   STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
-  pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst,
+  pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
 } from './faelles.js';
 
 const pref = {
@@ -30,7 +30,7 @@ function tegn() {
     b.style.setProperty('--c', STATUS[b.dataset.status].farve);
     if (b.dataset.status === 'ankommet') b.disabled = !mig.haendelse_id;
   });
-  tegnSos(); tegnOpgave(); tegnListe(); tegnKort();
+  tegnSos(); tegnTilbud(); tegnOpgave(); tegnListe(); tegnKort();
   if (åbenId && $('#dlg-haendelse').open) visHaendelse(åbenId, false);
 }
 
@@ -81,7 +81,27 @@ function tegnListe() {
   const nye = aktive.filter(h => h.status === 'ny').length;
   const t = $('#antal-nye'); t.hidden = !nye; t.textContent = nye;
   $('#liste').innerHTML = (aktive.length ? aktive.map(kort_).join('') : '<p class="tom">Ingen aktive hændelser lige nu.</p>')
+    + kollegaListe()
     + (afsluttede.length ? `<h4 class="sektion">Afsluttet seneste døgn</h4>${afsluttede.map(kort_).join('')}` : '');
+}
+
+// Kolleger: navn, status, afstand og telefon (afstand kun når begge deler position)
+function kollegaListe() {
+  const orden = { ledig: 0, ankommet: 1, optaget: 2, pause: 3, offline: 4 };
+  const kol = store.state.profiler.filter(p => p.rolle === 'foto' && p.id !== mig.id)
+    .sort((a, b) => (orden[a.status] - orden[b.status]) || a.navn.localeCompare(b.navn));
+  if (!kol.length) return '';
+  return `<h4 class="sektion">Kolleger</h4><div class="kolleger">${kol.map(p => {
+    const st = STATUS[p.status] || STATUS.offline, d = km(minPos || mig, p);
+    const opg = store.state.haendelser.find(h => h.id === p.haendelse_id);
+    return `<div class="kollega${p.status === 'offline' ? ' offline' : ''}">
+      <i class="dot" style="--c:${st.farve}"></i>
+      <div class="kollega-info"><b>${esc(p.navn)}</b>
+        <span class="lille">${st.tekst}${d != null && p.status !== 'offline' ? ` · ${kmTekst(d)}` : ''}${set(p) || p.status === 'offline' ? '' : ' · ikke set for nylig'}${opg ? ` · ${esc(opg.titel)}` : ''}</span></div>
+      ${p.lat != null && p.status !== 'offline' ? `<button class="ikon-knap" data-vis-kollega="${p.id}" aria-label="Vis ${esc(p.navn)} på kortet">📍</button>` : ''}
+      ${p.telefon ? `<a class="ikon-knap" href="tel:${esc(p.telefon)}" aria-label="Ring til ${esc(p.navn)}">📞</a>` : ''}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function tegnKort() {
@@ -134,6 +154,27 @@ function tegnSos() {
     }, () => {}, { enableHighAccuracy: true, maximumAge: 5e3, timeout: 20e3 });
   }
   if (!egen && sosWatch != null) { navigator.geolocation.clearWatch(sosWatch); sosWatch = null; }
+}
+
+// Tilbud om en opgave: stor boks med Tag den / Nej tak og nedtælling
+const mineTilbud = () => (store.state.tilbud || []).filter(t => t.fotograf === mig.id && !t.svar && new Date(t.udloeber) > new Date());
+function tegnTilbud() {
+  $('#tilbud-omraade').innerHTML = mineTilbud().map(t => {
+    const h = store.state.haendelser.find(x => x.id === t.haendelse_id);
+    if (!h || h.status !== 'ny') return '';
+    return `
+      <div class="tilbud-boks" data-tilbud="${t.id}">
+        <div class="tilbud-top"><span class="tilbud-mærke">📩 Tilbud til dig</span><span class="tilbud-tid" data-udloeber="${t.udloeber}">${nedtælling(t.udloeber)}</span></div>
+        <div class="opgave-hoved"><span class="kat">${KATEGORI_IKON[h.kategori] || '📍'}</span>
+          <div><h2>${esc(h.titel)}</h2>
+            <p class="adresse">${esc(h.adresse || '')}${t.afstand_km != null ? ` · <b>${kmTekst(t.afstand_km)} fra dig</b>` : ''}</p></div></div>
+        <div class="knap-række">
+          <button data-tilbud-ja="${t.id}" class="ok stor-knap">Tag den</button>
+          <button data-tilbud-nej="${t.id}" class="secondary">Nej tak</button>
+          <button data-tilbud-vis="${h.id}" class="secondary">Se detaljer</button>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 let sosNedtælling = null;
@@ -253,10 +294,11 @@ function visPushBanner() {
 // Åbn en hændelse fra et link (push-besked): ./?h=<id>
 function åbnFraLink(url = location.href) {
   const q = new URL(url, location.href).searchParams;
-  const id = q.get('h'), sos = q.get('sos');
-  if (!id && !sos) return;
+  const id = q.get('h'), sos = q.get('sos'), tilbud = q.get('tilbud');
+  if (!id && !sos && !tilbud) return;
   history.replaceState(null, '', location.pathname + (store.demo ? '?demo' : ''));
   if (sos) return visSos(sos);
+  if (tilbud) return $('#tilbud-omraade').scrollIntoView({ block: 'start' });
   if (store.state.haendelser.some(h => h.id === id)) visHaendelse(id);
 }
 
@@ -282,6 +324,7 @@ async function start() {
         toast(`${min ? 'Opdatering på din opgave' : 'Opdatering'}: ${senesteOpdatering(h).replace(/^kl\. \d\d[.:]\d\d [^:]+: /, '').slice(0, 120)}`, min ? 'ny' : '');
       }
     }
+    if (s.nytTilbud) { if (pref.get('lyd', true)) bip(); navigator.vibrate?.([300, 120, 300, 120, 300]); toast('📩 Du har fået et tilbud om en opgave', 'ny'); }
     if (s.nySos && s.nySos.bruger !== mig.id) toast('🆘 SOS fra en kollega – se den røde boks øverst', 'fejl');
     const ny = s.nyHaendelse;
     if (ny && ny.status === 'ny') {
@@ -318,6 +361,18 @@ async function start() {
 
   document.querySelector('.status-knapper').onclick = e => { const b = e.target.closest('[data-status]'); if (b) meldStatus(b.dataset.status); };
   document.querySelector('.faner').onclick = e => { const b = e.target.closest('[data-fane]'); if (b) skiftFane(b.dataset.fane); };
+  $('#liste').addEventListener('click', e => {
+    const b = e.target.closest('[data-vis-kollega]'); if (!b) return;
+    e.stopPropagation();
+    const p = store.state.profiler.find(x => x.id === b.dataset.visKollega);
+    if (p?.lat != null) { skiftFane('kort'); kort.setView([p.lat, p.lon], 14); }
+  }, true);
+  $('#tilbud-omraade').onclick = async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tilbudJa) { const ok = await prøv(() => store.svarTilbud(b.dataset.tilbudJa, true), 'Opgaven er din. Du står som optaget.'); if (ok) skiftFane('kort'); }
+    if (b.dataset.tilbudNej) await prøv(() => store.svarTilbud(b.dataset.tilbudNej, false), 'Tilbuddet går videre til en kollega.');
+    if (b.dataset.tilbudVis) visHaendelse(b.dataset.tilbudVis);
+  };
   $('#liste').onclick = e => {
     const t = e.target.closest('[data-tag]'); if (t) { e.stopPropagation(); return tag(t.dataset.tag); }
     const k = e.target.closest('[data-id]'); if (k) visHaendelse(k.dataset.id);
@@ -386,7 +441,8 @@ async function start() {
 
   startPosition();
   setInterval(pulsSlag, 60e3);
-  setInterval(() => { tegnListe(); }, 30e3); // "x min siden" holdes opdateret
+  setInterval(() => { tegnListe(); }, 30e3);
+  setInterval(() => { if (document.querySelector('#tilbud-omraade .tilbud-boks') && !mineTilbud().length) tegnTilbud(); }, 1000); // "x min siden" holdes opdateret
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { store.hentAlt().catch(() => {}); pulsSlag(); } });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 }

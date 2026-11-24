@@ -1,6 +1,6 @@
 # Plan: Automatisk tildeling til nærmeste fotograf
 
-**Status:** Kun plan. Intet er bygget endnu.
+**Status:** Trin 1 og 2 er bygget (se README → Automatiske tilbud). Valgt: 60 sek. pr. fotograf, blink på kontoret efter 2 min, maks. 35 km. Trin 3 er ikke bygget.
 
 ## Kort svar
 Ja, det kan lade sig gøre. Fotovagt kender allerede det, der skal til:
