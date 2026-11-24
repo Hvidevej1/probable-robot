@@ -172,6 +172,53 @@ function pulsSlag() {
 }
 
 // ---------------------------------------------------------------------------------
+// Push-beskeder til låst telefon
+const erIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const påHjemmeskærm = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function pushKanBruges() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    return erIOS && !påHjemmeskærm()
+      ? 'På iPhone skal Fotovagt først lægges på hjemmeskærmen: tryk Del → "Føj til hjemmeskærm", og åbn den derfra.'
+      : 'Denne browser kan ikke modtage push-beskeder.';
+  }
+  if (!window.FOTOVAGT_CONFIG?.vapidPublicKey) return 'Push er ikke sat op endnu.';
+  return '';
+}
+const nøgleBytes = b64 => {
+  const s = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(s, c => c.charCodeAt(0));
+};
+async function slåPushTil() {
+  const grund = pushKanBruges();
+  if (grund) throw new Error(grund);
+  if (await Notification.requestPermission() !== 'granted') throw new Error('Du har ikke givet lov til beskeder. Det kan ændres i telefonens indstillinger.');
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription()
+    || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: nøgleBytes(window.FOTOVAGT_CONFIG.vapidPublicKey) });
+  await store.gemPush(sub.toJSON());
+  pref.set('push', true);
+}
+async function slåPushFra() {
+  const reg = await navigator.serviceWorker?.ready;
+  const sub = await reg?.pushManager?.getSubscription();
+  if (sub) { await store.sletPush(sub.endpoint).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
+  pref.set('push', false);
+}
+function visPushBanner() {
+  const vis = store.cloud && !pushKanBruges() && Notification.permission !== 'denied'
+    && !pref.get('push', false) && !pref.get('push-spurgt', false);
+  $('#push-banner').hidden = !vis;
+}
+
+// Åbn en hændelse fra et link (push-besked): ./?h=<id>
+function åbnFraLink(url = location.href) {
+  const id = new URL(url, location.href).searchParams.get('h');
+  if (!id) return;
+  history.replaceState(null, '', location.pathname);
+  if (store.state.haendelser.some(h => h.id === id)) visHaendelse(id);
+}
+
+// ---------------------------------------------------------------------------------
 async function start() {
   mig = await logInd();
   $('#demo-mærke').hidden = !store.demo;
@@ -235,6 +282,11 @@ async function start() {
     const f = $('#form-profil');
     f.navn.value = mig.navn || ''; f.telefon.value = mig.telefon || '';
     f.position.checked = pref.get('position', false); f.lyd.checked = pref.get('lyd', true);
+    f.push.checked = pref.get('push', false);
+    const grund = store.demo ? 'Push-beskeder virker først, når Fotovagt er sat op med Supabase.' : pushKanBruges();
+    $('#push-hint').hidden = !grund; $('#push-hint').textContent = grund;
+    f.push.disabled = !!grund;
+    $('#btn-test-push').hidden = !pref.get('push', false) || !!grund;
     $('#dlg-profil').showModal();
   };
   $('#dlg-profil').onclose = async () => {
@@ -245,6 +297,10 @@ async function start() {
     pref.set('position', f.position.checked);
     if (f.position.checked !== varPos) f.position.checked ? startPosition() : (stopPosition(), minPos = null);
     if (f.lyd.checked && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+    if (f.push.checked !== pref.get('push', false)) {
+      await prøv(() => f.push.checked ? slåPushTil() : slåPushFra(), f.push.checked ? 'Push-beskeder er slået til.' : 'Push-beskeder er slået fra.');
+      visPushBanner();
+    }
     await prøv(() => store.retProfil(f.navn.value.trim(), f.telefon.value.trim()), 'Gemt.');
   };
   $('#btn-logud').onclick = async () => {
@@ -252,6 +308,18 @@ async function start() {
     await prøv(() => store.meldStatus('offline'));
     await store.logout(); location.reload();
   };
+
+  // Push: banner første gang, prøve-knap, og abonnementet fornyes ved hver start (det kan udløbe)
+  visPushBanner();
+  $('#btn-push-ja').onclick = async () => { pref.set('push-spurgt', true); await prøv(slåPushTil, 'Push-beskeder er slået til.'); visPushBanner(); };
+  $('#btn-push-nej').onclick = () => { pref.set('push-spurgt', true); visPushBanner(); };
+  $('#btn-test-push').onclick = () => prøv(async () => {
+    const r = await store.testPush();
+    if (!r?.sendt) throw new Error('Ingen telefon fik beskeden. Slå push fra og til igen.');
+  }, 'Prøven er sendt.');
+  if (store.cloud && pref.get('push', false) && !pushKanBruges() && Notification.permission === 'granted') slåPushTil().catch(() => {});
+  navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.åbn) åbnFraLink(e.data.åbn); });
+  åbnFraLink();
 
   startPosition();
   setInterval(pulsSlag, 60e3);

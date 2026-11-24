@@ -51,6 +51,12 @@
       <button data-status="ankommet">Ankommet</button>
     </nav>
 
+    <div id="push-banner" class="push-banner" hidden>
+      <span>Få besked om nye hændelser, også når telefonen er låst.</span>
+      <button id="btn-push-ja">Slå til</button>
+      <button id="btn-push-nej" class="link" aria-label="Ikke nu">Ikke nu</button>
+    </div>
+
     <section id="opgave" class="opgave" hidden aria-live="polite"></section>
 
     <div class="faner" role="tablist">
@@ -74,7 +80,10 @@
       <label>Navn <input name="navn" required></label>
       <label>Telefon <input name="telefon" type="tel" autocomplete="tel"></label>
       <label class="check"><input type="checkbox" name="position"> Del min position med kontoret, mens appen er åben</label>
-      <label class="check"><input type="checkbox" name="lyd"> Bip og vibrér ved nye hændelser</label>
+      <label class="check"><input type="checkbox" name="lyd"> Bip og vibrér ved nye hændelser, mens appen er åben</label>
+      <label class="check"><input type="checkbox" name="push"> Push-beskeder på låst telefon (nye hændelser når du er ledig, opgaver fra kontoret og opdateringer på din opgave)</label>
+      <p class="hint" id="push-hint" hidden></p>
+      <button type="button" id="btn-test-push" class="secondary" hidden>Send en prøve til denne telefon</button>
       <div class="knap-række">
         <button value="gem" type="submit">Gem</button>
         <button value="luk" type="submit" class="secondary" formnovalidate>Luk</button>

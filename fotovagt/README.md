@@ -60,10 +60,29 @@ Kør `node supabase/functions/pushover/parse.test.mjs` for at teste parseren eft
 
 **Andre kilder:** Funktionen tager også imod `POST {title, message, url}` med headeren `x-fotovagt-secret`, fx fra Zapier eller en mail-regel.
 
+## Push-beskeder til låst telefon
+Fotovagt sender selv push-beskeder, også når telefonen er låst:
+- **Ny hændelse:** til alle fotografer, der står som **Ledig**. Står man som Pause, Optaget eller Offline, får man ingen.
+- **Opgave fra kontoret:** "Du har fået en opgave: …" til den fotograf, kontoret giver opgaven.
+- **Live opdatering:** "🔄 Opdatering: …" til den fotograf, der har opgaven, når en ny kilde lægger noget ind (fx politiets opfølgning).
+
+Trykker man på beskeden, åbner Fotovagt direkte på hændelsen.
+
+Opsætning:
+1. Læg funktionen `supabase/functions/push` op under *Edge Functions*, og slå "Verify JWT" **fra**. Med Supabase CLI: `supabase functions deploy push --no-verify-jwt`.
+2. Under *Edge Functions → Secrets* sætter du:
+   - `VAPID_PUBLIC_KEY`: den samme nøgle, som står i `config.js`.
+   - `VAPID_PRIVATE_KEY`: den private nøgle (fås af Claude; den står ikke i koden).
+   - `FOTOVAGT_URL`: appens adresse, fx `https://vagt.hrc-fotos.dk`.
+3. Ret `RET_MIG_PROJEKT` i `supabase/push.sql`, og kør filen.
+4. Hver fotograf slår push til på sin telefon. Appen spørger første gang, ellers sker det under profilen. Med knappen "Send en prøve" kan man se, at det virker.
+
+**iPhone:** Push virker kun, når Fotovagt er lagt på hjemmeskærmen (Del → "Føj til hjemmeskærm") og åbnet derfra (iOS 16.4 eller nyere). Appen forklarer det, hvis det mangler.
+
 ## Godt at vide
 - Fotografer, der ikke har haft appen åben i 2 timer, sættes automatisk til "offline", hvis de ikke har en opgave. Det står i `pushover-cron.sql`.
 - På kontorsiden står der "ikke set i …", hvis en fotograf ikke har haft appen åben de sidste 5 minutter.
-- Mens appen er åben, bipper og vibrerer den ved nye hændelser. Pushover står stadig for beskederne, når telefonen er låst.
+- Mens appen er åben, bipper og vibrerer den ved nye hændelser og ved opdateringer på ens egen opgave.
 - Position deles kun, når fotografen selv slår det til under sin profil.
 - Kortet er OpenStreetMap og kræver ingen nøgle.
 
@@ -73,6 +92,8 @@ Kør `node supabase/functions/pushover/parse.test.mjs` for at teste parseren eft
 - `store.js`: data, enten Supabase med live-opdatering eller demo
 - `faelles.js`: kort, login og hjælpere. `style.css`: design
 - `supabase/opsaetning.sql`: tabeller, adgangsregler og funktionerne tag/meld status/afslut/slip/tildel
+- `supabase/push.sql`: push-beskeder (telefoner og hvornår der sendes)
+- `supabase/functions/push/`: Edge Function, der sender push-beskeder
 - `supabase/pushover-cron.sql`: henter Pushover hvert 15. sekund og sætter gamle fotografer offline
 - `supabase/functions/pushover/`: Edge Function og beskedparser
 - `vendor/`: Leaflet 1.9.4 (kort) og supabase-js 2.119.0

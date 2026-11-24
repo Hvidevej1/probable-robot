@@ -110,6 +110,14 @@ function supabaseBackend() {
       const { error } = await sb.from('haendelser').insert({ kilde: 'manuel', ...felter });
       if (error) throw new Error(error.message);
     },
+    // Push-beskeder til den låste telefon
+    gemPush: s => rpc('gem_push', { ep: s.endpoint, nøgle: s.keys.p256dh, hemmelig: s.keys.auth }),
+    sletPush: endpoint => rpc('slet_push', { ep: endpoint }),
+    async testPush() {
+      const { data, error } = await sb.functions.invoke('push', { body: { test: true } });
+      if (error) throw new Error(fejlTekst(error));
+      return data;
+    },
     async pushover(body) {
       const { data, error } = await sb.functions.invoke('pushover', { body });
       if (error) throw new Error(fejlTekst(error));
@@ -206,6 +214,9 @@ function demoBackend() {
     async glemt() {},
     async hentAlt() { læs(); spejl(); },
     nulstil() { localStorage.removeItem(NØGLE); læs(); gem(); },
+    async gemPush() { throw new Error('Push-beskeder virker først, når Fotovagt er sat op med Supabase.'); },
+    async sletPush() {},
+    async testPush() { throw new Error('Push-beskeder virker først, når Fotovagt er sat op med Supabase.'); },
     tag: kør(id => {
       const m = mig(), h = H(id);
       if (m.haendelse_id && m.haendelse_id !== id) throw new Error('Du har allerede en opgave. Afslut eller slip den først.');
