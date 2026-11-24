@@ -197,6 +197,17 @@ export function lavKort(el) {
   const kort = L.map(el, { zoomControl: true, attributionControl: true });
   // Start: hele Danmark passer i vinduet, uanset skærmstørrelse (præcis zoom følger, når der er punkter)
   kort.fitBounds(cfg.kortGrænser || [[54.56, 8.07], [57.75, 12.69]], { padding: [10, 10] });
+  // Vis punkterne – og gør det igen, når kortet får sin rigtige størrelse (fx når appen åbnes på
+  // telefonen eller fanen skiftes), så længe brugeren ikke selv har flyttet kortet
+  let rørt = false;
+  for (const ev of ['pointerdown', 'wheel']) el.addEventListener(ev, () => { rørt = true; }, { passive: true });
+  kort.vis = (pkt, maxZoom = 12) => {
+    kort._sidste = [pkt, maxZoom];
+    if (!pkt.length || !el.offsetHeight) return;
+    if (pkt.length > 1) kort.fitBounds(pkt, { padding: [40, 40], maxZoom, animate: false });
+    else kort.setView(pkt[0], maxZoom, { animate: false });
+  };
+  new ResizeObserver(() => { kort.invalidateSize(); if (!rørt && kort._sidste) kort.vis(...kort._sidste); }).observe(el);
   setTimeout(() => kort.invalidateSize(), 200);
   window.addEventListener('resize', () => kort.invalidateSize());
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -460,3 +471,27 @@ export function åbnSkiftKode() {
   dlg.showModal();
   setTimeout(() => f.ny.focus(), 50);
 }
+
+// ---------------------------------------------------------------------------------
+// Ny version af appen: en app på hjemmeskærmen genindlæses sjældent af sig selv. Vi tjekker
+// version.json, når appen kommer frem igen (og hvert 10. minut), og opdaterer, når det er sikkert.
+let kendtVersion = null;
+async function tjekVersion() {
+  try {
+    const r = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const { version } = await r.json();
+    if (!kendtVersion) { kendtVersion = version; return; }
+    if (version === kendtVersion) return;
+    const iGang = document.querySelector('dialog[open]') || [...document.querySelectorAll('textarea')].some(t => t.value.trim());
+    if (!iGang && document.visibilityState === 'visible') return location.reload();
+    if (document.getElementById('ny-version')) return;
+    const b = document.createElement('button');
+    b.id = 'ny-version'; b.className = 'ny-version'; b.textContent = '🔄 Ny version af Fotovagt – tryk for at opdatere';
+    b.onclick = () => location.reload();
+    document.body.append(b);
+  } catch { /* offline: prøv senere */ }
+}
+tjekVersion();
+setInterval(tjekVersion, 10 * 60e3);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') tjekVersion(); });

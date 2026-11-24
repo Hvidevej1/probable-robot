@@ -158,8 +158,7 @@ function tegnKort() {
   if (førsteZoom) {
     const pkt = [...vis.filter(h => h.lat != null).map(h => [h.lat, h.lon]),
       ...S().profiler.filter(p => p.status !== 'offline' && p.lat != null).map(p => [p.lat, p.lon])];
-    if (pkt.length > 1) { kort.fitBounds(pkt, { padding: [40, 40], maxZoom: 12 }); førsteZoom = false; }
-    else if (pkt.length === 1) { kort.setView(pkt[0], 12); førsteZoom = false; }
+    if (pkt.length) { kort.vis(pkt, 12); førsteZoom = false; }
   }
 }
 
