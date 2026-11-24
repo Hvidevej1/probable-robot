@@ -115,6 +115,30 @@ function supabaseBackend() {
       if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Forkert e-mail eller adgangskode.' : error.message);
       return startSession(data.user);
     },
+    // Ny bruger med invitation: databasen afviser e-mails, der ikke er inviteret
+    async opretBruger(email, password) {
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.href.split('#')[0].split('?')[0] } });
+      if (error) {
+        if (/database error|not invited|ikke inviteret/i.test(error.message)) throw new Error('Din e-mail er ikke inviteret til Fotovagt. Kontakt kontoret.');
+        throw new Error(kodeFejl(error.message));
+      }
+      if (data.session) return { profil: await startSession(data.user) };
+      return { bekræft: true };
+    },
+    // Invitationer (kun kontoret)
+    async hentInvitationer() {
+      const { data, error } = await sb.from('invitationer').select('*').order('oprettet', { ascending: false });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    async inviter({ email, navn, telefon, rolle }) {
+      const { error } = await sb.from('invitationer').insert({ email: email.trim().toLowerCase(), navn: navn || null, telefon: telefon || null, rolle: rolle || 'foto', inviteret_af: state.mig?.id });
+      if (error) throw new Error(/duplicate|unique/i.test(error.message) ? 'Den e-mail er allerede inviteret.' : error.message);
+    },
+    async sletInvitation(email) {
+      const { error } = await sb.from('invitationer').delete().eq('email', email);
+      if (error) throw new Error(error.message);
+    },
     async glemt(email) {
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.href.split('#')[0] });
       if (error) throw new Error(error.message);
@@ -465,6 +489,16 @@ function demoBackend() {
       db.kommentarer = db.kommentarer.filter(x => x.id !== id);
     }),
     async skiftKode() { throw new Error('I demoen er der ingen adgangskoder.'); },
+    async opretBruger() { throw new Error('I demoen logger man ind ved at vælge en bruger.'); },
+    async hentInvitationer() { læs(); return [...(db.invitationer || [])]; },
+    inviter: kør(({ email, navn, telefon, rolle }) => {
+      kontor(); db.invitationer ||= [];
+      const e = email.trim().toLowerCase();
+      if (!e.includes('@')) throw new Error('Skriv en gyldig e-mail.');
+      if (db.invitationer.some(i => i.email === e)) throw new Error('Den e-mail er allerede inviteret.');
+      db.invitationer.unshift({ email: e, navn, telefon, rolle: rolle || 'foto', oprettet: nu(), brugt: null });
+    }),
+    sletInvitation: kør(email => { kontor(); db.invitationer = (db.invitationer || []).filter(i => i.email !== email); }),
     async fotografRapport(fra, til) {
       læs();
       const hs = db.haendelser.filter(h => h.taget_af && h.oprettet >= fra && h.oprettet < til).sort((a, b) => a.oprettet.localeCompare(b.oprettet));

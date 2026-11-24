@@ -192,6 +192,65 @@ function åbnTidslinje(id) {
 }
 
 // ---------------------------------------------------------------------------------
+// Invitationer: kun inviterede e-mails kan oprette en bruger
+async function åbnInvitationer() {
+  let dlg = $('#dlg-inviter');
+  if (!dlg) {
+    dlg = document.createElement('dialog'); dlg.id = 'dlg-inviter'; dlg.className = 'ark';
+    dlg.innerHTML = `
+      <div class="ark-indhold">
+        <div class="ark-top"><h2>👥 Inviter ny bruger</h2><button class="luk" data-luk-inv aria-label="Luk">✕</button></div>
+        <p class="hint">Kun e-mails på listen kan oprette en bruger i Fotovagt. Den nye åbner <b>vagt.hrc-fotos.dk</b>, trykker
+          <b>"Ny bruger? Opret din adgangskode"</b> og bruger den e-mail, du skriver her. Så kommer de automatisk med på kortet, i tilbud og i rapporterne.</p>
+        <form id="form-inviter" class="inviter-form">
+          <label>Navn <input name="navn" required autocomplete="off"></label>
+          <label>E-mail <input name="email" type="email" required autocomplete="off"></label>
+          <label>Telefon <input name="telefon" type="tel" autocomplete="off"></label>
+          <label>Rolle <select name="rolle"><option value="foto">Fotograf</option><option value="kontor">Kontor</option></select></label>
+          <button type="submit">Inviter</button>
+        </form>
+        <div class="kopi-boks" id="inv-kopi" hidden></div>
+        <h3 class="inv-titel">Inviterede</h3>
+        <div id="inv-liste" class="inv-liste"><p class="hint">Henter …</p></div>
+      </div>`;
+    document.body.append(dlg);
+    dlg.addEventListener('click', async e => {
+      if (e.target === dlg || e.target.closest('[data-luk-inv]')) return dlg.close();
+      const s = e.target.closest('[data-slet-inv]');
+      if (s && confirm(`Fjern invitationen til ${s.dataset.sletInv}? (En bruger, der allerede er oprettet, beholder sin adgang – den fjernes under Fotografer.)`)) {
+        await prøv(() => store.sletInvitation(s.dataset.sletInv), 'Invitationen er fjernet.'); visListe();
+      }
+      const c = e.target.closest('[data-kopi]');
+      if (c) { try { await navigator.clipboard.writeText(c.dataset.kopi); toast('Teksten er kopieret.', 'ok'); } catch { toast('Kunne ikke kopiere – markér teksten og kopiér selv.', 'fejl'); } }
+    });
+    dlg.querySelector('form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target, data = { navn: f.navn.value.trim(), email: f.email.value.trim(), telefon: f.telefon.value.trim(), rolle: f.rolle.value };
+      if (await prøv(() => store.inviter(data), `${data.navn} er inviteret.`)) {
+        const tekst = `Hej ${data.navn}. Du er inviteret til Fotovagt. Åbn https://vagt.hrc-fotos.dk, tryk "Ny bruger? Opret din adgangskode" og brug denne e-mail: ${data.email.toLowerCase()}`;
+        $('#inv-kopi').hidden = false;
+        $('#inv-kopi').innerHTML = `<p>Send denne besked til ${esc(data.navn)} (sms eller mail):</p><p class="kopi-tekst">${esc(tekst)}</p><button type="button" class="secondary" data-kopi="${esc(tekst)}">📋 Kopiér beskeden</button>`;
+        f.reset(); visListe();
+      }
+    });
+  }
+  async function visListe() {
+    try {
+      const liste = await store.hentInvitationer();
+      $('#inv-liste').innerHTML = liste.length ? liste.map(i => `
+        <div class="inv-række">
+          <div><b>${esc(i.navn || i.email)}</b> <small>${i.rolle === 'kontor' ? 'Kontor' : 'Fotograf'}</small><br><small>${esc(i.email)}${i.telefon ? ` · ${esc(i.telefon)}` : ''}</small></div>
+          <span class="pille ${i.brugt ? 'p-afsluttet' : 'p-ny'}">${i.brugt ? 'Oprettet' : 'Venter'}</span>
+          ${i.brugt ? '' : `<button class="link fare" data-slet-inv="${esc(i.email)}">Fjern</button>`}
+        </div>`).join('') : '<p class="hint">Ingen invitationer endnu.</p>';
+    } catch (e) { $('#inv-liste').innerHTML = `<p class="fejl-tekst">${esc(store.fejlTekst(e))}</p>`; }
+  }
+  $('#inv-kopi').hidden = true;
+  dlg.showModal();
+  visListe();
+}
+
+// ---------------------------------------------------------------------------------
 // Tildel
 function åbnTildel(id) {
   const h = H(id), dlg = $('#dlg-tildel');
@@ -510,6 +569,13 @@ async function start() {
   $('#btn-logud').onclick = async () => { await store.logout(); location.reload(); };
   $('#btn-kode').onclick = () => åbnSkiftKode();
   $('#btn-rapport').onclick = () => åbnRapport();
+  $('#btn-inviter').onclick = () => åbnInvitationer();
+  // Telefon: knapperne ligger i en menu, så toppen ikke fylder halvdelen af skærmen
+  const menuKnap = $('#btn-menu'), menu = $('#top-menu');
+  const lukMenu = () => { document.body.classList.remove('menu-åben'); menuKnap.setAttribute('aria-expanded', 'false'); };
+  menuKnap.onclick = e => { e.stopPropagation(); const åben = document.body.classList.toggle('menu-åben'); menuKnap.setAttribute('aria-expanded', String(åben)); };
+  menu.addEventListener('click', e => { if (e.target.closest('button')) setTimeout(lukMenu, 0); });
+  document.addEventListener('click', e => { if (!e.target.closest('#top-menu, #btn-menu')) lukMenu(); });
   const dlgTl = $('#dlg-tidslinje');
   kommentarHandlinger(dlgTl);
   dlgTl.addEventListener('click', e => { if (e.target === dlgTl || e.target.closest('[data-luk-tl]')) dlgTl.close(); });

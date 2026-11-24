@@ -2,7 +2,8 @@
 <html lang="da">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
   <title>Fotovagt – kontoret</title>
   <meta name="theme-color" content="#1c1c21">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
@@ -11,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script type="module" src="kontor.js?v=8"></script>
+  <script type="module" src="kontor.js?v=9"></script>
 </head>
 <body class="kontor">
   <section id="login" class="login" hidden>
@@ -47,12 +48,15 @@
       <div class="nøgletal" id="nøgletal"></div>
       <div class="top-knapper">
         <button id="btn-ny">+ Ny hændelse</button>
+        <button id="btn-menu" class="secondary menu-knap" aria-expanded="false" aria-controls="top-menu">☰ Menu</button>
+        <div class="top-menu" id="top-menu">
         <button id="btn-auto" class="secondary" title="Automatiske tilbud til nærmeste fotograf">📩 Auto</button>
         <button id="btn-push" class="secondary" title="Få SOS-alarmer som push på denne computer">🔔 Push</button>
         <button id="btn-pushover" class="secondary"><span id="po-prik" class="prik"></span>Pushover</button>
         <button id="btn-rapport" class="secondary" title="Indsatsrapport: hvilke hændelser fotograferne har kørt på">📄 Rapport</button>
         <button id="btn-kode" class="secondary" title="Skift din adgangskode">🔑 Kode</button>
         <button id="btn-logud" class="secondary">Log ud</button>
+        </div>
       </div>
     </header>
 
@@ -60,7 +64,7 @@
 
     <main class="kontor-grid">
       <section class="panel fotografer">
-        <h2>Fotografer</h2>
+        <div class="panel-top"><h2>Fotografer</h2><button id="btn-inviter" class="secondary lille-knap" title="Inviter en ny fotograf eller en fra kontoret">＋ Inviter</button></div>
         <div id="fotografer"></div>
       </section>
 

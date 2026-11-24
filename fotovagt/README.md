@@ -169,3 +169,11 @@ Knappen **📄 Rapport** på kontoret samler alle hændelser i en periode under 
 
 ## Filtrering på døgnrapporten
 Tryk på en kategori (fx 🔥 brand) for kun at se den på kort og liste. Flere kan vælges. "I alt" viser alle igen. Filteret står i adressen (`?kat=Brand`), så et link kan deles.
+
+## Sikkerhed og nye brugere (invitationer)
+- **Kun inviterede kan oprette en bruger** (`supabase/invitationer.sql`). Kontoret inviterer under **Fotografer → ＋ Inviter** (navn, e-mail, telefon, rolle). Den nye åbner vagt.hrc-fotos.dk, trykker **"Ny bruger? Opret din adgangskode"** og bekræfter via mail. Alle andre e-mails afvises af databasen, også hvis kontoen oprettes i Supabase-dashboardet.
+- Adgangsregler (RLS) er slået til på alle tabeller. Uden login kan man ikke læse tabellerne; kun den offentlige `doegnrapport()` (kategori, by, afrundet placering, offentlige kommentarer).
+- Funktioner, der ændrer noget, tjekker selv, hvem der kalder (kontor eller brugerens egen profil).
+- Hemmeligheder (Pushover-nøgle, push-nøgler, cron-hemmelighed) ligger kun i databasen bag adgangsregler og aldrig i koden. `config.js` indeholder kun den offentlige nøgle.
+- Websiden sender sikkerheds-headers (`vercel.json`): appen kan ikke vises inde i andre sider (clickjacking); døgnrapporten må vises på hrc-fotos.dk.
+- Anbefalet i Supabase-dashboardet: **Authentication → Providers/Policies → "Leaked password protection"** slås til.

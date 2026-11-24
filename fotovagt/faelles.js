@@ -299,6 +299,47 @@ export async function logInd({ kunKontor = false } = {}) {
       if (!email) { msg.textContent = 'Skriv din e-mail først.'; return; }
       await prøv(() => store.glemt(email), 'Vi har sendt en mail med et link.');
     };
+    // Ny bruger: kun e-mails, kontoret har inviteret, kan oprette en adgangskode
+    let nyBruger = false;
+    const login = form.onsubmit;
+    if (!$('#btn-ny-bruger')) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.id = 'btn-ny-bruger'; b.className = 'link'; b.textContent = 'Ny bruger? Opret din adgangskode';
+      $('#btn-glemt').after(b);
+      const igen = document.createElement('label');
+      igen.id = 'felt-igen'; igen.hidden = true;
+      igen.innerHTML = 'Gentag adgangskode <input name="igen" type="password" autocomplete="new-password" minlength="8">';
+      form.password.closest('label').after(igen);
+    }
+    const skiftTilstand = til => {
+      nyBruger = til;
+      $('#felt-igen').hidden = !til;
+      form.password.autocomplete = til ? 'new-password' : 'current-password';
+      form.querySelector('button[type=submit]').textContent = til ? 'Opret bruger' : 'Log ind';
+      $('#btn-ny-bruger').textContent = til ? 'Har du allerede en bruger? Log ind' : 'Ny bruger? Opret din adgangskode';
+      $('#btn-glemt').hidden = til;
+      msg.textContent = til ? 'Brug den e-mail, kontoret har inviteret. Adgangskoden skal være mindst 8 tegn.' : '';
+      msg.classList.toggle('info-tekst', til);
+    };
+    $('#btn-ny-bruger').onclick = () => skiftTilstand(!nyBruger);
+    form.onsubmit = async e => {
+      if (!nyBruger) return login(e);
+      e.preventDefault(); msg.classList.remove('info-tekst'); msg.textContent = '';
+      const email = form.email.value.trim(), pw = form.password.value;
+      if (pw.length < 8) { msg.textContent = 'Adgangskoden skal være mindst 8 tegn.'; return; }
+      if (pw !== form.igen.value) { msg.textContent = 'De to adgangskoder er ikke ens.'; return; }
+      const knap = form.querySelector('button[type=submit]'); knap.disabled = true;
+      try {
+        const r = await store.opretBruger(email, pw);
+        if (r?.profil) {
+          if (kunKontor && r.profil.rolle !== 'kontor') { await store.logout(); throw new Error('Din bruger er fotograf. Brug siden for marken.'); }
+          boks.hidden = true; $('#app').hidden = false; return resolve(r.profil);
+        }
+        skiftTilstand(false);
+        msg.classList.add('info-tekst');
+        msg.textContent = `Næsten færdig: vi har sendt en mail til ${email}. Tryk på linket i mailen, og log så ind her.`;
+      } catch (err) { msg.textContent = store.fejlTekst(err); } finally { knap.disabled = false; }
+    };
     vis(form.email);
   });
 }
