@@ -8,7 +8,7 @@
   --top: #1c1c21; --top2: #26262d; --top-tekst: #f4f4f6; --top-dæmpet: #a3a3ad;
   --accent: #1c1c21; --accent-tekst: #fff; --fokus: #2f80ff;
   --ledig: #1f9f4c; --optaget: #e8343a; --pause: #ffc21a; --pause-tekst: #9a7000; --ankommet: #2f80ff; --offline: #8c8c96;
-  --ny: #ff7a1a; --taget: #e8343a; --sos: #d4001a;
+  --ny: #ff7a1a; --taget: #8b5cf6; --sos: #d4001a;
   --radius: 16px; --radius-s: 11px;
   --skygge-s: 0 1px 2px rgba(16, 20, 28, .06);
   --skygge: 0 1px 2px rgba(16, 20, 28, .05), 0 6px 20px rgba(16, 20, 28, .07);
@@ -617,3 +617,9 @@ body.marken .skift { flex: none; }
 .ny-kommentar-knap { background: var(--ankommet); color: #fff; border-color: var(--ankommet); animation: ny-k 1.6s ease-in-out 3; }
 @keyframes ny-k { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ankommet) 30%, transparent); } }
 .h-kort.har-ny-kommentar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ankommet) 60%, transparent), var(--skygge); }
+
+/* Kortforklaring i to grupper: hændelser og fotografer */
+.kort-forklaring .fk-gruppe { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.kort-forklaring .fk-navn { font-weight: 700; color: var(--dæmpet); font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; }
+.kort-forklaring .fk-skille { width: 1px; height: 16px; background: var(--kant); }
+@media (max-width: 640px) { .kort-forklaring .fk-skille { display: none; } .kort-forklaring .fk-gruppe { width: 100%; } }

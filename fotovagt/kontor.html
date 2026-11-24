@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
@@ -71,10 +71,12 @@
       <section class="panel kort-panel">
         <div id="kort" class="kort"></div>
         <div class="kort-forklaring">
-          <span><i class="pin-mini pin-ny"></i>Ny</span><span><i class="pin-mini pin-taget"></i>Taget</span>
-          <span><i class="pin-mini pin-ankommet"></i>Ankommet</span>
-          <span><i class="dot" style="--c:var(--ledig)"></i>Ledig</span><span><i class="dot" style="--c:var(--optaget)"></i>Optaget</span>
-          <span><i class="dot" style="--c:var(--pause)"></i>Pause</span><span><i class="dot" style="--c:var(--ankommet)"></i>Ankommet</span>
+          <span class="fk-gruppe"><span class="fk-navn">Hændelser</span>
+            <span><i class="pin-mini pin-ny"></i>Ny</span><span><i class="pin-mini pin-taget"></i>Taget</span><span><i class="pin-mini pin-ankommet"></i>Fotograf på stedet</span></span>
+          <span class="fk-skille" aria-hidden="true"></span>
+          <span class="fk-gruppe"><span class="fk-navn">Fotografer</span>
+            <span><i class="dot" style="--c:var(--ledig)"></i>Ledig</span><span><i class="dot" style="--c:var(--optaget)"></i>Optaget</span>
+            <span><i class="dot" style="--c:var(--pause)"></i>Pause</span><span><i class="dot" style="--c:var(--ankommet)"></i>Ankommet</span></span>
         </div>
       </section>
 
