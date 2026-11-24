@@ -16,7 +16,9 @@ Supabase-projektet **Fotovagt** (`uhhfqojbbslfcivykcxx`, Frankfurt) er sat op:
 - push-nøgler, som serveren selv har lavet
 
 `config.js` peger på projektet. Der mangler:
-1. **At lægge appen online:** Importér repoet i Vercel, sæt *Root Directory* til `fotovagt`, og giv den fx adressen `vagt.hrc-fotos.dk`.
+1. **At lægge appen online på `vagt.hrc-fotos.dk`:** DNS er klar (CNAME `vagt` → `cname.vercel-dns.com` hos Simply).
+   Importér repoet i Vercel med *Root Directory* `fotovagt` og *Framework* "Other". Vælg grenen med Fotovagt som *Production Branch*, og tilføj domænet `vagt.hrc-fotos.dk` under *Domains*.
+   I Supabase → *Authentication → URL Configuration* sættes *Site URL* til `https://vagt.hrc-fotos.dk`, så "Glemt adgangskode"-mails peger rigtigt.
 2. **Brugere:** Opret dem under Supabase → *Authentication → Users → Add user* (e-mail + adgangskode, "Auto confirm"). Gør dig selv til kontor:
    `update profiles set rolle = 'kontor' where id = (select id from auth.users where email = 'din@mail.dk');`
 3. **Pushover:** Log ind på kontorsiden → **Pushover** → forbind med jeres Pushover-login. Det kræver Pushover for Desktop-licens.
