@@ -4,10 +4,11 @@
 :root {
   --bg: #eef1f5; --flade: #ffffff; --flade2: #f6f8fb; --flade3: #eaeef4;
   --tekst: #121722; --dæmpet: #5b6576; --kant: #dfe4ec; --kant2: #cfd6e1;
-  --top: #10141c; --top2: #1a2030; --top-tekst: #f3f5f8; --top-dæmpet: #9aa4b6;
-  --accent: #e8572a; --accent-tekst: #fff;
-  --ledig: #17a05a; --optaget: #d93b3b; --pause: #d99400; --ankommet: #2f6fe0; --offline: #8a93a3;
-  --ny: #e8572a; --taget: #d93b3b; --sos: #d4001a;
+  /* HRC-Fotos: mørk #1c1c21, blå #2f80ff, rød #ff3b3b, gul #ffc21a, grøn #22b455 */
+  --top: #1c1c21; --top2: #26262d; --top-tekst: #f4f4f6; --top-dæmpet: #a3a3ad;
+  --accent: #1c1c21; --accent-tekst: #fff; --fokus: #2f80ff;
+  --ledig: #1f9f4c; --optaget: #e8343a; --pause: #ffc21a; --pause-tekst: #9a7000; --ankommet: #2f80ff; --offline: #8c8c96;
+  --ny: #ff7a1a; --taget: #e8343a; --sos: #d4001a;
   --radius: 16px; --radius-s: 11px;
   --skygge-s: 0 1px 2px rgba(16, 20, 28, .06);
   --skygge: 0 1px 2px rgba(16, 20, 28, .05), 0 6px 20px rgba(16, 20, 28, .07);
@@ -20,7 +21,7 @@
   :root {
     --bg: #0b0e14; --flade: #151a23; --flade2: #1b212c; --flade3: #232a36;
     --tekst: #eef1f6; --dæmpet: #98a2b3; --kant: #262d3a; --kant2: #313a4a;
-    --top: #07090d; --top2: #111621;
+    --top: #121216; --top2: #1c1c21; --accent: #2f80ff;
     --skygge-s: 0 1px 2px rgba(0, 0, 0, .4); --skygge: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .3);
     color-scheme: dark;
   }
@@ -43,7 +44,7 @@ a { color: var(--ankommet); }
 .tom { color: var(--dæmpet); text-align: center; padding: 28px 8px; }
 .advarsel { color: var(--pause); font-weight: 600; }
 .fejl-tekst { color: var(--optaget); min-height: 1.2em; margin: 8px 0 0; }
-:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 2px; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--fokus) 75%, transparent); outline-offset: 2px; }
 
 /* ---------- Knapper og felter ---------- */
 button, .knap {
@@ -54,7 +55,7 @@ button, .knap {
   box-shadow: 0 1px 0 rgba(255, 255, 255, .12) inset, 0 1px 2px rgba(0, 0, 0, .12);
   touch-action: manipulation; user-select: none;
 }
-button:hover, .knap:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+button:hover, .knap:hover { background: color-mix(in srgb, var(--accent) 86%, #fff); }
 button:active, .knap:active { transform: scale(.97); }
 button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 button.secondary, .knap.secondary { background: var(--flade); color: var(--tekst); border: 1px solid var(--kant2); box-shadow: var(--skygge-s); }
@@ -68,10 +69,10 @@ input, textarea, select {
   font: inherit; width: 100%; padding: 11px 13px; border-radius: var(--radius-s); border: 1px solid var(--kant2);
   background: var(--flade); color: var(--tekst); margin-top: 5px; transition: border-color var(--hurtig), box-shadow var(--hurtig);
 }
-input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--fokus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--fokus) 22%, transparent); }
 label { display: block; font-size: .88rem; font-weight: 600; margin: 12px 0; }
 label.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; }
-label.check input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
+label.check input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--fokus); }
 .knap-række { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
 .to-kol { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .input-knap { display: flex; gap: 8px; align-items: stretch; }
@@ -88,6 +89,16 @@ label.check input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; acce
 }
 .brand { font-weight: 800; font-size: 1.12rem; display: flex; align-items: center; gap: 10px; letter-spacing: -.02em; white-space: nowrap; }
 .brand small, h1 small { font-weight: 500; opacity: .6; font-size: .8em; letter-spacing: 0; }
+.logo-maerke { width: 34px; height: 34px; flex: none; border-radius: 9px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .12); }
+.logo-maerke.stor { width: 48px; height: 48px; border-radius: 12px; box-shadow: var(--skygge); }
+.hrc-logo { display: block; width: max-content; margin: 22px auto 0; background: #1c1c21; padding: 9px 14px; border-radius: 12px; transition: transform var(--hurtig); }
+.hrc-logo:hover { transform: translateY(-1px); }
+.hrc-logo img { width: 93px; height: auto; display: block; }
+/* Topbjælke: fuldt hrc FOTOS-logo på bredere skærme, kun mærket på telefon */
+.hrc-top { height: 40px; width: auto; display: block; }
+.brand-skil { width: 1px; height: 26px; background: rgba(255, 255, 255, .18); }
+.kun-smal { display: none; }
+@media (max-width: 640px) { .kun-bred { display: none !important; } .kun-smal { display: block; } }
 .logo-boks { position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: rgba(255, 255, 255, .09); flex: none; }
 .logo-boks img { width: 22px; height: auto; display: block; }
 .logo-boks::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--top2); }
@@ -232,6 +243,8 @@ body.marken .top { flex-wrap: nowrap; gap: 8px; }
 .status-knapper button:hover { background: var(--flade3); }
 .status-knapper button.aktiv { background: var(--c); border-color: var(--c); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--c) 40%, transparent); }
 .status-knapper button.aktiv::before { background: #fff; }
+.status-knapper button[data-status="pause"].aktiv { color: #1c1c21; }
+.status-knapper button[data-status="pause"].aktiv::before { background: #1c1c21; }
 .push-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; background: color-mix(in srgb, var(--accent) 11%, var(--flade)); border-bottom: 1px solid var(--kant); font-size: .9rem; }
 .push-banner span { flex: 1 1 180px; }
 .push-banner button { min-height: 38px; padding: 6px 14px; }
@@ -397,3 +410,9 @@ dialog.sos-dialog::backdrop { background: var(--sos); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Gul (Pause) kræver mørk tekst / mørkere gul som tekstfarve */
+.chip[style*="--pause"] { color: #1c1c21; }
+.status-tekst[style*="--pause"] { color: var(--pause-tekst) !important; }
+.toast.ny, .tæller { background: var(--ny); }
+.login { background: radial-gradient(900px 500px at 15% -10%, rgba(47, 128, 255, .28) 0%, transparent 60%), radial-gradient(800px 480px at 110% 110%, rgba(255, 194, 26, .16) 0%, transparent 55%), var(--top); }

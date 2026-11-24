@@ -121,6 +121,6 @@ Opsætning:
 - `supabase/pushover-cron.sql`: henter Pushover hvert 15. sekund og sætter gamle fotografer offline
 - `supabase/functions/pushover/`: Edge Function og beskedparser
 - `vendor/`: Leaflet 1.9.4 (kort) og supabase-js 2.119.0
-- `logo-hvid.png`, `icon-*.png`, `favicon.png`, `apple-touch-icon.png`: HRC-Fotos-logoet
+- `logo.svg`, `hrc-fotos-logo.png`, `icon-*.png`, `favicon.png`, `apple-touch-icon.png`: HRC-Fotos-logoet fra hrc-fotos.dk-temaet. Logoets fire farver (grøn, rød, gul, blå) er også statusfarverne Ledig, Optaget, Pause og Ankommet
 
 © HRC-Fotos.dk
