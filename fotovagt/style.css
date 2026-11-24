@@ -628,3 +628,9 @@ body.marken #app { overflow: hidden; }
 .kort-forklaring .fk-navn { font-weight: 700; color: var(--dæmpet); font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; }
 .kort-forklaring .fk-skille { width: 1px; height: 16px; background: var(--kant); }
 @media (max-width: 640px) { .kort-forklaring .fk-skille { display: none; } .kort-forklaring .fk-gruppe { width: 100%; } }
+
+/* iPhone zoomer ind, når man trykker i et felt med skrift under 16 px – og zoomer ikke selv ud igen.
+   Derfor er alle felter mindst 16 px på touch-skærme. */
+@media (pointer: coarse), (max-width: 899px) {
+  input, textarea, select, .kommentar-form textarea { font-size: 16px !important; }
+}
