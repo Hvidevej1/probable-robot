@@ -125,7 +125,6 @@ export function sosBoks(s, { fra = null, kontor = false } = {}) {
   const p = store.state.profiler.find(x => x.id === s.bruger) || {};
   const kvit = s.kvitteret_af ? store.state.profiler.find(x => x.id === s.kvitteret_af) : null;
   const d = s.lat != null && fra?.lat != null ? km(fra, s) : null;
-  const kort = s.lat != null ? `https://maps.google.com/?q=${s.lat},${s.lon}` : null;
   const ios = /iPhone|iPad|Mac/.test(navigator.userAgent);
   const nav = s.lat != null ? (ios ? `https://maps.apple.com/?daddr=${s.lat},${s.lon}` : `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}`) : null;
   return `
@@ -146,7 +145,6 @@ export function sosBoks(s, { fra = null, kontor = false } = {}) {
         ${p.telefon ? `<a class="knap" href="tel:${esc(p.telefon)}">📞 Ring til ${esc(p.navn || 'fotografen')}</a>` : ''}
         ${s.lat != null ? `<button data-sos-vis="${s.id}">📍 Vis på kortet</button>` : ''}
         ${nav ? `<a class="knap" href="${nav}" target="_blank" rel="noopener">🚗 Navigér</a>` : ''}
-        ${kort ? `<a class="knap" href="${kort}" target="_blank" rel="noopener">Google Maps</a>` : ''}
         ${!kontor && !(s.paa_vej || []).includes(store.state.mig?.id) ? `<button data-sos-vej="${s.id}" class="hvid">🚗 Jeg kører derhen</button>` : ''}
         ${!kvit ? `<button data-sos-set="${s.id}" class="hvid">✓ Set${kontor ? ' – vi tager os af det' : ''}</button>` : ''}
         ${kontor ? `<button data-sos-afslut="${s.id}" class="hvid">Afslut alarm</button>` : ''}
