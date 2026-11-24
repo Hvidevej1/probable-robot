@@ -1,5 +1,7 @@
 # Fotovagt
 
+**Online:** https://vagt.hrc-fotos.dk (fotografer) · https://vagt.hrc-fotos.dk/kontor.html (kontoret)
+
 Webapp til freelancefotografer: Pushover-alarmer bliver automatisk til hændelser på et kort.
 Fotograferne i marken kan tage en hændelse og melde status, og kontoret kan se, hvem der er aktive, og hvem der har taget hvad.
 
