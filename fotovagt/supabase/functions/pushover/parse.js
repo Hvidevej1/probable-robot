@@ -344,8 +344,15 @@ export function findMatch(ny, aktive, nu = Date.now()) {
 }
 
 // Felter, der skal opdateres på den eksisterende hændelse, når en ekstra besked kommer ind.
+// Live opdatering fra stedet: "færdige på uheldsstedet", "trafikken er åbnet op igen"
+const FÆRDIG = /færdige (?:med [a-zæøå ]+ )?på (?:uhelds|ulykkes|gerningsstedet|stedet)|færdige med undersøgelserne|trafikken er (?:åbnet|genåbnet)|åbnet op igen|vejen er (?:åbnet|genåbnet)|slukket|under kontrol/i;
+const klokkenDK = () => new Intl.DateTimeFormat('da-DK', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Copenhagen' }).format(new Date());
+
 export function flet(h, ny, app) {
-  const linje = `— ${app || 'Ekstra besked'}: ${[ny.titel, ny.tekst].filter(Boolean).join(' · ').replace(/\n+/g, ' · ')}`;
+  const kort = String(ny.tekst || '').split('\n').map(l => renEmoji(l).replace(NYHEDSKILDE, ''))
+    .filter(l => l && !/^læs mere|^https?:\/\//i.test(l)).join(' · ');
+  const indhold = kort.startsWith(ny.titel) ? kort : [ny.titel, kort].filter(Boolean).join(' · ');
+  const linje = `— kl. ${klokkenDK()} ${app || 'Ekstra besked'}: ${FÆRDIG.test(ny.tekst || '') ? '✅ ' : ''}${indhold}`;
   const kendt = String(ny.tekst || '').replace(/\s+/g, ' ').slice(0, 80);
   const felter = { tekst: kendt && String(h.tekst || '').replace(/\s+/g, ' ').includes(kendt) ? h.tekst : [h.tekst, linje].filter(Boolean).join('\n') };
   // Efterlyst person fundet: politiet beder om at slette navn og foto, så den første tekst fjernes

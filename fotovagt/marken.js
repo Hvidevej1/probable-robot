@@ -1,7 +1,7 @@
 // Marken: fotografens telefon. Kort og liste over hændelser, tag en hændelse, meld status.
 import { store } from './store.js';
 import {
-  STATUS, H_STATUS, KATEGORI_IKON, aktiv, esc, $, siden, klokken, km, kmTekst, navigationsLink,
+  STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
 } from './faelles.js';
 
@@ -43,6 +43,7 @@ function tegnOpgave() {
         <p class="lille">Din opgave · taget kl. ${klokken(h.taget_tid)}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>
         <h2>${esc(h.titel)}</h2>
         <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${h.cirka ? ' (ca.)' : ''}${afstand(h) != null ? ` · ${kmTekst(afstand(h))}` : ''}</p>
+        ${senesteOpdatering(h) ? `<p class="opdatering"><span>🔄 ${esc(senesteOpdatering(h))}</span></p>` : ''}
       </div>
     </div>
     <div class="knap-række">
@@ -177,8 +178,20 @@ async function start() {
   kort = lavKort($('#kort'));
   hLag = markørLag(kort); fLag = markørLag(kort);
 
+  // Live opdateringer: hvis teksten på min opgave (eller en ledig hændelse) bliver længere, får jeg besked
+  const kendtTekst = new Map(store.state.haendelser.map(h => [h.id, h.tekst || '']));
   store.lyt(s => {
     tegn();
+    for (const h of s.haendelser) {
+      const før = kendtTekst.get(h.id);
+      kendtTekst.set(h.id, h.tekst || '');
+      if (før == null || før === (h.tekst || '') || !senesteOpdatering(h)) continue;
+      const min = h.id === s.mig?.haendelse_id;
+      if (min || h.status === 'ny') {
+        if (min && pref.get('lyd', true)) bip();
+        toast(`${min ? 'Opdatering på din opgave' : 'Opdatering'}: ${senesteOpdatering(h).replace(/^kl\. \d\d[.:]\d\d [^:]+: /, '').slice(0, 120)}`, min ? 'ny' : '');
+      }
+    }
     const ny = s.nyHaendelse;
     if (ny && ny.status === 'ny') {
       if (pref.get('lyd', true)) bip();

@@ -2,7 +2,7 @@
 import { store } from './store.js';
 import { parseBesked } from './supabase/functions/pushover/parse.js';
 import {
-  STATUS, H_STATUS, KATEGORI_IKON, aktiv, esc, $, siden, klokken, km, kmTekst, set,
+  STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, set,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
 } from './faelles.js';
 
@@ -62,6 +62,7 @@ function haendelseKort(h) {
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}</p>
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)} · taget kl. ${klokken(h.taget_tid)}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
+        ${senesteOpdatering(h) ? `<p class="opdatering"><span>🔄 ${esc(senesteOpdatering(h))}</span></p>` : ''}
         ${h.note ? `<p class="lille note">Note: ${esc(h.note)}</p>` : ''}
         <div class="h-knapper">
           ${aktiv(h) ? `<button data-tildel="${h.id}">${h.taget_af ? 'Skift fotograf' : 'Tildel'}</button>

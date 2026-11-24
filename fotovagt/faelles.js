@@ -14,6 +14,11 @@ export const H_STATUS = {
 export const KATEGORI_IKON = {
   Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Miljø: '☣️', Vejr: '🌧️', Forsyning: '🔧', Andet: '📍',
 };
+// Seneste live opdatering, der er lagt ind i hændelsen ("— kl. 19:42 PF-Upload: …")
+export function senesteOpdatering(h) {
+  const l = String(h?.tekst || '').split('\n').filter(x => x.startsWith('— ')).pop();
+  return l ? l.slice(2) : '';
+}
 export const aktiv = h => ['ny', 'taget', 'ankommet'].includes(h.status);
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

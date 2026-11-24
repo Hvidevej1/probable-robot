@@ -114,6 +114,8 @@ tjek('Politiets opfølgning (død) lægges ind via pressemeddelelsen', findMatch
 tjek('Breaking fra Aalestrup og Kolding holdes adskilt', !findMatch(P.tvMidtvest, [aktiv(P.tvSyd)]));
 tjek('Samme Breaking-tekst tilføjes ikke to gange', (() => { const f = flet(aktiv(P.breakingTv2), P.breakingTv2Kort, 'PF-Upload'); return f.tekst === P.breakingTv2.tekst; })());
 tjek('"Færdselsuheld på Randersvej" og "Færdselsuheld E45" ved Vejle holdes adskilt', !findMatch(P.politiRandersvej, [aktiv({ titel: 'Færdselsuheld E45', tekst: 'Trafikuheld E45 ved Vejle', adresse: 'E45 ved Vejle', kategori: 'Trafik', lat: 55.72, lon: 9.5 })]));
+tjek('Politiets "færdige på uheldsstedet" markeres med ✅ (opgaven lukkes ikke)', (() => { const f = flet(aktiv(P.politiRandersvej), P.politiDød, 'PF-Upload'); return /✅/.test(f.tekst) && !f.status; })());
+tjek('Breaking-overskriften gentages ikke i opdateringen', (() => { const f = flet(aktiv(P.politiRandersvej), P.breakingTv2, 'PF-Upload'); return (f.tekst.match(/alt er spærret/g) || []).length === 1; })());
 tjek('Gammel hændelse (over 45 min) bruges ikke', !findMatch(P.abaMast, [aktiv(P.aba112, 60)]));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

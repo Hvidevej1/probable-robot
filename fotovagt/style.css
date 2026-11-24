@@ -243,3 +243,7 @@ body.kontor #app { display: flex; flex-direction: column; height: 100vh; }
 }
 /* Cirka-placering (kun by/station kendt): stiplet kant */
 .pin.cirka { border-style: dashed; opacity: .85; }
+
+/* Seneste live opdatering på en hændelse */
+.opdatering { margin: 6px 0 0; font-size: .85rem; background: color-mix(in srgb, var(--ankommet) 10%, var(--flade)); border-left: 3px solid var(--ankommet); padding: 5px 8px; border-radius: 6px; }
+.opdatering span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
