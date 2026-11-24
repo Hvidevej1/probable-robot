@@ -365,6 +365,26 @@ begin
   values (auth.uid(), 'afsluttede SOS fra ' || (select p.navn from sos join profiles p on p.id = sos.bruger where sos.id = s));
 end $$;
 
+-- Flere kan rykke ud til samme SOS ("Jeg kører derhen")
+alter table sos add column if not exists paa_vej uuid[] not null default '{}';
+alter table sos add column if not exists push_paa_vej int not null default 0;
+
+create or replace function sos_paa_vej(s uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not er_bruger() then raise exception 'Ikke logget ind.'; end if;
+  update sos set paa_vej = array_append(paa_vej, auth.uid()),
+                 kvitteret_af = coalesce(kvitteret_af, auth.uid()), kvitteret_tid = coalesce(kvitteret_tid, now())
+   where id = s and aktiv and not (auth.uid() = any(paa_vej));
+  if found then
+    insert into logbog (bruger, handling)
+    values (auth.uid(), 'kører til SOS fra ' || (select p.navn from sos join profiles p on p.id = sos.bruger where sos.id = s));
+  end if;
+end $$;
+revoke execute on function sos_paa_vej(uuid) from public, anon;
+grant execute on function sos_paa_vej(uuid) to authenticated;
+
+
 revoke execute on function sos_start(double precision, double precision, double precision), sos_stop(), sos_kvitter(uuid), sos_afslut(uuid) from public, anon;
 grant execute on function sos_start(double precision, double precision, double precision), sos_stop(), sos_kvitter(uuid), sos_afslut(uuid) to authenticated;
 

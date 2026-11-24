@@ -424,7 +424,7 @@ async function start() {
     pushTekst();
   };
   const sosLink = new URLSearchParams(location.search).get('sos');
-  if (sosLink) { history.replaceState(null, '', location.pathname); setTimeout(() => visSos(sosLink), 300); }
+  if (sosLink) { history.replaceState(null, '', location.pathname + (store.demo ? '?demo' : '')); setTimeout(() => visSos(sosLink), 300); }
   navigator.serviceWorker?.addEventListener('message', e => {
     const id = e.data?.åbn && new URL(e.data.åbn, location.href).searchParams.get('sos'); if (id) visSos(id);
   });

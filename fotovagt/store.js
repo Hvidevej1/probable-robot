@@ -4,7 +4,7 @@
 import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './supabase/functions/pushover/parse.js';
 
 const cfg = window.FOTOVAGT_CONFIG || {};
-const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
+const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey) && !/[?&]demo\b/.test(location.search);
 const lyttere = new Set();
 const state = { haendelser: [], profiler: [], log: [], sos: [], mig: null };
 const fejlTekst = e => (e && (e.message || e.error_description)) || String(e);
@@ -124,6 +124,7 @@ function supabaseBackend() {
     },
     sosStop: () => rpc('sos_stop'),
     sosKvitter: id => rpc('sos_kvitter', { s: id }),
+    sosPåVej: id => rpc('sos_paa_vej', { s: id }),
     sosAfslut: id => rpc('sos_afslut', { s: id }),
     // Push-beskeder til den låste telefon
     async pushNøgle() {
@@ -258,6 +259,13 @@ function demoBackend() {
       const s = (db.sos || []).find(x => x.id === id);
       if (s && s.aktiv && !s.kvitteret_af) Object.assign(s, { kvitteret_af: mig().id, kvitteret_tid: nu() });
       log(null, 'så SOS fra ' + (P(s?.bruger)?.navn || ''));
+    }),
+    sosPåVej: kør(id => {
+      const s = (db.sos || []).find(x => x.id === id), m = mig();
+      if (!s || !s.aktiv || (s.paa_vej || []).includes(m.id)) return;
+      s.paa_vej = [...(s.paa_vej || []), m.id];
+      if (!s.kvitteret_af) Object.assign(s, { kvitteret_af: m.id, kvitteret_tid: nu() });
+      log(null, 'kører til SOS fra ' + (P(s.bruger)?.navn || ''));
     }),
     sosAfslut: kør(id => {
       kontor(); const s = (db.sos || []).find(x => x.id === id);

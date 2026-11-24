@@ -3,7 +3,7 @@ import { store } from './store.js';
 import {
   STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
-  pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm,
+  pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst,
 } from './faelles.js';
 
 const pref = {
@@ -112,6 +112,7 @@ function tegnSos() {
     <div class="sos-mig" role="alert">
       <b>🆘 Din SOS er sendt</b>
       <p>${kvit ? `✅ ${esc(kvit.navn)} har set din alarm kl. ${klokken(egen.kvitteret_tid)}.` : 'Kontoret og fotografer inden for 20 km er alarmeret. Venter på, at nogen ser den …'}
+        ${påVejTekst(egen) ? `<br><b>🚗 På vej til dig: ${påVejTekst(egen)}</b>` : ''}
         Din position sendes løbende${egen.lat != null ? '' : ' (placering ikke fundet endnu)'}.</p>
       <div class="sos-knapper">
         <a class="knap hvid" href="tel:112">📞 Ring 112</a>
@@ -254,7 +255,7 @@ function åbnFraLink(url = location.href) {
   const q = new URL(url, location.href).searchParams;
   const id = q.get('h'), sos = q.get('sos');
   if (!id && !sos) return;
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(null, '', location.pathname + (store.demo ? '?demo' : ''));
   if (sos) return visSos(sos);
   if (store.state.haendelser.some(h => h.id === id)) visHaendelse(id);
 }
@@ -263,6 +264,7 @@ function åbnFraLink(url = location.href) {
 async function start() {
   mig = await logInd();
   $('#demo-mærke').hidden = !store.demo;
+  $('#skift').hidden = mig.rolle !== 'kontor';   // kontoret kan skifte mellem fotografens side og sit dashboard
   kort = lavKort($('#kort'));
   hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort);
 
@@ -303,6 +305,13 @@ async function start() {
   $('#sos-omraade').onclick = async e => {
     const t = e.target.closest('button'); if (!t) return;
     if (t.id === 'btn-sos-ok' && confirm('Stop din SOS-alarm? Kontoret får besked om, at du er OK.')) await prøv(() => store.sosStop(), 'Alarmen er stoppet.');
+    if (t.dataset.sosVej) {
+      sosSet.add(t.dataset.sosVej);
+      const s = aktiveSos().find(x => x.id === t.dataset.sosVej);
+      await prøv(() => store.sosPåVej(t.dataset.sosVej), 'Du står som på vej. Kontoret og kollegaen kan se det.');
+      if (s?.lat != null) window.open(/iPhone|iPad|Mac/.test(navigator.userAgent) ? `https://maps.apple.com/?daddr=${s.lat},${s.lon}` : `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}`, '_blank');
+      tegnSos();
+    }
     if (t.dataset.sosSet) { sosSet.add(t.dataset.sosSet); await prøv(() => store.sosKvitter(t.dataset.sosSet), 'Du har meldt, at du har set alarmen.'); tegnSos(); }
     if (t.dataset.sosVis) visSos(t.dataset.sosVis);
   };

@@ -8,17 +8,38 @@ Fotograferne i marken kan tage en hændelse og melde status, og kontoret kan se,
 
 Alt opdateres live på alle skærme. Kun én fotograf kan tage en hændelse; den, der trykker først, får den.
 
-## Prøv den nu (demo)
-Står felterne i `config.js` tomme, kører appen som demo med opdigtede fotografer og hændelser, og alt gemmes kun i browseren.
-Åbn `index.html` (marken) og `kontor.html` (kontoret) i hver sin fane i samme browser, så kan du se dem opdatere hinanden.
+## Status for opsætningen
+Supabase-projektet **Fotovagt** (`uhhfqojbbslfcivykcxx`, Frankfurt) er sat op:
+- database og adgangsregler
+- Edge Functions `pushover` og `push`
+- ure til Pushover-hentning, adresseopslag og offline-markering
+- push-nøgler, som serveren selv har lavet
 
-## Opsætning (gratis: Supabase + Vercel)
-1. **Supabase:** Opret et *nyt* projekt på supabase.com (region EU, fx Frankfurt). Brug ikke medicin-projektet.
-2. **SQL Editor:** Indsæt og kør `supabase/opsaetning.sql`.
-3. **Brugere:** Under *Authentication → Users → Add user* opretter du hver fotograf og dig selv (e-mail + adgangskode, "Auto confirm"). Slå "Allow new users to sign up" fra under *Sign In / Providers*.
-4. **Gør dig selv til kontor:** Kør linjen nederst i `opsaetning.sql` med din e-mail. Andre kan bagefter gøres til kontor fra kontorsiden (✎ ved fotografen).
-5. **config.js:** Kopiér *Project URL* og *anon/publishable key* (Project Settings → API) ind.
-6. **Vercel:** Importér repoet som et nyt projekt og sæt *Root Directory* til `fotovagt`. Giv det evt. en adresse som `vagt.hrc-fotos.dk`.
+`config.js` peger på projektet. Der mangler:
+1. **At lægge appen online:** Importér repoet i Vercel, sæt *Root Directory* til `fotovagt`, og giv den fx adressen `vagt.hrc-fotos.dk`.
+2. **Brugere:** Opret dem under Supabase → *Authentication → Users → Add user* (e-mail + adgangskode, "Auto confirm"). Gør dig selv til kontor:
+   `update profiles set rolle = 'kontor' where id = (select id from auth.users where email = 'din@mail.dk');`
+3. **Pushover:** Log ind på kontorsiden → **Pushover** → forbind med jeres Pushover-login. Det kræver Pushover for Desktop-licens.
+
+## Prøv den (demo)
+Tilføj `?demo` til adressen (fx `index.html?demo` og `kontor.html?demo`), så kører appen med opdigtede fotografer og hændelser i browseren. Faner i samme browser opdaterer hinanden.
+
+## Skærme
+- **Telefon (marken):** faner med Kort og Hændelser.
+- **iPad og større (marken):** liste og kort side om side.
+- **Kontoret:**
+  - Stor skærm: tre kolonner.
+  - iPad på langs: kort til højre, fotografer og hændelser til venstre.
+  - iPad på højkant: én kolonne.
+- Kontor-brugere kan skifte mellem **Marken** og **Kontor** i toppen.
+
+## SOS / alarmknap
+- Fotografen trykker **SOS** øverst. Der går 5 sekunders nedtælling (eller "Send nu"), så den ikke sendes ved et uheld.
+- Kontoret og fotografer inden for 20 km får push og en **rød boks** med navn, telefon, placering og afstand.
+- Alarmen lyder på kontoret, indtil nogen trykker "Set".
+- Flere kan trykke **🚗 Jeg kører derhen**. Kontoret ser en tabel med navn, telefon, afstand og placering for dem, der er på vej, og fotografen i nød får push for hver ny, der rykker ud.
+- Positionen opdateres løbende, mens alarmen er aktiv. Fotografen stopper med "Jeg er OK", eller kontoret afslutter.
+- "Ring 112" står altid fremme. Fotovagt erstatter ikke alarmcentralen.
 
 ## Pushover → hændelser automatisk
 Fotovagt bruger Pushovers *Open Client API*. Appen bliver en ekstra "enhed" på jeres Pushover-konto, ligesom Pushover på en computer. Telefonerne får stadig alle beskeder som før.
@@ -86,6 +107,9 @@ Opsætning:
 - Position deles kun, når fotografen selv slår det til under sin profil.
 - Kortet er OpenStreetMap og kræver ingen nøgle.
 
+## Videre arbejde
+- `PLAN-auto-tildeling.md`: plan for automatisk tildeling til nærmeste fotograf.
+
 ## Filer
 - `index.html`, `marken.js`: siden til marken
 - `kontor.html`, `kontor.js`: siden til kontoret
@@ -97,3 +121,6 @@ Opsætning:
 - `supabase/pushover-cron.sql`: henter Pushover hvert 15. sekund og sætter gamle fotografer offline
 - `supabase/functions/pushover/`: Edge Function og beskedparser
 - `vendor/`: Leaflet 1.9.4 (kort) og supabase-js 2.119.0
+- `logo-hvid.png`, `icon-*.png`, `favicon.png`, `apple-touch-icon.png`: HRC-Fotos-logoet
+
+© HRC-Fotos.dk

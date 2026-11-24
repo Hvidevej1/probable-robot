@@ -37,7 +37,7 @@ alter table haendelser add column if not exists push_tekst_len int;
 alter table haendelser add column if not exists push_tildelt uuid;
 
 create or replace function push_start() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 begin
   new.push_tekst_len := coalesce(length(new.tekst), 0);
   return new;
@@ -72,12 +72,13 @@ drop trigger if exists push_kald on haendelser;
 create trigger push_kald after insert or update of status, taget_af, tekst on haendelser
   for each row execute function push_kald();
 
--- SOS: ny alarm -> kontoret + fotografer inden for 20 km; "Set" -> besked til den, der trykkede SOS
+-- SOS: ny alarm -> kontoret + fotografer inden for 20 km; "Set" og "Jeg kører derhen" -> besked til den, der trykkede SOS
 create or replace function sos_push() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare slags text;
 begin
   if tg_op = 'INSERT' then slags := 'sos';
+  elsif coalesce(array_length(new.paa_vej, 1), 0) > coalesce(array_length(old.paa_vej, 1), 0) then slags := 'sos_paa_vej';
   elsif old.kvitteret_af is null and new.kvitteret_af is not null then slags := 'sos_set';
   end if;
   if slags is not null then
@@ -90,5 +91,5 @@ begin
   return new;
 end $$;
 drop trigger if exists sos_push on sos;
-create trigger sos_push after insert or update of kvitteret_af on sos for each row execute function sos_push();
+create trigger sos_push after insert or update of kvitteret_af, paa_vej on sos for each row execute function sos_push();
 revoke execute on function sos_push() from public, anon, authenticated;

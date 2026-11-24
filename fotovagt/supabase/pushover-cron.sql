@@ -1,6 +1,7 @@
 -- Henter nye Pushover-beskeder hvert 15. sekund.
 -- Kør EFTER opsaetning.sql, og efter at funktionen "pushover" er lagt op.
 -- Ret RET_MIG_PROJEKT til dit projekts adresse, fx abcdefgh.supabase.co (Project Settings -> API).
+-- (Fotovagts eget projekt er uhhfqojbbslfcivykcxx – allerede sat op.)
 -- Hemmeligheden, som funktionen tjekker, laver databasen selv (tabellen intern).
 
 create extension if not exists pg_net;
@@ -41,7 +42,7 @@ create table if not exists public.geokod_koe (
 alter table public.geokod_koe enable row level security;
 
 create or replace function public.url_koder(t text) returns text
-language sql immutable as $$
+language sql immutable set search_path = public as $$
   select coalesce(string_agg(case when (b between 48 and 57) or (b between 65 and 90) or (b between 97 and 122) or b in (45, 46, 95, 126)
     then chr(b) else '%' || upper(lpad(to_hex(b), 2, '0')) end, '' order by i), '')
   from (select i, get_byte(convert_to(t, 'UTF8'), i) as b

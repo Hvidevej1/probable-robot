@@ -139,17 +139,42 @@ export function sosBoks(s, { fra = null, kontor = false } = {}) {
           ? `${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}${s.noejagtighed ? ` (±${Math.round(s.noejagtighed)} m)` : ''}${d != null ? ` · <b>${kmTekst(d)} fra dig</b>` : ''}<br><small>opdateret ${siden(s.pos_tid || s.start)} siden</small>`
           : 'ukendt – ring til fotografen'}</dd>
         <dt>Status</dt><dd>${kvit ? `Set af ${esc(kvit.navn)} kl. ${klokken(s.kvitteret_tid)}` : '<b>Ingen har set alarmen endnu</b>'}</dd>
+        <dt>På vej</dt><dd>${(s.paa_vej || []).length ? `${s.paa_vej.length} ${s.paa_vej.length === 1 ? 'person' : 'personer'}` : 'ingen endnu'}</dd>
       </dl>
+      ${påVejTabel(s)}
       <div class="sos-knapper">
         ${p.telefon ? `<a class="knap" href="tel:${esc(p.telefon)}">📞 Ring til ${esc(p.navn || 'fotografen')}</a>` : ''}
         ${s.lat != null ? `<button data-sos-vis="${s.id}">📍 Vis på kortet</button>` : ''}
         ${nav ? `<a class="knap" href="${nav}" target="_blank" rel="noopener">🚗 Navigér</a>` : ''}
         ${kort ? `<a class="knap" href="${kort}" target="_blank" rel="noopener">Google Maps</a>` : ''}
-        ${!kvit ? `<button data-sos-set="${s.id}" class="hvid">✓ Set – jeg tager mig af det</button>` : ''}
+        ${!kontor && !(s.paa_vej || []).includes(store.state.mig?.id) ? `<button data-sos-vej="${s.id}" class="hvid">🚗 Jeg kører derhen</button>` : ''}
+        ${!kvit ? `<button data-sos-set="${s.id}" class="hvid">✓ Set${kontor ? ' – vi tager os af det' : ''}</button>` : ''}
         ${kontor ? `<button data-sos-afslut="${s.id}" class="hvid">Afslut alarm</button>` : ''}
       </div>
       <p class="sos-112">Er der fare for liv: ring 112.</p>
     </div>`;
+}
+
+// "Anna (4,8 km), Ida (12 km)": hvem der kører til alarmen, og hvor langt de har
+export function påVejTekst(s) {
+  return (s.paa_vej || []).map(id => {
+    const p = store.state.profiler.find(x => x.id === id);
+    const d = p && s.lat != null && p.lat != null ? km(p, s) : null;
+    return p ? `${esc(p.navn)}${d != null ? ` (${kmTekst(d)})` : ''}` : '';
+  }).filter(Boolean).join(', ');
+}
+
+// Tabel over dem, der kører til alarmen: navn, telefon, afstand til SOS-stedet og placering
+export function påVejTabel(s) {
+  const rækker = (s.paa_vej || []).map(id => store.state.profiler.find(x => x.id === id)).filter(Boolean);
+  if (!rækker.length) return '';
+  return `<table class="sos-vej"><thead><tr><th>På vej</th><th>Telefon</th><th>Afstand</th><th>Placering</th></tr></thead><tbody>${rækker.map(p => {
+    const d = s.lat != null && p.lat != null ? km(p, s) : null;
+    return `<tr><td><b>${esc(p.navn)}</b></td>
+      <td>${p.telefon ? `<a href="tel:${esc(p.telefon)}">${esc(p.telefon)}</a>` : '–'}</td>
+      <td>${d != null ? kmTekst(d) : '–'}</td>
+      <td>${p.lat != null ? `<a href="https://maps.google.com/?q=${p.lat},${p.lon}" target="_blank" rel="noopener">${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</a><br><small>${siden(p.pos_tid) || '?'} siden</small>` : 'ukendt'}</td></tr>`;
+  }).join('')}</tbody></table>`;
 }
 
 export function sosIkon() {
@@ -260,4 +285,9 @@ export async function logInd({ kunKontor = false } = {}) {
     };
     vis(form.email);
   });
+}
+
+// I demo (?demo i adressen) beholder links mellem Marken og Kontor demo-tilstanden
+if (/[?&]demo\b/.test(location.search)) {
+  document.querySelectorAll('a[href="index.html"], a[href="kontor.html"]').forEach(a => { a.href = a.getAttribute('href') + '?demo'; });
 }

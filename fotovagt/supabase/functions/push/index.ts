@@ -7,6 +7,7 @@
 // Med { sos, slags } (se push.sql):
 //   sos         -> alle på kontoret + fotografer inden for 20 km (navn, telefon og afstand i beskeden)
 //   sos_set     -> den der trykkede SOS: "Din SOS er set af …"
+//   sos_paa_vej -> den der trykkede SOS: "Anna (5 km væk) kører til dig"
 // Med { test: true } og brugerens login sendes en prøve til brugerens egne telefoner.
 //
 // Nøglesættet til push (VAPID) laver funktionen selv første gang og gemmer i tabellen intern.
@@ -121,6 +122,14 @@ async function sos(id: string, slags: string) {
       });
     }
     return { sendt };
+  }
+  if (slags === "sos_paa_vej") {
+    const vej: string[] = s.paa_vej ?? [];
+    if (vej.length <= (s.push_paa_vej ?? 0)) return { sendt: 0 };
+    await db.from("sos").update({ push_paa_vej: vej.length }).eq("id", id);
+    const { data: pp } = await db.from("profiles").select("id, navn, lat, lon").in("id", vej.slice(s.push_paa_vej ?? 0));
+    const hvem = (pp ?? []).map((p) => p.navn + (s.lat != null && p.lat != null ? ` (${Math.max(1, Math.round(km(s, p)))} km væk)` : "")).join(", ");
+    return { sendt: await send([s.bruger], { title: "🚗 Hjælp er på vej", body: `${hvem} kører til dig.`, tag: `sos-${id}-vej-${vej.length}`, url: "./" }) };
   }
   if (slags === "sos_set" && s.kvitteret_af) {
     const { data: k } = await db.from("profiles").select("navn").eq("id", s.kvitteret_af).single();

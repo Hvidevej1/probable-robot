@@ -6,12 +6,15 @@
   <title>Fotovagt – marken</title>
   <meta name="theme-color" content="#14181f">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" href="favicon.png" type="image/png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Fotovagt">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
@@ -20,7 +23,7 @@
 <body class="marken">
   <section id="login" class="login" hidden>
     <div class="login-kort">
-      <h1><span class="logo-prik"></span>Fotovagt</h1>
+      <h1><span class="logo-boks"><img src="logo-hvid.png" alt="" width="28" height="20"></span>Fotovagt</h1>
       <p class="hint">Hændelser, kort og status for fotografer i marken.</p>
       <form id="login-form">
         <label>E-mail <input name="email" type="email" autocomplete="username" required></label>
@@ -34,13 +37,15 @@
         <p class="hint">Åbn <a href="kontor.html" target="_blank">kontoret</a> i en anden fane for at se begge sider samtidig.</p>
       </div>
       <p id="login-msg" class="fejl-tekst" role="alert"></p>
+      <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a></p>
     </div>
   </section>
 
   <div id="app" hidden>
     <header class="top">
-      <div class="brand"><span class="logo-prik"></span>Fotovagt</div>
+      <div class="brand"><span class="logo-boks"><img src="logo-hvid.png" alt="" width="22" height="16"></span><span>Fotovagt</span></div>
       <span id="demo-mærke" class="demo-chip" hidden>DEMO</span>
+      <nav class="skift" id="skift" aria-label="Skift side" hidden><a href="index.html" aria-current="page">Marken</a><a href="kontor.html">Kontor</a></nav>
       <button id="btn-sos" class="sos-knap" aria-label="SOS – tilkald hjælp">SOS</button>
       <button id="btn-mig" class="mig-knap" aria-label="Min profil"><span id="mig-navn"></span><span id="mig-status" class="chip"></span></button>
     </header>
@@ -92,7 +97,8 @@
         <button value="luk" type="submit" class="secondary" formnovalidate>Luk</button>
       </div>
       <button type="button" id="btn-logud" class="link fare">Log ud</button>
-      <p class="hint">Fotovagt viser kun det, kontoret og jeres Pushover-alarmer lægger ind. Din position deles kun, når du har slået det til.</p>
+      <p class="hint">Fotovagt viser kun det, kontoret og jeres Pushover-alarmer lægger ind. Din position deles kun, når du har slået det til (og mens en SOS er aktiv).</p>
+      <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a></p>
     </form>
   </dialog>
 

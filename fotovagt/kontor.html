@@ -5,9 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fotovagt – kontoret</title>
   <meta name="theme-color" content="#14181f">
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
@@ -16,7 +19,7 @@
 <body class="kontor">
   <section id="login" class="login" hidden>
     <div class="login-kort">
-      <h1><span class="logo-prik"></span>Fotovagt <small>kontoret</small></h1>
+      <h1><span class="logo-boks"><img src="logo-hvid.png" alt="" width="28" height="20"></span>Fotovagt <small>kontoret</small></h1>
       <p class="hint">Overblik over hændelser og fotografer.</p>
       <form id="login-form">
         <label>E-mail <input name="email" type="email" autocomplete="username" required></label>
@@ -30,13 +33,15 @@
         <p class="hint">Åbn <a href="index.html" target="_blank">marken</a> i en anden fane og log ind som en fotograf.</p>
       </div>
       <p id="login-msg" class="fejl-tekst" role="alert"></p>
+      <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a></p>
     </div>
   </section>
 
   <div id="app" class="kontor-app" hidden>
     <header class="top">
-      <div class="brand"><span class="logo-prik"></span>Fotovagt <small>kontoret</small></div>
+      <div class="brand"><span class="logo-boks"><img src="logo-hvid.png" alt="" width="22" height="16"></span><span>Fotovagt <small>kontoret</small></span></div>
       <span id="demo-mærke" class="demo-chip" hidden>DEMO</span>
+      <nav class="skift" aria-label="Skift side"><a href="index.html">Marken</a><a href="kontor.html" aria-current="page">Kontor</a></nav>
       <div class="nøgletal" id="nøgletal"></div>
       <div class="top-knapper">
         <button id="btn-ny">+ Ny hændelse</button>
@@ -77,6 +82,7 @@
         <ol id="logbog" class="logbog"></ol>
       </section>
     </main>
+    <p class="copyright kontor-fod">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a></p>
   </div>
 
   <!-- Ny / ret hændelse -->
