@@ -441,6 +441,59 @@ dialog.sos-dialog::backdrop { background: var(--sos); }
 .kollega.offline { opacity: .55; }
 .kollega-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 @media (prefers-reduced-motion: reduce) { .h-kort.blink { animation: none; } }
-@media (max-width: 1499px) { .nøgletal .tal:nth-child(4) { display: none; } }
-@media (min-width: 900px) and (max-width: 1279px) { .nøgletal .tal:nth-child(3) { display: none; } }
-@media (min-width: 900px) and (max-width: 1279px) { body.kontor .top { gap: 8px; } .top-knapper { gap: 6px; } .top-knapper button { padding: 9px 10px; } }
+
+/* =====================================================================
+   SKALERING: siden må aldrig blive bredere end skærmen
+   ===================================================================== */
+#app { max-width: 100vw; overflow-x: clip; }
+.top > * { min-width: 0; }
+.brand { min-width: 0; flex: 0 1 auto; overflow: hidden; }
+.brand > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.sos-knap { flex: none; }
+
+/* Marken: navneknap forkortes med … i stedet for at skubbe siden ud */
+body.marken .mig-knap { flex: 0 1 auto; min-width: 0; max-width: 48%; display: inline-flex; }
+body.marken .mig-knap span:first-child { max-width: none; min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.marken .mig-knap .chip { flex: none; }
+body.marken .skift { flex: none; }
+@media (max-width: 600px) {
+  body.marken .brand > span:last-child { display: none; }       /* kun logoet på telefon */
+  body.marken .skift a { padding: 6px 9px; font-size: .8rem; }
+  body.marken .sos-knap { min-height: 46px; padding: 8px 16px; font-size: 1.05rem; }
+}
+@media (max-width: 380px) {
+  body.marken .mig-knap span:first-child { display: none; }      /* meget smal: kun status-chip */
+  body.marken .mig-knap { padding: 5px 6px; }
+}
+
+/* Statusknapper deler bredden ligeligt og må ikke skubbe siden ud */
+.status-knapper { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.status-knapper button { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(.76rem, 3.5vw, .95rem); padding-left: 2px; padding-right: 2px; }
+.push-banner { padding-right: max(14px, env(safe-area-inset-right)); }
+
+/* Kontoret: på mellemstore skærme kommer knapperne på en ekstra linje i stedet for at skrue ud */
+@media (max-width: 1679px) {
+  body.kontor .top { flex-wrap: wrap; row-gap: 8px; }
+  body.kontor .nøgletal { margin: 0 0 0 auto; }
+  body.kontor .nøgletal .tal { display: block !important; }
+  body.kontor .top-knapper { flex: 1 1 100%; justify-content: flex-end; flex-wrap: wrap; }
+}
+@media (max-width: 899px) {
+  body.kontor .nøgletal { order: 3; width: 100%; margin: 0; }
+  body.kontor .top-knapper { order: 2; flex: 1 1 auto; justify-content: flex-end; }
+}
+@media (max-width: 560px) {
+  body.kontor .top-knapper button { padding: 8px 10px; font-size: .88rem; }
+  body.kontor .brand small { display: none; }
+}
+
+/* Større SOS-knap: let at ramme, også med handsker */
+.sos-knap { min-height: 50px; padding: 8px 24px; font-size: 1.15rem; letter-spacing: .09em; }
+.sos-knap { box-shadow: 0 0 0 4px rgba(212, 0, 26, .35), 0 6px 18px rgba(212, 0, 26, .45); }
+
+/* Telefon + kontorbruger i marken: skiftet Marken/Kontor tager logoets plads, så navnet kan ses */
+@media (max-width: 480px) {
+  body.marken .top:has(#skift:not([hidden])) .brand { display: none; }
+  body.marken .top:has(#skift:not([hidden])) .demo-chip { display: none; }
+  body.kontor .top-knapper button { padding: 7px 9px; font-size: .84rem; }
+}

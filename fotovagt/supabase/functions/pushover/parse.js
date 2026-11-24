@@ -17,6 +17,8 @@
 // Nøgleord -> kategori. Titel og første linjer tjekkes først, og første match vinder.
 const KATEGORIER = [
   ['Forsyning', /vandafbrydelse|varmeafbrydelse|strømafbrydelse|fjernvarme|vandledning|elnet|ledningsbrud|\bforsyning\b/i],
+  // Redningskoder fra beredskabet (fx "Redn.-Silo/Brønd") vinder over 🔥, som alle beredskabsbeskeder har
+  ['Redning', /\bredn\.|(?<!&\s?)\bredning\b|\bsilo\b|brønd|drukn|person i vand(?:et)?|fastklemt|vandredning|dyreredning/i],
   ['Brand', /🔥|🚒|\bABA\d*|bygn\.?\s?brand|brand(?!væsen)|\bild\b|røg|eksplosion|brænd|skorsten|sprøjte|tankvogn|\bass\.|\bassistance\b/i],
   ['Trafik', /🚗|🚙|🚘|trafik|færdsel|uheld|ulykke|påkørsel|motorvej|frontal|lastbil|(?:^|[\s,.])kø(?=$|[\s,.])|\bE\d{2}\b|spærret|vejarbejde|dyr på vejen/i],
   ['Politi', /🚓|👮|efterlys|varetægt|voldtægt|politi(?! og redning)|anholdt|skud|skyd|knivstik|røveri|indbrud|vold|drab|bevæbnet|aktion/i],

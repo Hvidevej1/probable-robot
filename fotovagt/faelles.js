@@ -191,7 +191,11 @@ export function alarm(til) {
 // ------------------------------------------------------------------------------------
 export function lavKort(el) {
   const cfg = window.FOTOVAGT_CONFIG || {};
-  const kort = L.map(el, { zoomControl: true, attributionControl: true }).setView(cfg.kortCenter || [56.1, 10.6], cfg.kortZoom || 7);
+  const kort = L.map(el, { zoomControl: true, attributionControl: true });
+  // Start: hele Danmark passer i vinduet, uanset skærmstørrelse (præcis zoom følger, når der er punkter)
+  kort.fitBounds(cfg.kortGrænser || [[54.56, 8.07], [57.75, 12.69]], { padding: [10, 10] });
+  setTimeout(() => kort.invalidateSize(), 200);
+  window.addEventListener('resize', () => kort.invalidateSize());
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(kort);

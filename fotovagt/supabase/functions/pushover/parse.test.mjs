@@ -117,5 +117,9 @@ tjek('"Færdselsuheld på Randersvej" og "Færdselsuheld E45" ved Vejle holdes a
 tjek('Politiets "færdige på uheldsstedet" markeres med ✅ (opgaven lukkes ikke)', (() => { const f = flet(aktiv(P.politiRandersvej), P.politiDød, 'PF-Upload'); return /✅/.test(f.tekst) && !f.status; })());
 tjek('Breaking-overskriften gentages ikke i opdateringen', (() => { const f = flet(aktiv(P.politiRandersvej), P.breakingTv2, 'PF-Upload'); return (f.tekst.match(/alt er spærret/g) || []).length === 1; })());
 tjek('Gammel hændelse (over 45 min) bruges ikke', !findMatch(P.abaMast, [aktiv(P.aba112, 60)]));
+const redn = parseBesked({ title: '🔥 Redn.-Silo/Brønd', message: '🔥 Redn.-Silo/Brønd\nBeredskab: Midtjysk Brand & Redning\nStation: Ørum\n24-11-2026 19:41', app: 'Mast' });
+tjek('"Redn.-Silo/Brønd" bliver Redning (ikke Brand)', redn.kategori === 'Redning');
+const bygn = parseBesked({ title: '🔥 Bygn.brand-Villa', message: '🔥 Bygn.brand-Villa\nBeredskab: Midtjysk Brand & Redning\nStation: Ørum', app: 'Mast' });
+tjek('Bygningsbrand med "Brand & Redning" i teksten er stadig Brand', bygn.kategori === 'Brand');
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);
