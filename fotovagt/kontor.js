@@ -218,14 +218,17 @@ function åbnFoto(id) {
 
 // ---------------------------------------------------------------------------------
 // Pushover-forbindelse
+// Eksempler i samme format som jeres kilder i Pushover (app, titel, besked).
+// "1-1-2 Århus" og "Mast" er samme alarm og bliver lagt sammen til én hændelse.
 const DEMO_BESKEDER = [
-  ['Brand i villa', 'Melding: Brand i villa, Skovvej 12, 8600 Silkeborg. Flere vogne kørt.'],
-  ['Færdselsuheld', 'Trafikuheld med tre biler på Vejlevej 120, 7000 Fredericia. Vejen er spærret.'],
-  ['Politiaktion', 'Større politiaktion på Algade 30, 4000 Roskilde. Området er afspærret.'],
-  ['Redning', 'Eftersøgning af person ved Strandvejen 5, 9990 Skagen.'],
-  ['Gasudslip', 'Gasudslip ved byggeplads, Jernbanegade 10, 4700 Næstved.'],
-  ['Storm', 'Træ væltet over vejen ved Kongensgade 1, 6000 Kolding.'],
+  ['1-1-2 Århus', '', 'ABA12 CI-M1 + CI  S1 Ny Munkegade 114 8000 Aarhus C Aarhus Kommune'],
+  ['Mast', '🔥 ABA12 CI-M1 + CI-S1', 'Beredskab: Østjyllands Brandvæsen'],
+  ['1-1-2 Århus', '', 'Bygn.brand-Lejlighed Vestergade 20 8600 Silkeborg Silkeborg Kommune'],
+  ['PF-Upload', '🔥 Bygn.brand-Lejlighed', 'Beredskab: Midtjysk Brand & Redning'],
+  ['Google Maps Scanner', '📍 Østjyske Motorvej', '🏙️ 7100 Vejle'],
+  ['Trafik Server', 'Kø', 'E45 fra Randers mod Randers mellem <44> Randers N og <43> Randers C'],
 ];
+let næsteEksempel = 1;
 let poStatus = {};
 async function hentPoStatus() {
   try { poStatus = await store.pushover({}); } catch (e) { poStatus = { fejl: store.fejlTekst(e) }; }
@@ -244,7 +247,7 @@ async function åbnPushover() {
       <p class="lille">Senest hentet: ${s.sidst_hentet ? `kl. ${klokken(s.sidst_hentet)} (${siden(s.sidst_hentet)} siden)` : 'endnu ikke'}${s.device_id ? ` · enhed ${esc(s.device_id).slice(0, 8)}…` : ''}</p>
       <form id="po-filter" class="ark-form">
         <label>Kun beskeder fra disse Pushover-apps (adskil med komma – tom = alle)
-          <input name="apps" value="${esc((s.kun_apps || []).join(', '))}" placeholder="Fx Beredskab, Politiradio"></label>
+          <input name="apps" value="${esc((s.kun_apps || []).join(', '))}" placeholder="Fx 1-1-2 Århus, Mast, PF-Upload, Trafik Server, Google Maps Scanner"></label>
         <div class="knap-række"><button type="submit" class="secondary">Gem filter</button>
           ${store.cloud ? '<button type="button" class="secondary" id="po-hent">Hent nu</button>' : ''}
           <button type="button" class="link fare" id="po-afbryd">Afbryd forbindelsen</button></div>
@@ -262,10 +265,11 @@ async function åbnPushover() {
     <h3>Prøv med en testbesked</h3>
     <p class="hint">Skriv en besked, som den ser ud i Pushover. Den bliver læst og placeret på kortet præcis som de rigtige.</p>
     <form id="po-test" class="ark-form">
-      <label>Titel <input name="title" value="${esc(DEMO_BESKEDER[0][0])}"></label>
-      <label>Besked <textarea name="message" rows="3">${esc(DEMO_BESKEDER[0][1])}</textarea></label>
+      <label>Afsender (Pushover-app) <input name="app" value="${esc(DEMO_BESKEDER[0][0])}"></label>
+      <label>Titel <input name="title" value="${esc(DEMO_BESKEDER[0][1])}" placeholder="Tom, hvis beskeden ikke har en titel"></label>
+      <label>Besked <textarea name="message" rows="3">${esc(DEMO_BESKEDER[0][2])}</textarea></label>
       <div class="knap-række"><button type="submit">Send testbesked</button>
-        <button type="button" class="secondary" id="po-tilfældig">Tilfældig</button></div>
+        <button type="button" class="secondary" id="po-tilfældig">Næste eksempel</button></div>
     </form>
     ${store.demo ? '<hr><button type="button" class="link fare" id="demo-nulstil">Nulstil demo-data</button>' : ''}`;
 
@@ -286,17 +290,20 @@ async function åbnPushover() {
     if (f.id === 'po-test') {
       const knap = f.querySelector('[type=submit]'); knap.disabled = true;
       await prøv(async () => {
-        const h = await store.simulerBesked(f.title.value.trim(), f.message.value.trim());
+        const h = await store.simulerBesked(f.title.value.trim(), f.message.value.trim(), undefined, f.app.value.trim());
+        if (h.slaaetSammen) return toast(`Samme alarm som "${h.slaaetSammen.titel}" – lagt sammen med den.`, 'ok');
         if (h.lat == null) throw new Error('Testhændelsen er oprettet, men adressen blev ikke fundet. Ret den i listen.');
-      }, 'Testhændelsen er lagt på kortet.');
+        toast('Testhændelsen er lagt på kortet.', 'ok');
+      });
       knap.disabled = false;
     }
   };
   el.onclick = async e => {
     if (e.target.closest('[data-luk-dlg]')) return dlg.close();
     if (e.target.id === 'po-tilfældig') {
-      const [t, m] = DEMO_BESKEDER[Math.floor(Math.random() * DEMO_BESKEDER.length)];
-      el.querySelector('#po-test [name=title]').value = t; el.querySelector('#po-test [name=message]').value = m;
+      const [a, t, m] = DEMO_BESKEDER[næsteEksempel++ % DEMO_BESKEDER.length];
+      const f = el.querySelector('#po-test');
+      f.app.value = a; f.title.value = t; f.message.value = m;
     }
     if (e.target.id === 'po-hent') { await prøv(() => store.pushover({ hent_nu: true }), 'Hentet.'); åbnPushover(); }
     if (e.target.id === 'po-afbryd' && confirm('Afbryd forbindelsen til Pushover? Nye alarmer kommer så ikke ind automatisk.')) {

@@ -1,7 +1,7 @@
 // Datalaget. Med Supabase-nøgler i config.js bruges den fælles database med live-opdatering.
 // Uden nøgler kører DEMO: alt gemmes i browseren, og faner i samme browser opdaterer hinanden,
 // så man kan have "Marken" og "Kontoret" åbne side om side og se det virke.
-import { parseBesked, geokod } from './supabase/functions/pushover/parse.js';
+import { parseBesked, geokod, findMatch, flet } from './supabase/functions/pushover/parse.js';
 
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
@@ -280,13 +280,19 @@ function demoBackend() {
 const backend = cloud ? supabaseBackend() : demoBackend();
 
 // Fælles for begge: en Pushover-besked tastet ind på kontoret bliver læst præcis som de rigtige.
-async function simulerBesked(title, message, url) {
-  const h = parseBesked({ title, message, url });
-  if (h.lat == null && h.adresse) {
+// Samme alarm fra en anden kilde lægges ind i den eksisterende hændelse, ligesom på serveren.
+async function simulerBesked(title, message, url, app) {
+  const h = parseBesked({ title, message, url, app });
+  let match = findMatch(h, state.haendelser);
+  if (!match && h.lat == null && h.adresse) {
     const pos = await geokod(h.adresse).catch(() => null);
     if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
+    match = findMatch(h, state.haendelser);
   }
-  delete h.app;
+  if (match) {
+    await backend.ret(match.id, flet(match, h, app));
+    return { ...h, lat: h.lat ?? match.lat, slaaetSammen: match };
+  }
   await backend.opret({ ...h, kilde: cloud ? 'manuel' : 'pushover' });
   return h;
 }

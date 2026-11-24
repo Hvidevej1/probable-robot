@@ -30,13 +30,21 @@ Det kræver en **Pushover for Desktop-licens** på kontoen (engangskøb, ca. 5 $
 4. Log ind på kontorsiden, tryk **Pushover** og forbind med jeres Pushover-login. Adgangskoden gemmes ikke.
 5. Kommer der også andre beskeder på kontoen (fx fra hjemmet), kan du skrive navnene på de Pushover-apps, der sender alarmer, i feltet "Kun beskeder fra disse apps".
 
-**Sådan læses beskederne** (`supabase/functions/pushover/parse.js`):
-- Koordinater i teksten eller i et kortlink (Google/Apple Maps) bruges direkte.
-- Ellers findes adressen: en linje med "Adresse:" eller "Sted:", så "Vej nr, postnr by", så "postnr by", og til sidst "E45 ved Vejle".
-- Adressen slås op på OpenStreetMap og placeres på kortet.
-- Kategorien (Brand, Trafik, Politi, Redning, Miljø, Vejr) gættes ud fra nøgleord.
+**Sådan læses beskederne** (`supabase/functions/pushover/parse.js`) – tilpasset jeres kilder:
 
-Rammer den forkert på jeres beskeder, så send et par eksempler, så kan parseren rettes til. Med knappen "Send testbesked" under Pushover kan I prøve uden at vente på en rigtig alarm.
+| Kilde | Eksempel | Bliver til |
+|---|---|---|
+| 1-1-2 Århus | `ABA12 CI-M1 + CI  S1 Ny Munkegade 114 8000 Aarhus C Aarhus Kommune` | "ABA12 CI-M1 + CI S1 – automatisk brandalarm", Ny Munkegade 114, 8000 Aarhus C |
+| Mast | `🔥 ABA12 CI-M1 + CI-S1` / `Beredskab: Østjyllands Brandvæsen` | Lægges sammen med 1-1-2-hændelsen |
+| PF-Upload | `🔥 Bygn.brand-Lejlighed` / `Beredskab: …` | "Bygn.brand-Lejlighed – bygningsbrand" (lægges sammen med samme alarm fra 1-1-2) |
+| Google Maps Scanner | `📍 Østjyske Motorvej` / `🏙️ 7100 Vejle` | Østjyske Motorvej, 7100 Vejle (link med koordinater bruges direkte) |
+| Trafik Server | `Kø` / `E45 fra Randers mod Randers mellem <44> …` | Trafik, placeret ved Randers |
+
+- Koordinater i teksten eller i et kortlink (også korte maps.app.goo.gl-links) bruges direkte. Ellers slås adressen op på OpenStreetMap.
+- **Samme alarm fra flere kilder bliver til én hændelse.** Det sker, når titel/kode er den samme inden for 45 minutter (og de ikke ligger over 2 km fra hinanden), eller når to beskeder med samme kategori ligger under 300 m fra hinanden. De ekstra beskeder lægges ind i hændelsens tekst og logbog, og mangler den første adresse, bruges den nye.
+- Kategorien gættes ud fra 🔥, ABA, Bygn.brand, Kø, E45 osv.
+
+Rammer den forkert på en besked, så send den, så kan parseren rettes til. Med knappen "Send testbesked" under Pushover (med "Næste eksempel") kan I prøve jeres formater uden at vente på en rigtig alarm.
 
 **Andre kilder:** Funktionen tager også imod `POST {title, message, url}` med headeren `x-fotovagt-secret`, fx fra Zapier eller en mail-regel.
 

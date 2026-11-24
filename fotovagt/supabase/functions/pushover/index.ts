@@ -12,7 +12,7 @@
 // Hemmeligheder (Edge Functions -> Secrets): FOTOVAGT_SECRET (en lang tilfældig tekst).
 // "Verify JWT" skal være slået FRA for denne funktion (den tjekker selv login og hemmelighed).
 import { createClient } from "npm:@supabase/supabase-js@2.119.0";
-import { geokod, parseBesked } from "./parse.js";
+import { findKoordinater, findMatch, flet, geokod, parseBesked } from "./parse.js";
 
 const API = "https://api.pushover.net/1";
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -29,13 +29,47 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Indgang = { title?: string; message?: string; url?: string; priority?: number; app?: string };
 
+// Korte Google Maps-links (maps.app.goo.gl) peger videre til et link med koordinater
+async function udvidLink(url: string) {
+  try {
+    const r = await fetch(url, { redirect: "manual" });
+    return r.headers.get("location") || url;
+  } catch { return url; }
+}
+
+// Aktive hændelser fra de seneste 45 minutter (til at finde dubletter)
+async function nyligeAktive() {
+  const siden = new Date(Date.now() - 45 * 60e3).toISOString();
+  const { data } = await db.from("haendelser").select("*")
+    .in("status", ["ny", "taget", "ankommet"]).gt("oprettet", siden);
+  return data ?? [];
+}
+
 // Én besked -> én hændelse (med adresseopslag, hvis beskeden ikke selv har koordinater).
+// Er det samme alarm som en, der allerede er kommet fra en anden kilde, lægges beskeden ind i den.
 async function indsaet(b: Indgang, kilde: string, eksternId: string | null) {
   const h = parseBesked(b);
-  if (h.lat == null && h.adresse) {
+  if (h.lat == null && h.url && /goo\.gl|maps\.app/i.test(h.url)) {
+    const pos = findKoordinater(await udvidLink(h.url));
+    if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
+  }
+  const aktive = await nyligeAktive();
+  let match = findMatch(h, aktive);
+  if (!match && h.lat == null && h.adresse) {
     const pos = await geokod(h.adresse, { headers: GEO_HEADERS });
     if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
     await sleep(1100); // højst ét opslag i sekundet hos OpenStreetMap
+    match = findMatch(h, aktive);
+  }
+  if (match) {
+    const felter = flet(match, h, b.app);
+    if (felter.adresse && felter.lat == null && match.lat == null) {
+      const pos = await geokod(felter.adresse, { headers: GEO_HEADERS });
+      if (pos) { felter.lat = pos.lat; felter.lon = pos.lon; }
+    }
+    await db.from("haendelser").update(felter).eq("id", match.id);
+    await db.from("logbog").insert({ haendelse_id: match.id, handling: `ekstra besked fra ${b.app || kilde}` });
+    return { ...h, slaaet_sammen_med: match.id };
   }
   const række = { ...h, kilde, ekstern_id: eksternId };
   const { error } = eksternId
