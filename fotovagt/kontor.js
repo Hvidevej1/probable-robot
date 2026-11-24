@@ -59,7 +59,7 @@ function haendelseKort(h) {
       <span class="kat">${KATEGORI_IKON[h.kategori] || '📍'}</span>
       <div class="h-tekst">
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
-        <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : ''}</p>
+        <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}</p>
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)} · taget kl. ${klokken(h.taget_tid)}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
         ${h.note ? `<p class="lille note">Note: ${esc(h.note)}</p>` : ''}
@@ -171,6 +171,7 @@ function åbnRet(id = null) {
       kategori: f.kategori.value, url: f.url.value.trim() || null,
       lat: f.lat.value ? +f.lat.value : null, lon: f.lon.value ? +f.lon.value : null,
     };
+    if (felter.lat != null && (!h || felter.lat !== h.lat || felter.lon !== h.lon || felter.adresse !== h.adresse)) felter.cirka = false;
     if (h) await prøv(() => store.ret(h.id, felter), 'Hændelsen er rettet.');
     else await prøv(() => store.opret(felter), 'Hændelsen er oprettet.');
   };
@@ -218,15 +219,20 @@ function åbnFoto(id) {
 
 // ---------------------------------------------------------------------------------
 // Pushover-forbindelse
-// Eksempler i samme format som jeres kilder i Pushover (app, titel, besked).
-// "1-1-2 Århus" og "Mast" er samme alarm og bliver lagt sammen til én hændelse.
+// Eksempler fra jeres rigtige Pushover-beskeder (app, titel, besked).
+// 1-1-2 Århus + Mast er samme alarm og lægges sammen. Radioprøven og busbeskeden springes over.
 const DEMO_BESKEDER = [
   ['1-1-2 Århus', '', 'ABA12 CI-M1 + CI  S1 Ny Munkegade 114 8000 Aarhus C Aarhus Kommune'],
-  ['Mast', '🔥 ABA12 CI-M1 + CI-S1', 'Beredskab: Østjyllands Brandvæsen'],
-  ['1-1-2 Århus', '', 'Bygn.brand-Lejlighed Vestergade 20 8600 Silkeborg Silkeborg Kommune'],
-  ['PF-Upload', '🔥 Bygn.brand-Lejlighed', 'Beredskab: Midtjysk Brand & Redning'],
-  ['Google Maps Scanner', '📍 Østjyske Motorvej', '🏙️ 7100 Vejle'],
-  ['Trafik Server', 'Kø', 'E45 fra Randers mod Randers mellem <44> Randers N og <43> Randers C'],
+  ['Mast', '🚒 Aarhus C', '🔥 ABA12 CI-M1 + CI-S1\nBeredskab: Østjyllands Brandvæsen\nStation: Aarhus C\nAdresse: Ny Munkegade 114, 8000 Aarhus C\n24-11-2026 15:51'],
+  ['1-1-2 Århus', '', '@0 Ass.-A-sprøjte og tankvogn OD-M1 + OD V1 Byvej 63 8330 Beder'],
+  ['1-1-2 Århus', '', 'ABA11 SY-M1 + SY V1 Byvej 63 8330 Beder'],
+  ['Mast', '🚒 Assistance - Vejle', '🔥 Assistance: Assistance VB V-1 /- (VB ISL + VB MR-1) EL-instal.-Brand-Transformatorstation, Lysholt All. 11 , 7100 Vejle\nBeredskab: Vejle Brandvæsen\nStation: Vejle\n24-11-2026 14:47'],
+  ['PF-Upload', '🚒 Odder', '🔥 Bygn.brand-Lejlighed\nBeredskab: Østjyllands Brandvæsen\nStation: Odder\n24-11-2026 16:54'],
+  ['Trafik Server', 'Trafikmelding', '<b>Uheld</b>\nE45 Nordjyske Motorvej fra Aarhus mod Randers mellem &lt;46&gt; Aarhus Nord og &lt;44&gt; Hadsten\n\nUheld, Spor blokeret, Uheldsstedet er ikke sikret'],
+  ['PF-Upload', 'Trafikmelding', '🚙 Uheld\nE45 Nordjyske Motorvej fra Aarhus mod Randers mellem [46] Aarhus Nord og [44] Hadsten\nUheld, Spor blokeret\n\nNordjyske Motorvej, 8380 Spørring, Aarhus Kommune\n24-11-2026 16:22:00\n\nSe placeringen her: https://112meldinger.dk/map.php?uid=NKtJaLs'],
+  ['Google Maps Scanner', '🚨 Muligt trafikuheld detekteret på Google Maps', '📍 Østjyske Motorvej\n🏙️ 7100 Vejle\n⚠️ AI-detektion af trafikmaengde var ikke mulig - meldingen er ikke verificeret\n🕒 Detekteret kl. 16:04'],
+  ['1-1-2 Århus', '', '24-11 26 Radioprøve fra Østjyllands Brandvæsen'],
+  ['PF-Upload', 'Trafikmelding - Midttrafik (Bus)', 'Forsinkelser Pga uheld på motorvejen, er der store forsinkelser på busserne i Vejle. Rejsegarantien bortfalder. Lokation: Vejle Trafikcenter'],
 ];
 let næsteEksempel = 1;
 let poStatus = {};
@@ -245,13 +251,9 @@ async function åbnPushover() {
     ${s.forbundet ? `
       <p class="status-linje ${s.fejl ? 'h-ny' : 'h-afsluttet'}">${s.fejl ? '⚠ ' + esc(s.fejl) : '✓ Forbundet – nye beskeder hentes automatisk'}</p>
       <p class="lille">Senest hentet: ${s.sidst_hentet ? `kl. ${klokken(s.sidst_hentet)} (${siden(s.sidst_hentet)} siden)` : 'endnu ikke'}${s.device_id ? ` · enhed ${esc(s.device_id).slice(0, 8)}…` : ''}</p>
-      <form id="po-filter" class="ark-form">
-        <label>Kun beskeder fra disse Pushover-apps (adskil med komma – tom = alle)
-          <input name="apps" value="${esc((s.kun_apps || []).join(', '))}" placeholder="Fx 1-1-2 Århus, Mast, PF-Upload, Trafik Server, Google Maps Scanner"></label>
-        <div class="knap-række"><button type="submit" class="secondary">Gem filter</button>
-          ${store.cloud ? '<button type="button" class="secondary" id="po-hent">Hent nu</button>' : ''}
-          <button type="button" class="link fare" id="po-afbryd">Afbryd forbindelsen</button></div>
-      </form>` : `
+      <div class="knap-række">
+        ${store.cloud ? '<button type="button" class="secondary" id="po-hent">Hent nu</button>' : ''}
+        <button type="button" class="link fare" id="po-afbryd">Afbryd forbindelsen</button></div>` : `
       <p>Forbind jeres Pushover-konto, så alarmerne automatisk bliver til hændelser på kortet.
       Fotovagt bliver en ekstra "enhed" på kontoen (som Pushover på en computer) – telefonerne får stadig beskederne som før.</p>
       <p class="hint">Kræver Pushover for Desktop-licens på kontoen (engangsbeløb ca. 5 $ efter 30 dages prøve). Adgangskoden bliver ikke gemt.</p>
@@ -262,12 +264,22 @@ async function åbnPushover() {
         <button type="submit">Forbind</button>
       </form>`}
     <hr>
+    <form id="po-filter" class="ark-form">
+      <h3>Hvilke beskeder bliver til hændelser?</h3>
+      <label>Kun fra disse Pushover-apps (adskil med komma – tom = alle)
+        <input name="apps" value="${esc((s.kun_apps || []).join(', '))}" placeholder="Fx 1-1-2 Århus, Mast, PF-Upload, Trafik Server, Google Maps Scanner"></label>
+      <label>Spring beskeder over, der indeholder (adskil med komma)
+        <input name="ignorer" value="${esc((s.ignorer || []).join(', '))}" placeholder="Fx (Bus), Vejarbejde"></label>
+      <p class="hint">Radioprøver springes altid over.</p>
+      <button type="submit" class="secondary">Gem</button>
+    </form>
+    <hr>
     <h3>Prøv med en testbesked</h3>
     <p class="hint">Skriv en besked, som den ser ud i Pushover. Den bliver læst og placeret på kortet præcis som de rigtige.</p>
     <form id="po-test" class="ark-form">
       <label>Afsender (Pushover-app) <input name="app" value="${esc(DEMO_BESKEDER[0][0])}"></label>
       <label>Titel <input name="title" value="${esc(DEMO_BESKEDER[0][1])}" placeholder="Tom, hvis beskeden ikke har en titel"></label>
-      <label>Besked <textarea name="message" rows="3">${esc(DEMO_BESKEDER[0][2])}</textarea></label>
+      <label>Besked <textarea name="message" rows="5">${esc(DEMO_BESKEDER[0][2])}</textarea></label>
       <div class="knap-række"><button type="submit">Send testbesked</button>
         <button type="button" class="secondary" id="po-tilfældig">Næste eksempel</button></div>
     </form>
@@ -286,11 +298,12 @@ async function åbnPushover() {
       } catch (err) { toast(store.fejlTekst(err), 'fejl'); }
       knap.disabled = false; knap.textContent = 'Forbind';
     }
-    if (f.id === 'po-filter') { await prøv(() => store.pushover({ kun_apps: f.apps.value }), 'Filteret er gemt.'); hentPoStatus(); }
+    if (f.id === 'po-filter') { await prøv(() => store.pushover({ kun_apps: f.apps.value, ignorer: f.ignorer.value }), 'Gemt.'); hentPoStatus(); }
     if (f.id === 'po-test') {
       const knap = f.querySelector('[type=submit]'); knap.disabled = true;
       await prøv(async () => {
-        const h = await store.simulerBesked(f.title.value.trim(), f.message.value.trim(), undefined, f.app.value.trim());
+        const h = await store.simulerBesked(f.title.value.trim(), f.message.value.trim(), undefined, f.app.value.trim(), poStatus.ignorer || []);
+        if (h.ignoreret) return toast('Beskeden springes over (radioprøve eller på listen over beskeder, der springes over).');
         if (h.slaaetSammen) return toast(`Samme alarm som "${h.slaaetSammen.titel}" – lagt sammen med den.`, 'ok');
         if (h.lat == null) throw new Error('Testhændelsen er oprettet, men adressen blev ikke fundet. Ret den i listen.');
         toast('Testhændelsen er lagt på kortet.', 'ok');

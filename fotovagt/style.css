@@ -241,3 +241,5 @@ body.kontor #app { display: flex; flex-direction: column; height: 100vh; }
   .kort-panel { height: 55vh; order: -1; }
   .panel { overflow: visible; }
 }
+/* Cirka-placering (kun by/station kendt): stiplet kant */
+.pin.cirka { border-style: dashed; opacity: .85; }

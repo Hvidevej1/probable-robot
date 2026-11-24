@@ -12,7 +12,7 @@
 // Hemmeligheder (Edge Functions -> Secrets): FOTOVAGT_SECRET (en lang tilfældig tekst).
 // "Verify JWT" skal være slået FRA for denne funktion (den tjekker selv login og hemmelighed).
 import { createClient } from "npm:@supabase/supabase-js@2.119.0";
-import { findKoordinater, findMatch, flet, geokod, parseBesked } from "./parse.js";
+import { findKoordinater, findMatch, flet, geokod, parseBesked, række, skalIgnoreres, skalSlåsOp } from "./parse.js";
 
 const API = "https://api.pushover.net/1";
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -28,13 +28,33 @@ const GEO_HEADERS = { "User-Agent": "Fotovagt/1.0 (supabase edge function)" };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Indgang = { title?: string; message?: string; url?: string; priority?: number; app?: string };
+type Hændelse = ReturnType<typeof parseBesked>;
 
-// Korte Google Maps-links (maps.app.goo.gl) peger videre til et link med koordinater
-async function udvidLink(url: string) {
+// Find koordinater bag et link: 112meldinger.dk-kortsider har dem i siden,
+// korte Google Maps-links (maps.app.goo.gl) peger videre til et link med koordinater.
+async function slåLinkOp(url: string) {
   try {
+    if (/112meldinger\.dk\/map/i.test(url)) {
+      const r = await fetch(url, { headers: { "User-Agent": GEO_HEADERS["User-Agent"] } });
+      return r.ok ? findKoordinater(await r.text()) : null;
+    }
     const r = await fetch(url, { redirect: "manual" });
-    return r.headers.get("location") || url;
-  } catch { return url; }
+    return findKoordinater(r.headers.get("location") || "");
+  } catch { return null; }
+}
+
+// Placér hændelsen: først links, så adresseopslag hos OpenStreetMap
+async function placér(h: Hændelse) {
+  if (h.lat != null && !h.cirka) return;
+  for (const u of h.links.filter(skalSlåsOp)) {
+    const pos = await slåLinkOp(u);
+    if (pos) { h.lat = pos.lat; h.lon = pos.lon; h.cirka = false; return; }
+  }
+  if (h.lat == null && h.adresse) {
+    const pos = await geokod(h.adresse, { headers: GEO_HEADERS });
+    if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
+    await sleep(1100); // højst ét opslag i sekundet hos OpenStreetMap
+  }
 }
 
 // Aktive hændelser fra de seneste 45 minutter (til at finde dubletter)
@@ -45,25 +65,22 @@ async function nyligeAktive() {
   return data ?? [];
 }
 
-// Én besked -> én hændelse (med adresseopslag, hvis beskeden ikke selv har koordinater).
-// Er det samme alarm som en, der allerede er kommet fra en anden kilde, lægges beskeden ind i den.
-async function indsaet(b: Indgang, kilde: string, eksternId: string | null) {
+// Én besked -> én hændelse. Er det samme alarm som en, der allerede er kommet fra en anden kilde,
+// lægges beskeden ind i den. Radioprøver og kontorets ignorér-liste (fx "(Bus)") springes over.
+async function indsaet(b: Indgang, kilde: string, eksternId: string | null, ignorer: string[] = []) {
   const h = parseBesked(b);
-  if (h.lat == null && h.url && /goo\.gl|maps\.app/i.test(h.url)) {
-    const pos = findKoordinater(await udvidLink(h.url));
-    if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
-  }
+  if (skalIgnoreres(h, ignorer)) return { ...h, ignoreret: true };
   const aktive = await nyligeAktive();
   let match = findMatch(h, aktive);
-  if (!match && h.lat == null && h.adresse) {
-    const pos = await geokod(h.adresse, { headers: GEO_HEADERS });
-    if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
-    await sleep(1100); // højst ét opslag i sekundet hos OpenStreetMap
+  if (!match) {
+    await placér(h);
     match = findMatch(h, aktive);
+  } else if (match.cirka || match.lat == null) {
+    await placér(h); // den eksisterende har kun en cirka-placering: måske kan denne besked gøre den præcis
   }
   if (match) {
     const felter = flet(match, h, b.app);
-    if (felter.adresse && felter.lat == null && match.lat == null) {
+    if (felter.adresse && felter.lat === null) {        // bedre adresse: slå den op
       const pos = await geokod(felter.adresse, { headers: GEO_HEADERS });
       if (pos) { felter.lat = pos.lat; felter.lon = pos.lon; }
     }
@@ -71,10 +88,10 @@ async function indsaet(b: Indgang, kilde: string, eksternId: string | null) {
     await db.from("logbog").insert({ haendelse_id: match.id, handling: `ekstra besked fra ${b.app || kilde}` });
     return { ...h, slaaet_sammen_med: match.id };
   }
-  const række = { ...h, kilde, ekstern_id: eksternId };
+  const ny = { ...række(h), kilde, ekstern_id: eksternId };
   const { error } = eksternId
-    ? await db.from("haendelser").upsert(række, { onConflict: "ekstern_id", ignoreDuplicates: true })
-    : await db.from("haendelser").insert(række);
+    ? await db.from("haendelser").upsert(ny, { onConflict: "ekstern_id", ignoreDuplicates: true })
+    : await db.from("haendelser").insert(ny);
   if (error) throw new Error(error.message);
   return h;
 }
@@ -93,16 +110,19 @@ async function hent() {
   const beskeder = (svar.messages ?? []) as Array<Record<string, unknown>>;
   const kunApps = (k.kun_apps ?? []).map((a: string) => a.toLowerCase().trim()).filter(Boolean);
   let nye = 0, højeste = Number(k.highest) || 0;
+  const fejl: string[] = [];
   for (const m of beskeder) {
     const id = Number(m.id);
     højeste = Math.max(højeste, id);
     const app = String(m.app ?? "");
     if (kunApps.length && !kunApps.includes(app.toLowerCase())) continue;
-    await indsaet({
-      title: String(m.title ?? ""), message: String(m.message ?? ""), url: m.url ? String(m.url) : undefined,
-      priority: Number(m.priority ?? 0), app,
-    }, "pushover", `po:${m.id_str ?? m.id}`);
-    nye++;
+    try {
+      const r = await indsaet({
+        title: String(m.title ?? ""), message: String(m.message ?? ""), url: m.url ? String(m.url) : undefined,
+        priority: Number(m.priority ?? 0), app,
+      }, "pushover", `po:${m.id_str ?? m.id}`, k.ignorer ?? []);
+      if (!("ignoreret" in r)) nye++;
+    } catch (e) { fejl.push(String((e as Error).message ?? e)); } // én dårlig besked må ikke stoppe resten
   }
   if (beskeder.length) {
     await fetch(`${API}/devices/${encodeURIComponent(k.device_id)}/update_highest_message.json`, {
@@ -110,8 +130,10 @@ async function hent() {
       body: new URLSearchParams({ secret: k.secret, message: String(højeste) }),
     });
   }
-  await db.from("pushover_konto").update({ highest: højeste, fejl: null, sidst_hentet: new Date().toISOString() }).eq("id", 1);
-  return { ok: true, hentet: beskeder.length, nye };
+  await db.from("pushover_konto").update({
+    highest: højeste, fejl: fejl.length ? fejl.join("; ").slice(0, 500) : null, sidst_hentet: new Date().toISOString(),
+  }).eq("id", 1);
+  return { ok: true, hentet: beskeder.length, nye, fejl };
 }
 
 // Forbind til Pushover: log ind én gang og registrér "fotovagt" som enhed.
@@ -167,7 +189,8 @@ Deno.serve(async (req) => {
 
     // 3. Udefra (webhook) med hemmeligheden
     if (medHemmelighed && (body.title || body.message)) {
-      const h = await indsaet(body, String(body.kilde || "webhook"), body.id ? `wh:${body.id}` : null);
+      const { data: k } = await db.from("pushover_konto").select("ignorer").eq("id", 1).single();
+      const h = await indsaet(body, String(body.kilde || "webhook"), body.id ? `wh:${body.id}` : null, k?.ignorer ?? []);
       return json({ ok: true, haendelse: h });
     }
 
@@ -182,8 +205,12 @@ Deno.serve(async (req) => {
       const liste = String(body.kun_apps || "").split(",").map((s) => s.trim()).filter(Boolean);
       await db.from("pushover_konto").update({ kun_apps: liste.length ? liste : null }).eq("id", 1);
     }
+    if ("ignorer" in body) {
+      const liste = String(body.ignorer || "").split(",").map((s) => s.trim()).filter(Boolean);
+      await db.from("pushover_konto").update({ ignorer: liste }).eq("id", 1);
+    }
     if (body.hent_nu) await hent();
-    const { data: k } = await db.from("pushover_konto").select("device_id,kun_apps,sidst_hentet,fejl").eq("id", 1).single();
+    const { data: k } = await db.from("pushover_konto").select("device_id,kun_apps,ignorer,sidst_hentet,fejl").eq("id", 1).single();
     return json({ ok: true, forbundet: !!k?.device_id, ...k });
   } catch (e) {
     return json({ ok: false, fejl: String((e as Error).message ?? e) }, 500);

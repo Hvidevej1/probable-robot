@@ -41,6 +41,7 @@ create table if not exists haendelser (
   afsluttet_tid timestamptz,
   note text
 );
+alter table haendelser add column if not exists cirka boolean default false;  -- kun by/station kendt, ikke præcis adresse
 create index if not exists haendelser_aktive on haendelser (oprettet desc) where status in ('ny', 'taget', 'ankommet');
 
 alter table profiles drop constraint if exists profiles_haendelse_fk;
@@ -66,6 +67,7 @@ create table if not exists pushover_konto (
   sidst_hentet timestamptz,
   fejl text
 );
+alter table pushover_konto add column if not exists ignorer text[] default array['(Bus)'];  -- beskeder med disse ord springes over
 insert into pushover_konto (id) values (1) on conflict do nothing;
 
 -- Ny bruger i Authentication -> får automatisk en profil som fotograf ----------------

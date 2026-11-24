@@ -42,7 +42,7 @@ function tegnOpgave() {
       <div>
         <p class="lille">Din opgave · taget kl. ${klokken(h.taget_tid)}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>
         <h2>${esc(h.titel)}</h2>
-        <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${afstand(h) != null ? ` · ${kmTekst(afstand(h))}` : ''}</p>
+        <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${h.cirka ? ' (ca.)' : ''}${afstand(h) != null ? ` · ${kmTekst(afstand(h))}` : ''}</p>
       </div>
     </div>
     <div class="knap-række">
@@ -62,7 +62,7 @@ function kort_(h) {
       <span class="kat">${KATEGORI_IKON[h.kategori] || '📍'}</span>
       <div class="h-tekst">
         <h3>${esc(h.titel)}</h3>
-        <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}</p>
+        <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
         <p class="lille">${siden(h.oprettet)} siden${d != null ? ` · ${kmTekst(d)}` : ''} ·
           <span class="h-status">${h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
       </div>
@@ -108,6 +108,7 @@ function visHaendelse(id, åbn = true) {
       <button class="luk" data-luk aria-label="Luk">✕</button></div>
     <h2>${esc(h.titel)}</h2>
     <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${d != null ? ` · ${kmTekst(d)} væk` : ''}</p>
+    ${h.cirka ? '<p class="hint">Placeringen er cirka (kun by eller station kendt). Tjek adressen i teksten.</p>' : ''}
     <p class="lille">Modtaget kl. ${klokken(h.oprettet)} (${siden(h.oprettet)} siden) · ${esc(h.kategori || '')}</p>
     <p class="status-linje h-${h.status}">${h.status === 'ny' ? 'Ingen har taget den endnu' : min ? 'Det er din opgave' : `${H_STATUS[h.status]}: ${esc(navn(h.taget_af))}`}</p>
     ${h.tekst ? `<p class="brødtekst">${esc(h.tekst).replace(/\n/g, '<br>')}</p>` : ''}

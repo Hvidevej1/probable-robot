@@ -1,7 +1,7 @@
 // Datalaget. Med Supabase-nøgler i config.js bruges den fælles database med live-opdatering.
 // Uden nøgler kører DEMO: alt gemmes i browseren, og faner i samme browser opdaterer hinanden,
 // så man kan have "Marken" og "Kontoret" åbne side om side og se det virke.
-import { parseBesked, geokod, findMatch, flet } from './supabase/functions/pushover/parse.js';
+import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './supabase/functions/pushover/parse.js';
 
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
@@ -159,7 +159,7 @@ function demoBackend() {
       { id: 2, tid: minSiden(15), bruger: 'f2', haendelse_id: 'h2', handling: 'tog hændelsen' },
       { id: 1, tid: minSiden(18), bruger: null, haendelse_id: 'h2', handling: 'ny hændelse fra pushover' },
     ];
-    return { haendelser, profiler, log, pushover: { forbundet: false, kun_apps: null } };
+    return { haendelser, profiler, log, pushover: { forbundet: false, kun_apps: null, ignorer: ['(Bus)'] } };
   }
 
   let db;
@@ -269,8 +269,10 @@ function demoBackend() {
     async pushover(body) {
       læs();
       if (body.forbind) db.pushover = { ...db.pushover, forbundet: true, device_id: 'demo', sidst_hentet: nu() };
-      if (body.afbryd) db.pushover = { forbundet: false };
-      if ('kun_apps' in body) db.pushover.kun_apps = String(body.kun_apps || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (body.afbryd) db.pushover = { ...db.pushover, forbundet: false };
+      const liste = v => String(v || '').split(',').map(s => s.trim()).filter(Boolean);
+      if ('kun_apps' in body) db.pushover.kun_apps = liste(body.kun_apps);
+      if ('ignorer' in body) db.pushover.ignorer = liste(body.ignorer);
       gem();
       return { ok: true, ...db.pushover };
     },
@@ -281,19 +283,26 @@ const backend = cloud ? supabaseBackend() : demoBackend();
 
 // Fælles for begge: en Pushover-besked tastet ind på kontoret bliver læst præcis som de rigtige.
 // Samme alarm fra en anden kilde lægges ind i den eksisterende hændelse, ligesom på serveren.
-async function simulerBesked(title, message, url, app) {
+async function simulerBesked(title, message, url, app, ignorer = []) {
   const h = parseBesked({ title, message, url, app });
+  if (skalIgnoreres(h, ignorer)) return { ...h, ignoreret: true };
   let match = findMatch(h, state.haendelser);
   if (!match && h.lat == null && h.adresse) {
+    // (112meldinger-links kan kun slås op på serveren; her bruges adressen)
     const pos = await geokod(h.adresse).catch(() => null);
     if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
     match = findMatch(h, state.haendelser);
   }
   if (match) {
-    await backend.ret(match.id, flet(match, h, app));
+    const felter = flet(match, h, app);
+    if (felter.adresse && felter.lat === null) {
+      const pos = await geokod(felter.adresse).catch(() => null);
+      if (pos) { felter.lat = pos.lat; felter.lon = pos.lon; }
+    }
+    await backend.ret(match.id, felter);
     return { ...h, lat: h.lat ?? match.lat, slaaetSammen: match };
   }
-  await backend.opret({ ...h, kilde: cloud ? 'manuel' : 'pushover' });
+  await backend.opret({ ...række(h), kilde: cloud ? 'manuel' : 'pushover' });
   return h;
 }
 

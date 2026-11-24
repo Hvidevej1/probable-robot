@@ -1,0 +1,65 @@
+// Test af beskedparseren med rigtige beskeder fra Pushover. Kør:  node parse.test.mjs
+import { parseBesked, findMatch, skalIgnoreres } from './parse.js';
+
+const B = {
+  aba112: { app: '1-1-2 Århus', message: 'ABA12 CI-M1 + CI  S1 Ny Munkegade 114 8000 Aarhus C Aarhus Kommune' },
+  abaMast: { app: 'Mast', title: '🚒 Aarhus C', message: '🔥 ABA12 CI-M1 + CI-S1\nBeredskab: Østjyllands Brandvæsen\nStation: Aarhus C\nAdresse: Ny Munkegade 114, 8000 Aarhus C\n24-11-2026 15:51' },
+  ass112: { app: '1-1-2 Århus', message: '@0 Ass.-A-sprøjte og tankvogn OD-M1 + OD V1 Byvej 63 8330 Beder' },
+  aba112b: { app: '1-1-2 Århus', message: 'ABA11 SY-M1 + SY V1 Byvej 63 8330 Beder' },
+  assMast: { app: 'Mast', title: '🚒 Assistance - Aarhus Syd', message: '🔥 Assistance: @0 Ass.-A-sprøjte og tankvogn OD-M1 + OD-V1\nBeredskab: Østjyllands Brandvæsen\nStation: Aarhus Syd\nAdresse: Byvej 63, 8330 Beder' },
+  viby: { app: '1-1-2 Århus', message: 'ABA41 ISL NO(22-06) + SY-M1 + SY S1 Skovlundgårdsvej 53 8260 Viby J Aarhus Kommune' },
+  radio: { app: '1-1-2 Århus', message: '24-11 26 Radioprøve fra Østjyllands Brandvæsen' },
+  skejby: { app: '1-1-2 Århus', message: 'ABA42 ABA Skejby SGH (06-22) ISL + NO-M1 + NO-V1 -- (22-06) ISL + NO-M1 + NO-V1 + CI-M1 + CI-V1 Palle Juul Jensens Blv 175 8200 Aarhus N' },
+  vejle: { app: 'Mast', title: '🚒 Assistance - Vejle', message: '🔥 Assistance: Assistance VB V-1 /- (VB ISL + VB MR-1) EL-instal.-Brand-Transformatorstation, Lysholt All. 11 , 7100 Vejle\nBeredskab: Vejle Brandvæsen\nStation: Vejle\n24-11-2026 14:47' },
+  vejleSkæv: { app: 'Mast', title: '🚒 Vejle', message: '🔥 Assistance VB V-1 /-`Q\nBeredskab: Vejle Brandvæsen\nStation: Vejle\n24-11-2026 14:47' },
+  odder: { app: 'PF-Upload', title: '🚒 Odder', message: '🔥 Bygn.brand-Lejlighed\nBeredskab: Østjyllands Brandvæsen\nStation: Odder\n24-11-2026 16:54' },
+  gmaps: { app: 'Google Maps Scanner', title: '🚨 Muligt trafikuheld detekteret på Google Maps', message: '📍 Østjyske Motorvej\n🏙️ 7100 Vejle\n⚠️ AI-detektion af trafikmaengde var ikke mulig - meldingen er ikke verificeret\n🕒 Detekteret kl. 16:04' },
+  trafikKø: { app: 'Trafik Server', title: 'Trafikmelding', message: '<b>Kø</b>\nE45 fra Randers mod Randers mellem &lt;44&gt; Hadsten og &lt;46&gt; Aarhus Nord\n\nKø, Forlænget rejsetid: 10-30 min., Grundet uheld\n\nForventes at vare indtil 24. nov. 2026 kl. 17:45.\n\n\n<small>FeatureID: f2aa2cff-fa77-4fef-92fd-1b330eefdf83_317340.1</small>\n\n<a href="https://www.google.com/maps/search/?api=1&amp;query=56.2511,10.0923">Se på Google Maps</a>' },
+  trafikUheld: { app: 'Trafik Server', title: 'Trafikmelding', message: '<b>Uheld</b>\nE45 Nordjyske Motorvej fra Aarhus mod Randers mellem &lt;46&gt; Aarhus Nord og &lt;44&gt; Hadsten\n\nUheld, Spor blokeret, Uheldsstedet er ikke sikret\n\nI venstre spor,\nPoliti og redning er på vej' },
+  pfUheld: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Uheld\nE45 Nordjyske Motorvej fra Aarhus mod Randers mellem [46] Aarhus Nord og [44] Hadsten\nUheld, Spor blokeret, Uheldsstedet er ikke sikret\nI venstre spor,\nPoliti og redning er på vej\n\nNordjyske Motorvej, 8380 Spørring, Aarhus Kommune\n24-11-2026 16:22:00\n\nSe placeringen her: https://112meldinger.dk/map.php?uid=abc' },
+  pfDyr: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Levende dyr på vejen\nE45 fra Horsens mod Vejle mellem Horsens C og [57] Horsens S\nLevende dyr på vejen\nSvane i græsrabat.\nForventes at vare indtil 24. nov. 2026 kl. 16:15.\n\nØstjyske Motorvej, 8700 Hatting, Horsens Kommune\n24-11-2026 15:35:00\n\nSe placeringen her: https://112meldinger.dk/map.php?uid=oZS7s7k' },
+  pfE45: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Uheld på E45 i nordgående retning mellem Århus og Randers\n\nSe placering her: https://112meldinger.dk/map.php?uid=NKtJaLs' },
+  bus: { app: 'PF-Upload', title: 'Trafikmelding - Midttrafik (Bus)', message: 'Forsinkelser Pga uheld på motorvejen, er der store forsinkelser på busserne i Vejle. Rejsegarantien bortfalder. Lokation: Vejle Trafikcenter\n\nhttps://112meldinger.dk/map.php?uid=BMGJqVb' },
+};
+
+const forvent = {
+  aba112: { titel: 'ABA12 CI-M1 + CI S1 – automatisk brandalarm', adresse: 'Ny Munkegade 114, 8000 Aarhus C', kategori: 'Brand', cirka: false },
+  abaMast: { titel: 'ABA12 CI-M1 + CI-S1 – automatisk brandalarm', adresse: 'Ny Munkegade 114, 8000 Aarhus C', kategori: 'Brand' },
+  ass112: { titel: 'Ass.-A-sprøjte og tankvogn OD-M1 + OD V1 – assistance', adresse: 'Byvej 63, 8330 Beder', kategori: 'Brand' },
+  aba112b: { titel: 'ABA11 SY-M1 + SY V1 – automatisk brandalarm', adresse: 'Byvej 63, 8330 Beder' },
+  assMast: { adresse: 'Byvej 63, 8330 Beder', kategori: 'Brand' },
+  viby: { adresse: 'Skovlundgårdsvej 53, 8260 Viby J' },
+  skejby: { adresse: 'Palle Juul Jensens Blv 175, 8200 Aarhus N', kategori: 'Brand' },
+  vejle: { adresse: 'Lysholt All. 11, 7100 Vejle', kategori: 'Brand', cirka: false },
+  vejleSkæv: { adresse: 'Vejle', cirka: true },
+  odder: { titel: 'Bygn.brand-Lejlighed – bygningsbrand', adresse: 'Odder', cirka: true, kategori: 'Brand' },
+  gmaps: { titel: 'Muligt trafikuheld – Østjyske Motorvej', adresse: 'Østjyske Motorvej, 7100 Vejle', kategori: 'Trafik' },
+  trafikKø: { titel: 'Kø – E45', kategori: 'Trafik', lat: 56.2511, cirka: false },
+  trafikUheld: { titel: 'Uheld – E45 Nordjyske Motorvej', adresse: 'Aarhus', kategori: 'Trafik', cirka: true },
+  pfUheld: { titel: 'Uheld – E45 Nordjyske Motorvej', adresse: 'Nordjyske Motorvej, 8380 Spørring', kategori: 'Trafik', url: 'https://112meldinger.dk/map.php?uid=abc' },
+  pfDyr: { titel: 'Levende dyr på vejen', adresse: 'Østjyske Motorvej, 8700 Hatting', kategori: 'Trafik' },
+  pfE45: { titel: 'Uheld på E45 i nordgående retning mellem Århus og Randers', adresse: 'Århus', kategori: 'Trafik' },
+};
+
+let fejl = 0;
+const P = {};
+for (const [navn, b] of Object.entries(B)) {
+  const p = P[navn] = parseBesked(b);
+  for (const [k, v] of Object.entries(forvent[navn] || {})) {
+    if (p[k] !== v) { fejl++; console.log(`✗ ${navn}.${k}: fik ${JSON.stringify(p[k])}, ventede ${JSON.stringify(v)}`); }
+  }
+  console.log(`${p.ignorer ? '⊘' : '·'} ${navn.padEnd(12)} ${p.titel}  |  ${p.adresse}${p.cirka ? ' (cirka)' : ''}  |  ${p.kategori}`);
+}
+const tjek = (navn, ok) => { if (!ok) { fejl++; console.log('✗ ' + navn); } else console.log('✓ ' + navn); };
+const aktiv = (p, min = 1) => ({ ...p, status: 'ny', oprettet: new Date(Date.now() - min * 60e3).toISOString() });
+tjek('Radioprøve ignoreres', P.radio.ignorer);
+tjek('Busbeskeder ignoreres med kontorets liste "(Bus)"', skalIgnoreres(P.bus, ['(Bus)']));
+tjek('Mast lægges sammen med 1-1-2 (samme ABA-kode)', findMatch(P.abaMast, [aktiv(P.aba112)]));
+tjek('ABA11 og Ass.-A-sprøjte på Byvej 63 lægges sammen (samme adresse)', findMatch(P.aba112b, [aktiv(P.ass112)]));
+tjek('Mast-assistance på Byvej 63 lægges sammen', findMatch(P.assMast, [aktiv(P.ass112)]));
+tjek('Vejle-assistance og den skæve Mast-besked lægges sammen', findMatch(P.vejleSkæv, [aktiv({ ...P.vejle, lat: 55.70, lon: 9.53 })]));
+tjek('Trafik Server og PF-Upload om samme uheld lægges sammen', findMatch(P.pfUheld, [aktiv(P.trafikUheld)]));
+tjek('ABA12 i Aarhus og ABA41 i Viby holdes adskilt', !findMatch(P.viby, [aktiv(P.aba112)]));
+tjek('Gammel hændelse (over 45 min) bruges ikke', !findMatch(P.abaMast, [aktiv(P.aba112, 60)]));
+console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
+process.exit(fejl ? 1 : 0);

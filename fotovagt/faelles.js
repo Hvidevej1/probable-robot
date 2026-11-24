@@ -93,7 +93,7 @@ export function haendelsesIkon(h, valgt = false) {
   const ikon = KATEGORI_IKON[h.kategori] || KATEGORI_IKON.Andet;
   return L.divIcon({
     className: '',
-    html: `<div class="pin pin-${h.status}${valgt ? ' valgt' : ''}${h.status === 'ny' ? ' puls' : ''}"><span>${ikon}</span></div>`,
+    html: `<div class="pin pin-${h.status}${valgt ? ' valgt' : ''}${h.status === 'ny' ? ' puls' : ''}${h.cirka ? ' cirka' : ''}"><span>${ikon}</span></div>`,
     iconSize: [36, 36], iconAnchor: [18, 34], popupAnchor: [0, -30],
   });
 }

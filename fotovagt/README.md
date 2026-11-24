@@ -30,21 +30,27 @@ Det kræver en **Pushover for Desktop-licens** på kontoen (engangskøb, ca. 5 $
 4. Log ind på kontorsiden, tryk **Pushover** og forbind med jeres Pushover-login. Adgangskoden gemmes ikke.
 5. Kommer der også andre beskeder på kontoen (fx fra hjemmet), kan du skrive navnene på de Pushover-apps, der sender alarmer, i feltet "Kun beskeder fra disse apps".
 
-**Sådan læses beskederne** (`supabase/functions/pushover/parse.js`) – tilpasset jeres kilder:
+**Sådan læses beskederne** (`supabase/functions/pushover/parse.js`, eksempler i `parse.test.mjs`):
 
-| Kilde | Eksempel | Bliver til |
+| Kilde | Format | Bliver til |
 |---|---|---|
 | 1-1-2 Århus | `ABA12 CI-M1 + CI  S1 Ny Munkegade 114 8000 Aarhus C Aarhus Kommune` | "ABA12 CI-M1 + CI S1 – automatisk brandalarm", Ny Munkegade 114, 8000 Aarhus C |
-| Mast | `🔥 ABA12 CI-M1 + CI-S1` / `Beredskab: Østjyllands Brandvæsen` | Lægges sammen med 1-1-2-hændelsen |
-| PF-Upload | `🔥 Bygn.brand-Lejlighed` / `Beredskab: …` | "Bygn.brand-Lejlighed – bygningsbrand" (lægges sammen med samme alarm fra 1-1-2) |
-| Google Maps Scanner | `📍 Østjyske Motorvej` / `🏙️ 7100 Vejle` | Østjyske Motorvej, 7100 Vejle (link med koordinater bruges direkte) |
-| Trafik Server | `Kø` / `E45 fra Randers mod Randers mellem <44> …` | Trafik, placeret ved Randers |
+| Mast | Titel = station. `🔥 ABA12 …`, `Beredskab:`, `Station:`, evt. `Adresse:` | Alarmen fra første linje, adressen fra `Adresse:`. Uden adresse: cirka ved stationen |
+| PF-Upload (brand) | Som Mast | Som Mast |
+| PF-Upload (trafik) | `🚙 Uheld`, vejstrækning, `Nordjyske Motorvej, 8380 Spørring, …`, link til 112meldinger.dk | "Uheld – E45 Nordjyske Motorvej", præcis placering fra 112meldinger-siden |
+| Trafik Server | HTML: `<b>Kø</b>`, vejstrækning, link "Se på Google Maps" | "Kø – E45", placering fra Google Maps-linket |
+| Google Maps Scanner | `🚨 Muligt trafikuheld detekteret på Google Maps`, `📍 Østjyske Motorvej`, `🏙️ 7100 Vejle` | "Muligt trafikuheld – Østjyske Motorvej", cirka ved Vejle |
 
-- Koordinater i teksten eller i et kortlink (også korte maps.app.goo.gl-links) bruges direkte. Ellers slås adressen op på OpenStreetMap.
-- **Samme alarm fra flere kilder bliver til én hændelse.** Det sker, når titel/kode er den samme inden for 45 minutter (og de ikke ligger over 2 km fra hinanden), eller når to beskeder med samme kategori ligger under 300 m fra hinanden. De ekstra beskeder lægges ind i hændelsens tekst og logbog, og mangler den første adresse, bruges den nye.
-- Kategorien gættes ud fra 🔥, ABA, Bygn.brand, Kø, E45 osv.
+- **Placering:** Koordinater fra links (Google Maps, 112meldinger.dk, korte maps.app.goo.gl) bruges først. Derefter slås adressen op på OpenStreetMap. Kendes kun by, station eller vejstrækning, markeres nålen som **cirka** (stiplet kant og "ca.").
+- **Samme alarm fra flere kilder bliver til én hændelse,** inden for 45 minutter, når den har
+  - samme adresse (fx ABA11 og Ass.-A-sprøjte på Byvej 63),
+  - samme kode/titel (fx ABA12 fra både 1-1-2 og Mast), eller
+  - ligger under 300 m fra den anden.
 
-Rammer den forkert på en besked, så send den, så kan parseren rettes til. Med knappen "Send testbesked" under Pushover (med "Næste eksempel") kan I prøve jeres formater uden at vente på en rigtig alarm.
+  Den ekstra besked lægges ind i hændelsens tekst og logbog og kan forbedre en cirka-placering.
+- **Springes over:** Radioprøver altid. Kontoret kan under Pushover tilføje egne ord. Som standard står "(Bus)" der, så busforsinkelser ikke bliver til hændelser.
+
+Kør `node supabase/functions/pushover/parse.test.mjs` for at teste parseren efter ændringer. Rammer den forkert, så send beskeden, så kommer den med i testen.
 
 **Andre kilder:** Funktionen tager også imod `POST {title, message, url}` med headeren `x-fotovagt-secret`, fx fra Zapier eller en mail-regel.
 
