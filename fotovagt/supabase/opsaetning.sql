@@ -67,7 +67,7 @@ create table if not exists pushover_konto (
   sidst_hentet timestamptz,
   fejl text
 );
-alter table pushover_konto add column if not exists ignorer text[] default array['(Bus)'];  -- beskeder med disse ord springes over
+alter table pushover_konto add column if not exists ignorer text[] default array['(Bus)', 'Welcome to Pushover'];  -- beskeder med disse ord springes over
 insert into pushover_konto (id) values (1) on conflict do nothing;
 
 -- Interne nøgler, som serveren selv laver: hemmelighed til Pushover-hentning og nøglesæt til push.

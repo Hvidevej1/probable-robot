@@ -33,7 +33,7 @@ const KODER = [
 ];
 
 // Beskeder, der aldrig skal blive til hændelser (flere kan sættes på kontoret under Pushover)
-const IGNORER = /radioprøve|prøvealarm|testalarm|type:\s*planlagt/i;
+const IGNORER = /radioprøve|prøvealarm|testalarm|type:\s*planlagt|welcome to pushover/i;
 // Lægehelikopter, der lander ved et hospital, er bare patienttransport
 const HOSPITAL = /hospital|sygehus|\bAUH\b|\bOUH\b|rigshospitalet|helipad|akutmodtagelse/i;
 
