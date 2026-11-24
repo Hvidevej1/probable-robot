@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fotovagt – kontoret</title>
+  <meta name="theme-color" content="#14181f">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
+  <link rel="stylesheet" href="style.css?v=1">
+  <script src="config.js?v=1"></script>
+  <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
+  <script src="vendor/supabase-js-2.119.0.js"></script>
+  <script type="module" src="kontor.js?v=1"></script>
+</head>
+<body class="kontor">
+  <section id="login" class="login" hidden>
+    <div class="login-kort">
+      <h1><span class="logo-prik"></span>Fotovagt <small>kontoret</small></h1>
+      <p class="hint">Overblik over hændelser og fotografer.</p>
+      <form id="login-form">
+        <label>E-mail <input name="email" type="email" autocomplete="username" required></label>
+        <label>Adgangskode <input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Log ind</button>
+        <button type="button" id="btn-glemt" class="link">Glemt adgangskode?</button>
+      </form>
+      <div id="login-demo" hidden>
+        <p class="demo-mærke">Demo – intet er sat op endnu.</p>
+        <div class="demo-liste"></div>
+        <p class="hint">Åbn <a href="index.html" target="_blank">marken</a> i en anden fane og log ind som en fotograf.</p>
+      </div>
+      <p id="login-msg" class="fejl-tekst" role="alert"></p>
+    </div>
+  </section>
+
+  <div id="app" class="kontor-app" hidden>
+    <header class="top">
+      <div class="brand"><span class="logo-prik"></span>Fotovagt <small>kontoret</small></div>
+      <span id="demo-mærke" class="demo-chip" hidden>DEMO</span>
+      <div class="nøgletal" id="nøgletal"></div>
+      <div class="top-knapper">
+        <button id="btn-ny">+ Ny hændelse</button>
+        <button id="btn-pushover" class="secondary"><span id="po-prik" class="prik"></span>Pushover</button>
+        <button id="btn-logud" class="secondary">Log ud</button>
+      </div>
+    </header>
+
+    <main class="kontor-grid">
+      <section class="panel fotografer">
+        <h2>Fotografer</h2>
+        <div id="fotografer"></div>
+      </section>
+
+      <section class="panel kort-panel">
+        <div id="kort" class="kort"></div>
+        <div class="kort-forklaring">
+          <span><i class="pin-mini pin-ny"></i>Ny</span><span><i class="pin-mini pin-taget"></i>Taget</span>
+          <span><i class="pin-mini pin-ankommet"></i>Ankommet</span>
+          <span><i class="dot" style="--c:var(--ledig)"></i>Ledig</span><span><i class="dot" style="--c:var(--optaget)"></i>Optaget</span>
+          <span><i class="dot" style="--c:var(--pause)"></i>Pause</span><span><i class="dot" style="--c:var(--ankommet)"></i>Ankommet</span>
+        </div>
+      </section>
+
+      <section class="panel haendelser">
+        <div class="panel-top">
+          <h2>Hændelser</h2>
+          <div class="filter" role="tablist">
+            <button data-filter="aktive" aria-selected="true">Aktive</button>
+            <button data-filter="alle" aria-selected="false">Seneste døgn</button>
+          </div>
+        </div>
+        <div id="haendelser"></div>
+        <h2 class="log-titel">Logbog</h2>
+        <ol id="logbog" class="logbog"></ol>
+      </section>
+    </main>
+  </div>
+
+  <!-- Ny / ret hændelse -->
+  <dialog id="dlg-ret" class="ark bred">
+    <form method="dialog" class="ark-indhold" id="form-ret">
+      <h2 id="ret-titel">Ny hændelse</h2>
+      <details id="indsaet-besked">
+        <summary>Indsæt tekst fra en Pushover-besked</summary>
+        <label>Beskedens tekst <textarea name="raa" rows="3" placeholder="Fx: Brand i etageejendom, Vestergade 12, 8000 Aarhus C"></textarea></label>
+        <button type="button" id="btn-laes" class="secondary">Læs beskeden</button>
+      </details>
+      <label>Titel <input name="titel" required></label>
+      <label>Beskrivelse <textarea name="tekst" rows="3"></textarea></label>
+      <div class="to-kol">
+        <label>Kategori
+          <select name="kategori">
+            <option>Brand</option><option>Trafik</option><option>Politi</option><option>Redning</option>
+            <option>Miljø</option><option>Vejr</option><option selected>Andet</option>
+          </select>
+        </label>
+        <label>Link <input name="url" type="url" placeholder="https://"></label>
+      </div>
+      <label>Adresse
+        <span class="input-knap"><input name="adresse" placeholder="Vej og nummer, postnr. by"><button type="button" id="btn-find" class="secondary">Find</button></span>
+      </label>
+      <p class="hint" id="ret-pos-hint">Tryk "Find", eller klik på kortet for at sætte nålen. Nålen kan trækkes.</p>
+      <div id="ret-kort" class="mini-kort"></div>
+      <input type="hidden" name="lat"><input type="hidden" name="lon">
+      <div class="knap-række">
+        <button value="gem" type="submit">Gem</button>
+        <button value="luk" type="submit" class="secondary" formnovalidate>Annullér</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Tildel -->
+  <dialog id="dlg-tildel" class="ark"><div class="ark-indhold"></div></dialog>
+
+  <!-- Fotograf -->
+  <dialog id="dlg-foto" class="ark">
+    <form method="dialog" class="ark-indhold" id="form-foto">
+      <h2>Fotograf</h2>
+      <label>Navn <input name="navn" required></label>
+      <label>Telefon <input name="telefon" type="tel"></label>
+      <div class="to-kol">
+        <label>Status
+          <select name="status"><option value="ledig">Ledig</option><option value="optaget">Optaget</option><option value="pause">Pause</option><option value="ankommet">Ankommet</option><option value="offline">Offline</option></select>
+        </label>
+        <label>Rolle
+          <select name="rolle"><option value="foto">Fotograf</option><option value="kontor">Kontor</option></select>
+        </label>
+      </div>
+      <div class="knap-række">
+        <button value="gem" type="submit">Gem</button>
+        <button value="luk" type="submit" class="secondary" formnovalidate>Luk</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Pushover -->
+  <dialog id="dlg-pushover" class="ark"><div class="ark-indhold"></div></dialog>
+</body>
+</html>
