@@ -12,7 +12,7 @@
 // Hemmeligheder (Edge Functions -> Secrets): FOTOVAGT_SECRET (en lang tilfældig tekst).
 // "Verify JWT" skal være slået FRA for denne funktion (den tjekker selv login og hemmelighed).
 import { createClient } from "npm:@supabase/supabase-js@2.119.0";
-import { findKoordinater, findMatch, flet, geokod, parseBesked, række, skalIgnoreres, skalSlåsOp } from "./parse.js";
+import { findKoordinater, findMatch, flet, geokod, parseBesked, pressemeddelelseNr, række, skalIgnoreres, skalSlåsOp } from "./parse.js";
 
 const API = "https://api.pushover.net/1";
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -58,11 +58,16 @@ async function placér(h: Hændelse) {
 }
 
 // Aktive hændelser fra de seneste 45 minutter (til at finde dubletter)
-async function nyligeAktive() {
+// + hændelser fra det seneste døgn fra samme pressemeddelelse (opfølgning fra politiet)
+async function nyligeAktive(h?: Hændelse) {
   const siden = new Date(Date.now() - 45 * 60e3).toISOString();
   const { data } = await db.from("haendelser").select("*")
     .in("status", ["ny", "taget", "ankommet"]).gt("oprettet", siden);
-  return data ?? [];
+  const pm = pressemeddelelseNr(h?.url);
+  if (!pm) return data ?? [];
+  const døgn = new Date(Date.now() - 24 * 3600e3).toISOString();
+  const { data: pmData } = await db.from("haendelser").select("*").like("url", `%pressemeddelelse/${pm}%`).gt("oprettet", døgn);
+  return [...(data ?? []), ...(pmData ?? []).filter((x) => !(data ?? []).some((y) => y.id === x.id))];
 }
 
 // Én besked -> én hændelse. Er det samme alarm som en, der allerede er kommet fra en anden kilde,
@@ -70,7 +75,7 @@ async function nyligeAktive() {
 async function indsaet(b: Indgang, kilde: string, eksternId: string | null, ignorer: string[] = []) {
   const h = parseBesked(b);
   if (skalIgnoreres(h, ignorer)) return { ...h, ignoreret: true };
-  const aktive = await nyligeAktive();
+  const aktive = await nyligeAktive(h);
   let match = findMatch(h, aktive);
   if (!match) {
     await placér(h);
@@ -88,6 +93,7 @@ async function indsaet(b: Indgang, kilde: string, eksternId: string | null, igno
     await db.from("logbog").insert({ haendelse_id: match.id, handling: `ekstra besked fra ${b.app || kilde}` });
     return { ...h, slaaet_sammen_med: match.id };
   }
+  if (h.opfoelgning) return { ...h, ignoreret: true }; // fx "personen er fundet" uden efterlysning at høre til
   const ny = { ...række(h), kilde, ekstern_id: eksternId };
   const { error } = eksternId
     ? await db.from("haendelser").upsert(ny, { onConflict: "ekstern_id", ignoreDuplicates: true })

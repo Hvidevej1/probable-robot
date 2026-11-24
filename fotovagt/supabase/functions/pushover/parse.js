@@ -16,9 +16,10 @@
 
 // Nøgleord -> kategori. Titel og første linjer tjekkes først, og første match vinder.
 const KATEGORIER = [
+  ['Forsyning', /vandafbrydelse|varmeafbrydelse|strømafbrydelse|fjernvarme|vandledning|elnet|ledningsbrud|\bforsyning\b/i],
   ['Brand', /🔥|🚒|\bABA\d*|bygn\.?\s?brand|brand(?!væsen)|\bild\b|røg|eksplosion|brænd|skorsten|sprøjte|tankvogn|\bass\.|\bassistance\b/i],
   ['Trafik', /🚗|🚙|🚘|trafik|færdsel|uheld|ulykke|påkørsel|motorvej|frontal|lastbil|(?:^|[\s,.])kø(?=$|[\s,.])|\bE\d{2}\b|spærret|vejarbejde|dyr på vejen/i],
-  ['Politi', /🚓|politi(?! og redning)|anholdt|skud|skyd|knivstik|røveri|indbrud|vold|drab|bevæbnet|aktion/i],
+  ['Politi', /🚓|👮|efterlys|varetægt|voldtægt|politi(?! og redning)|anholdt|skud|skyd|knivstik|røveri|indbrud|vold|drab|bevæbnet|aktion/i],
   ['Redning', /🚁|🚑|lægehelikopter|akuthjælper|hjertestop|udkald til|redning|drukn|eftersøg|savnet|person i vand|helikopter|ambulance|fastklemt/i],
   ['Miljø', /forurening|\bgas\b|kemikal|olie|udslip|lugt/i],
   ['Vejr', /storm|oversvøm|skybrud|stormflod|træ over/i],
@@ -32,11 +33,11 @@ const KODER = [
 ];
 
 // Beskeder, der aldrig skal blive til hændelser (flere kan sættes på kontoret under Pushover)
-const IGNORER = /radioprøve|prøvealarm|testalarm/i;
+const IGNORER = /radioprøve|prøvealarm|testalarm|type:\s*planlagt/i;
 // Lægehelikopter, der lander ved et hospital, er bare patienttransport
 const HOSPITAL = /hospital|sygehus|\bAUH\b|\bOUH\b|rigshospitalet|helipad|akutmodtagelse/i;
 
-const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}\u{20E3}]/gu;
+const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u{2640}\u{2642}\u{FE0F}\u{200D}\u{20E3}]/gu;
 const renEmoji = s => String(s || '').replace(EMOJI, '').replace(/[ \t]+/g, ' ').trim();
 const ENTITETER = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 const afkod = s => s.replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (m, e) =>
@@ -70,8 +71,19 @@ export function findKoordinater(...tekster) {
 export const skalSlåsOp = u => /112meldinger\.dk\/map|goo\.gl|maps\.app/i.test(u || '');
 
 const VEJ = "[A-ZÆØÅ][A-Za-zÆØÅæøåéüö.'\\- ]{2,40}?";
-const BY = '[A-ZÆØÅ][A-Za-zÆØÅæøå\\-]+(?:\\s(?!Kommune\\b)(?![A-Za-zÆØÅæøå]+\\sKommune\\b)(?:[A-ZÆØÅ][a-zæøå]+|[A-Z]{1,2}\\b))?';
+const BY = '[A-ZÆØÅ][A-Za-zÆØÅæøå\\-]+(?:\\s(?!Kommune\\b)(?![A-Za-zÆØÅæøå]+\\sKommune\\b)(?:[A-ZÆØÅ][a-zæøå]+|[A-ZÆØÅ]{1,2}(?![A-Za-zÆØÅæøå])))?';
 const STEDNAVN = '[A-ZÆØÅ][a-zæøå]+(?:\\s(?:[A-ZÆØÅ][a-zæøå]+|[A-Z]{1,2}\\b))?';
+
+// Et gadenavn uden husnummer i fri tekst: "lukke for vandet på Remstrupvej", "ved Stadion Allé i Viborg"
+const GADE = '(?<![A-Za-zÆØÅæøå])((?!Motorvej)[A-ZÆØÅ][a-zæøå]+(?:vej|gade|allé|alle|stræde|torv|plads|boulevard|vænget|parken|stien)|[A-ZÆØÅ][a-zæøå]+\\s(?:Allé|Alle|Vej|Gade|Plads|Torv|Boulevard|Stræde))(?![A-Za-zÆØÅæøåé])';
+function findGade(L) {
+  for (const l of L) {
+    if (/^(?:station|beredskab|netselskab|læs mere)/i.test(l)) continue;
+    const m = l.match(new RegExp(GADE));
+    if (m && !/motorvej/i.test(m[1])) return m[1];
+  }
+  return '';
+}
 
 // Giver { adresse, linje, start, cirka }: linje/start er hvor adressen står (bruges til at korte titlen af).
 // cirka = true, når det kun er en by/station/vejstrækning og ikke en præcis adresse.
@@ -110,6 +122,14 @@ export function findAdresse(linjer, station) {
     const vej = ord.slice(k).join(' ');
     return { adresse: `${vej}, ${m[2]} ${m[3].trim()}`, linje: i, start: L[i].indexOf(vej), cirka: false };
   }
+  // 3b) "Postnummer: 8600" og "By: Silkeborg" i hver sin linje
+  const pnLinje = L.find(l => /^postnummer:\s*\d{4}\s*$/i.test(l));
+  const byLinje = L.find(l => /^by:\s*\S/i.test(l));
+  if (pnLinje && byLinje) {
+    const by = `${pnLinje.match(/\d{4}/)[0]} ${byLinje.replace(/^by:\s*/i, '').trim()}`;
+    const gade = findGade(L);
+    return { adresse: gade ? `${gade}, ${by}` : by, linje: -1, start: -1, cirka: true };
+  }
   // 4) Postnummer + by, evt. med vejnavn foran på samme eller forrige linje:
   //    "Nordjyske Motorvej, 8380 Spørring, Aarhus Kommune" / "Østjyske Motorvej" + "7100 Vejle"
   const pb = new RegExp(`(?:^|[\\s,])(\\d{4})\\s+(${BY})`);
@@ -120,7 +140,13 @@ export function findAdresse(linjer, station) {
     let vej = L[i].slice(0, m.index).replace(/[,\s]+$/, '').trim();
     if (!vej && i > 0 && /^[A-ZÆØÅ][a-zæøå]+(?:\s[A-ZÆØÅa-zæøå]+){0,3}$/.test(L[i - 1]) && !/:/.test(L[i - 1])) vej = L[i - 1];
     if (vej && (/:/.test(vej) || vej.length > 40)) vej = '';
-    return { adresse: vej ? `${vej}, ${by}` : by, linje: vej ? i : -1, start: -1, cirka: true };
+    const gade = vej ? '' : findGade(L);   // fx "Remstrupvej" længere nede i teksten
+    return { adresse: vej ? `${vej}, ${by}` : gade ? `${gade}, ${by}` : by, linje: vej ? i : -1, start: -1, cirka: true };
+  }
+  // 4b) Gade i by: "i området ved Stadion Allé i Viborg"
+  for (const l of L) {
+    const m = l.match(new RegExp(`${GADE}\\s+i\\s+(${STEDNAVN})`));
+    if (m && !/motorvej/i.test(m[1])) return { adresse: `${m[1]}, ${m[2]}`, linje: -1, start: -1, cirka: true };
   }
   // 5) Motorvejsstrækning: "mellem <44> Hadsten og …", "mellem Horsens C og [57] Horsens S", "E45 fra Randers"
   for (const s of L) {
@@ -142,8 +168,8 @@ export function findKategori(...tekster) {
 }
 
 // Linjer, der ikke er selve meldingen (bruges ikke til titel)
-const METALINJE = /^(?:beredskab|station|adresse|lokation|featureid|se placering|se på google|detekteret kl|forventes at vare)|^\d{2}-\d{2}-\d{4}|^https?:\/\/|^ai-detektion/i;
-const GENERISK_TITEL = /^(?:trafikmelding|1-1-2.*|112.*|alarm|besked)$/i;
+const METALINJE = /^(?:beredskab|station|adresse|lokation|featureid|se placering|se på google|detekteret kl|forventes at vare|læs mere|postnummer|by:|type:|berørte|årsag|start:|forventet slut|netselskab|akut:)|^\d{2}-\d{2}-\d{4}|^https?:\/\/|^ai-detektion/i;
+const GENERISK_TITEL = /^(?:trafikmelding|1-1-2.*|112.*|alarm|besked|.*\bpoliti)$/i;
 const VEJLINJE = /^(?:E\d{1,3}|Rute\s?\d+|M\d{1,2}\b)|motorvej/i;
 
 // Hele beskeden -> felter til tabellen "haendelser" (+ links, station og ignorer til serveren).
@@ -174,6 +200,12 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     titel = rentitel;
   } else {
     titel = indhold[0] || rentitel || 'Ny hændelse';
+    // Politiets pressemeddelelser: første sætning (navne i efterlysninger kommer ikke i titlen)
+    if (/politi$/i.test(rentitel)) {
+      titel = /efterlys/i.test(titel) && !/er fundet/i.test(titel)
+        ? `Efterlysning${adresse ? ' – ' + adresse.split(',').pop().replace(/^\s*\d{4}\s+/, '').trim() : ''}`
+        : titel.split(/(?<=[a-zæøå])\.\s/)[0];
+    }
     // Adressen står i samme linje ("ABA12 CI-M1 + CI S1 Ny Munkegade 114 …"): skær den fra
     const i = rene.indexOf(indhold[0]);
     if (i === linje && start > 2) titel = rene[i].slice(0, start).trim();
@@ -211,12 +243,15 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     // Kun til serveren, gemmes ikke:
     links: [...new Set(links)],
     station: station || null,
+    // Opfølgning ("personen er fundet"): bruges kun til at opdatere den hændelse, den hører til
+    opfoelgning: /politi$/i.test(rentitel) && /er fundet|slette (?:foto|billede|navn)/i.test(tekst),
     ignorer: IGNORER.test(`${title}\n${tekst}`) || (helikopter && HOSPITAL.test(adresse)),
     helikopter,
   };
 }
 
 // Kolonnerne i tabellen "haendelser", som parseBesked udfylder
+export const pressemeddelelseNr = u => (String(u || '').match(/pressemeddelelse\/(\d+)/) || [])[1] || '';
 export const række = h => {
   const { titel, tekst, adresse, kategori, prioritet, url, app, lat, lon, cirka } = h;
   return { titel, tekst, adresse, kategori, prioritet, url, app, lat, lon, cirka: !!cirka };
@@ -241,8 +276,18 @@ const nøgle = s => renEmoji(s).toLowerCase().replace(KODE_FORKLARING, '').repla
 const adrNøgle = a => /\d/.test(a || '') ? String(a).toLowerCase().replace(/[^a-z0-9æøå]/g, '') : '';
 const fællesStart = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i; };
 
+const pressemeddelelse = u => (String(u || '').match(/pressemeddelelse\/(\d+)/) || [])[1] || '';
+
 export function findMatch(ny, aktive, nu = Date.now()) {
   const n = nøgle(ny.titel), na = adrNøgle(ny.adresse);
+  // Opfølgning på samme pressemeddelelse fra politiet (fx "personen er fundet")
+  const pm = pressemeddelelse(ny.url);
+  if (pm) {
+    // (også afsluttede, så en efterlysning bliver ryddet op, selvom kontoret allerede har lukket den)
+    const h = aktive.find(h => h.status !== 'annulleret' && pressemeddelelse(h.url) === pm
+      && nu - new Date(h.oprettet).getTime() < 24 * 3600e3);
+    if (h) return h;
+  }
   // Nyeste først, så en besked uden adresse havner hos den seneste alarm med samme titel
   for (const h of [...aktive].sort((x, y) => String(y.oprettet).localeCompare(String(x.oprettet)))) {
     if (!['ny', 'taget', 'ankommet'].includes(h.status)) continue;
@@ -274,6 +319,13 @@ export function findMatch(ny, aktive, nu = Date.now()) {
 export function flet(h, ny, app) {
   const linje = `— ${app || 'Ekstra besked'}: ${[ny.titel, ny.tekst].filter(Boolean).join(' · ').replace(/\n+/g, ' · ')}`;
   const felter = { tekst: [h.tekst, linje].filter(Boolean).join('\n') };
+  // Efterlyst person fundet: politiet beder om at slette navn og foto, så den første tekst fjernes
+  if (/er fundet|slette (?:foto|billede|navn)/i.test(ny.tekst || '') && /efterlys/i.test(`${h.titel} ${h.tekst}`)) {
+    felter.titel = 'Efterlysning afsluttet – personen er fundet';
+    felter.tekst = `Personen er fundet. Den oprindelige tekst er fjernet efter politiets opfordring.\n${linje}`;
+    if (h.status === 'ny') { felter.status = 'afsluttet'; felter.afsluttet_tid = new Date().toISOString(); }
+    return felter;
+  }
   const bedreAdresse = ny.adresse && (!h.adresse || (h.cirka && !ny.cirka && !ny.helikopter));
   if (bedreAdresse) felter.adresse = ny.adresse;
   // (en lægehelikopter lander ved stedet, ikke præcis på det: placeringen forbliver cirka)

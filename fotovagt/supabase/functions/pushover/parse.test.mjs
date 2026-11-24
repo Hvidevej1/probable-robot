@@ -1,5 +1,5 @@
 // Test af beskedparseren med rigtige beskeder fra Pushover. Kør:  node parse.test.mjs
-import { parseBesked, findMatch, skalIgnoreres } from './parse.js';
+import { parseBesked, findMatch, flet, skalIgnoreres } from './parse.js';
 
 const B = {
   aba112: { app: '1-1-2 Århus', message: 'ABA12 CI-M1 + CI  S1 Ny Munkegade 114 8000 Aarhus C Aarhus Kommune' },
@@ -24,6 +24,12 @@ const B = {
   give: { titel: 'Assistance VB MR-6 ABA', adresse: 'Danpo Tykhøjetvej 44, 7323 Give', cirka: false },
   heli: { titel: 'Lægehelikopter landet – Odder', adresse: 'Aakjærvej, 8300 Odder', kategori: 'Redning', lat: 55.908027, cirka: false, ignorer: false },
   heliAUH: { ignorer: true },
+  vand: { titel: 'Akut vandafbrydelse – Silkeborg', adresse: 'Remstrupvej, 8600 Silkeborg', kategori: 'Forsyning', ignorer: false },
+  varme: { adresse: 'Vibevej, 8240 Risskov', kategori: 'Forsyning' },
+  viborg: { adresse: 'Stadion Allé, Viborg', kategori: 'Politi' },
+  strøm: { kategori: 'Forsyning', ignorer: true },
+  efterlyst: { titel: 'Efterlysning – Randers NØ', adresse: 'Falkevej, 8930 Randers NØ', kategori: 'Politi' },
+  fundet: { opfoelgning: true },
   pfE45: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Uheld på E45 i nordgående retning mellem Århus og Randers\n\nSe placering her: https://112meldinger.dk/map.php?uid=NKtJaLs' },
   kolding: { app: 'Mast', title: '🚒 Kolding', message: '🔥 BMFM - (ISL SYD + KO MR-1 + KO V-1) Min. forurening-Mindre spild, #1536906\nBeredskab: TrekantBrand\nStation: Kolding\n24-11-2026 11:53' },
   hørning: { app: 'Mast', title: '🚒 Hørning', message: '🔥 @6 Naturbrand-Mindre brand ISL SY + HØ-M1 + HØ-V1 + SK-R1 MTV Ø 501 M61 166 8362 Hørning\nBeredskab: Østjyllands Brandvæsen\nStation: Hørning\n24-11-2026 08:26' },
@@ -31,6 +37,12 @@ const B = {
   give: { app: 'Mast', title: '🚒 Assistance - Give', message: '🔥 Assistance: Assistance VB MR-6 /- ABA - (MR-1)\nBeredskab: Vejle Brandvæsen\nStation: Give\nAdresse: Danpo Tykhøjetvej 44, 7323 Give\n24-11-2026 08:07' },
   heli: { app: 'PF-Upload', title: '🚁🛬 Lægehelikopter landet', message: '🚁🛬 Lægehelikopter landet\nLN-OTS (EC45) · DOC03\nSted: Aakjærvej, Odder (8300)\nGoogle Maps: https://maps.google.com/?q=55.908027,10.127163\nFlyvetid: 1152 sek · Distance: 62.91 km' },
   heliAUH: { app: 'PF-Upload', title: '🚁🛬 Lægehelikopter landet', message: '🚁🛬 Lægehelikopter landet\nLN-OTS (EC45) · DOC03\nSted: Aarhus Universitetshospital, Aarhus N (8200)\nGoogle Maps: https://maps.google.com/?q=56.191,10.170' },
+  vand: { app: 'PF-Upload', title: '💧 Akut vandafbrydelse – Silkeborg', message: '💧 AKUT VANDAFBRYDELSE\n📮 Postnummer: 8600 Silkeborg\n🔧 Lukning af vandet Remstrupvej tirsdag d. 24. november\nPå grund af et brud på en vandledning er vi nødt til at lukke for vandet på Remstrupvej, Åhave Allé i dag tirsdag d. 24. november. Vi forventer, at vandet er tilbage igen i løbet af 2-3 timer. Vandet kan efterfølgende være let farvet og indeholde luft i en kort periode. Vi beklager de gener, det måtte give.\n🏢 Silkeborg Forsyning\nhttps://www.silkeborgforsyning.dk/driftsinfo' },
+  varme: { app: 'PF-Upload', title: 'Varmeafbrydelse - Risskov', message: '🔥 Akut reparation\n\nAkut reparation. Fjernvarmen er afbrudt i dele af forsyningsområdet. Vibevej 24/11 10:15 til 24/11 11:15\n\n📍 8240 Risskov\n▶️ Start: 24/11 kl. 10:15\n⏰ Forventet slut: 24/11 kl. 11:15\n🚨 Akut: \'akut\'\n🏢 Kredsløb' },
+  viborg: { app: 'PF-Upload', title: '👮🏼‍♂️ Midt- og Vestjyllands Politi', message: 'En 19-årig mand blev søndag varetægtsfængslet for forsøg på voldtægt begået omkring klokken 7.00 søndag morgen den 22. november 2026 i området ved Stadion Allé i Viborg. Vi søger i den forbindelse vidner, som kan hjælpe med oplysninger om hændelsesforløbet og tiden op til, at voldtægtsforsøget fandt sted. Har du set eller hørt noget, eller har du andre oplysninger, som kan hjælpe os i efterforskningsarbejdet, så ring til os på 114.\n\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15307155/vi-soger-vidner-i-forbindelse-med-voldtaegtsforsog-i-viborg-sondag-morgen?lang=da#sm-15307155' },
+  strøm: { app: 'PF-Upload', title: '⚡ Strømafbrydelse – Silkeborg', message: '⚡ STRØMAFBRYDELSE\n📍 By: Silkeborg\n📮 Postnummer: 8600\n🔔 Type: Planlagt\n👥 Berørte kunder: 109\n🔧 Årsag:\nVedligeholdelse af elnettet\n🕒 Start: 24-11-2026 kl. 09:00\n🕓 Forventet slut: 24-11-2026 kl. 13:00\n🏢 Netselskab: Elnetselskabet N1\nhttps://elnet.greenpowerdenmark.dk/#/kort/193943/view' },
+  efterlyst: { app: 'PF-Upload', title: '👮🏼‍♂️ Østjyllands Politi', message: 'Østjyllands Politi efterlyser 20-årige Daniel Amin fra Randers, der er gået fra Falkevej i 8930 Randers NØ omkring kl. 2030. Den efterlyste beskrives som mand, 20 år, alm. bygning, kort sort hår, overskæg. Iført vinterhue med refleks og sort jakke. Kontakt Østjyllands Politi på 114 hvis du har set Daniel i løbet af aftenen.\n\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15307670/efterlysning-af-20-arig-mand-i-randers?lang=da#sm-15307670' },
+  fundet: { app: 'PF-Upload', title: '👮🏼‍♂️ Østjyllands Politi', message: 'Den unge mand fra Randers er fundet. Vi takker for hjælpen med finde ham. Vi opfordrer alle til slette foto og navn af personen, hvis det er blevet delt.  Mvh Vagtchefen. \n\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15307670/efterlysning-af-20-arig-mand-i-randers?lang=da#sm-15307757' },
   bus: { app: 'PF-Upload', title: 'Trafikmelding - Midttrafik (Bus)', message: 'Forsinkelser Pga uheld på motorvejen, er der store forsinkelser på busserne i Vejle. Rejsegarantien bortfalder. Lokation: Vejle Trafikcenter\n\nhttps://112meldinger.dk/map.php?uid=BMGJqVb' },
 };
 
@@ -79,6 +91,9 @@ tjek('ABA12 i Aarhus og ABA41 i Viby holdes adskilt', !findMatch(P.viby, [aktiv(
 tjek('Lægehelikopter lægges ind i uheld 1,5 km væk', findMatch(P.heli, [aktiv({ ...P.trafikUheld, cirka: false, lat: 55.92, lon: 10.14 }), aktiv({ ...P.aba112, lat: 56.171, lon: 10.199 })])?.titel === P.trafikUheld.titel);
 tjek('Lægehelikopter 7 km fra en cirka-placering lægges IKKE sammen', !findMatch(P.heli, [aktiv({ ...P.odder, lat: 55.973, lon: 10.153 })]));
 tjek('Lægehelikopter langt fra alt bliver sin egen hændelse', !findMatch(P.heli, [aktiv({ ...P.aba112, lat: 56.171, lon: 10.199 })]));
+tjek('"Fundet" lægges ind i efterlysningen (samme pressemeddelelse, 3 timer senere)', findMatch(P.fundet, [aktiv(P.efterlyst, 180)]));
+tjek('"Fundet" fjerner teksten med navnet og lukker efterlysningen', (() => { const f = flet(aktiv(P.efterlyst), P.fundet, 'PF-Upload'); return f.status === 'afsluttet' && !/Daniel/.test(f.tekst + f.titel); })());
+tjek('Efterlysningens titel indeholder ikke navnet', !/Daniel/.test(P.efterlyst.titel));
 tjek('Gammel hændelse (over 45 min) bruges ikke', !findMatch(P.abaMast, [aktiv(P.aba112, 60)]));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

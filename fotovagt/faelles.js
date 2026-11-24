@@ -12,7 +12,7 @@ export const H_STATUS = {
   ny: 'Ny', taget: 'Taget', ankommet: 'Fotograf ankommet', afsluttet: 'Afsluttet', annulleret: 'Annulleret',
 };
 export const KATEGORI_IKON = {
-  Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Miljø: '☣️', Vejr: '🌧️', Andet: '📍',
+  Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Miljø: '☣️', Vejr: '🌧️', Forsyning: '🔧', Andet: '📍',
 };
 export const aktiv = h => ['ny', 'taget', 'ankommet'].includes(h.status);
 

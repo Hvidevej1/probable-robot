@@ -302,6 +302,7 @@ async function simulerBesked(title, message, url, app, ignorer = []) {
     await backend.ret(match.id, felter);
     return { ...h, lat: h.lat ?? match.lat, slaaetSammen: match };
   }
+  if (h.opfoelgning) return { ...h, ignoreret: true };
   await backend.opret({ ...række(h), kilde: cloud ? 'manuel' : 'pushover' });
   return h;
 }
