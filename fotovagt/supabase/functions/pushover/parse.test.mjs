@@ -30,6 +30,12 @@ const B = {
   strøm: { kategori: 'Forsyning', ignorer: true },
   efterlyst: { titel: 'Efterlysning – Randers NØ', adresse: 'Falkevej, 8930 Randers NØ', kategori: 'Politi' },
   fundet: { opfoelgning: true },
+  politiRandersvej: { titel: 'Færdselsuheld på Randersvej ved Djurslandsmotorvejen', adresse: 'Randersvej', kategori: 'Trafik' },
+  breakingTv2: { titel: 'En person er omkommet i trafikulykke - alt er spærret', adresse: 'Randersvej, Aarhus', kategori: 'Trafik' },
+  heliSkads: { titel: 'Lægehelikopter landet – Skads', adresse: 'Smørpøt Engvej, 6731 Skads', lat: 55.505909 },
+  flyVojens: { titel: 'Fly - standby 1/sikkerhedslanding', adresse: 'Vojens', kategori: 'Redning' },
+  tvSyd: { titel: 'Giver lang kø: Motorvejsfrakørsel spærret efter uheld', adresse: 'Kolding', kategori: 'Trafik' },
+  tvMidtvest: { titel: 'Vej spærret efter uheld', adresse: 'Viborgvej, Aalestrup', kategori: 'Trafik' },
   pfE45: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Uheld på E45 i nordgående retning mellem Århus og Randers\n\nSe placering her: https://112meldinger.dk/map.php?uid=NKtJaLs' },
   kolding: { app: 'Mast', title: '🚒 Kolding', message: '🔥 BMFM - (ISL SYD + KO MR-1 + KO V-1) Min. forurening-Mindre spild, #1536906\nBeredskab: TrekantBrand\nStation: Kolding\n24-11-2026 11:53' },
   hørning: { app: 'Mast', title: '🚒 Hørning', message: '🔥 @6 Naturbrand-Mindre brand ISL SY + HØ-M1 + HØ-V1 + SK-R1 MTV Ø 501 M61 166 8362 Hørning\nBeredskab: Østjyllands Brandvæsen\nStation: Hørning\n24-11-2026 08:26' },
@@ -43,6 +49,14 @@ const B = {
   strøm: { app: 'PF-Upload', title: '⚡ Strømafbrydelse – Silkeborg', message: '⚡ STRØMAFBRYDELSE\n📍 By: Silkeborg\n📮 Postnummer: 8600\n🔔 Type: Planlagt\n👥 Berørte kunder: 109\n🔧 Årsag:\nVedligeholdelse af elnettet\n🕒 Start: 24-11-2026 kl. 09:00\n🕓 Forventet slut: 24-11-2026 kl. 13:00\n🏢 Netselskab: Elnetselskabet N1\nhttps://elnet.greenpowerdenmark.dk/#/kort/193943/view' },
   efterlyst: { app: 'PF-Upload', title: '👮🏼‍♂️ Østjyllands Politi', message: 'Østjyllands Politi efterlyser 20-årige Daniel Amin fra Randers, der er gået fra Falkevej i 8930 Randers NØ omkring kl. 2030. Den efterlyste beskrives som mand, 20 år, alm. bygning, kort sort hår, overskæg. Iført vinterhue med refleks og sort jakke. Kontakt Østjyllands Politi på 114 hvis du har set Daniel i løbet af aftenen.\n\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15307670/efterlysning-af-20-arig-mand-i-randers?lang=da#sm-15307670' },
   fundet: { app: 'PF-Upload', title: '👮🏼‍♂️ Østjyllands Politi', message: 'Den unge mand fra Randers er fundet. Vi takker for hjælpen med finde ham. Vi opfordrer alle til slette foto og navn af personen, hvis det er blevet delt.  Mvh Vagtchefen. \n\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15307670/efterlysning-af-20-arig-mand-i-randers?lang=da#sm-15307757' },
+  politiRandersvej: { app: 'PF-Upload', title: '👮🏼‍♂️ Østjyllands Politi', message: 'Østjyllands Politi modtog kl. 1857 en anmeldelse om et færdselsuheld på Randersvej ved Djurslandsmotorvejen i nordlig retning. Politi og redningberedskab er til stede og kørebanen er lukket for al færdsel i nordlig retning i flere timer. En person er omkommet i forbindelse med uheldet. Bilinspektør er rekvirreret til stedet, som skal være med til at klarlægge årsagen til ulykken. Vi råder folk til at søge alternative veje. Vi har ikke mere for nuværende.\n\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15307461/faerdselsuheld-randersvej-v-djurslandsmotorvejen?lang=da#sm-15307461' },
+  breakingTv2: { app: 'PF-Upload', title: '🚨 Breaking', message: 'TV2Ostjylland.dk: En person er omkommet i trafikulykke - alt er spærret\n\nEn person er omkommet i forbindelse med en trafikulykke på Randersvej ved Djurslandsmotorvejen. Det oplyser Østjyllands Politi, som modtog en anmeldelse klokken 18.57. Ulykken skete i nordlig retning, hvor politi og redningsmandskab lige nu er til stede, mens kørebanen er lukket for al færdsel i nor... https://www.tv2ostjylland.dk/aarhus/en-person-er-omkommet-i-trafikulykke-fd8fc' },
+  breakingTv2Kort: { app: 'PF-Upload', title: '🚨 Breaking', message: 'TV2Ostjylland.dk: En person er omkommet i trafikulykke - alt er spærret\n\nEn person er omkommet i forbindelse med en trafikulykke på Randersvej ved Djurslandsmotorvejen. Det oplyser Østjyllands Politi, som modtog en anmeldelse klokken 18.57. Ulykken skete i nordlig retning, hvor politi og redningsmandskab lige nu er til stede, mens kørebanen er lukket for al færdsel i nor...' },
+  politiDød: { app: 'PF-Upload', title: '👮🏼‍♂️ Østjyllands Politi', message: 'En 24-årig mand er død som følge af uheldet. De pårørende er underrettet.  Vi er færdige med undersøgelserne på uheldsstedet og trafikken er åbnet op igen.  Vi har ikke mere for nuværende. \n\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15307461/faerdselsuheld-randersvej-v-djurslandsmotorvejen?lang=da#sm-15307566' },
+  heliSkads: { app: 'PF-Upload', title: '🚁🛬 Lægehelikopter landet', message: '🚁🛬 Lægehelikopter landet\nOY-HNL (EC45) · SHW19B\nSted: Smørpøt Engvej, Skads (6731)\nGoogle Maps: https://maps.google.com/?q=55.505909,8.58779\nFlyvetid: 225 sek · Distance: 8.03 km' },
+  flyVojens: { app: 'PF-Upload', title: '🚒 Vojens', message: '🔥 Fly - standby 1/sikkerhedslanding\nBeredskab: Brand & Redning Sønderjylland\nStation: Vojens\n23-11-2026 15:03' },
+  tvSyd: { app: 'PF-Upload', title: '🚨 Breaking', message: 'TVSyd.dk: Giver lang kø: Motorvejsfrakørsel spærret efter uheld\n\nEt uheld giver store trafikale udfordringer på E45 Sønderjyske Motorvej i sydgående retning. Uheldet er sket ved Kolding V, hvor man kan køre fra til Esbjergmotorvejen i vestlig retning. Køen strækker sig her ved 12.30-tiden over flere kilometer. https://www.tvsyd.dk/kolding/giver-lang-ko-motorvejsfrakorsel-spaerret-efter-uheld-dbc2b' },
+  tvMidtvest: { app: 'PF-Upload', title: '🚨 Breaking', message: 'TVMidtvest.dk: Vej spærret efter uheld\n\nfor 9 minutter siden Mandag formiddag er der sket et uheld, hvor Hovedvejen bliver til Viborgvej nordøst for Aalestrup. Det skriver Vejdirektoratet på sit trafikkort Vejen er nu spærret. Politi og redningsfolk er på stedet. https://www.tvmidtvest.dk/vesthimmerland/vej-spaerret-efter-uheld-ved-aalestrup-a967e' },
   bus: { app: 'PF-Upload', title: 'Trafikmelding - Midttrafik (Bus)', message: 'Forsinkelser Pga uheld på motorvejen, er der store forsinkelser på busserne i Vejle. Rejsegarantien bortfalder. Lokation: Vejle Trafikcenter\n\nhttps://112meldinger.dk/map.php?uid=BMGJqVb' },
 };
 
@@ -94,6 +108,12 @@ tjek('Lægehelikopter langt fra alt bliver sin egen hændelse', !findMatch(P.hel
 tjek('"Fundet" lægges ind i efterlysningen (samme pressemeddelelse, 3 timer senere)', findMatch(P.fundet, [aktiv(P.efterlyst, 180)]));
 tjek('"Fundet" fjerner teksten med navnet og lukker efterlysningen', (() => { const f = flet(aktiv(P.efterlyst), P.fundet, 'PF-Upload'); return f.status === 'afsluttet' && !/Daniel/.test(f.tekst + f.titel); })());
 tjek('Efterlysningens titel indeholder ikke navnet', !/Daniel/.test(P.efterlyst.titel));
+tjek('Breaking fra TV2 lægges ind i politiets melding om Randersvej (40 min senere)', findMatch(P.breakingTv2, [aktiv(P.politiRandersvej, 40)]));
+tjek('Den samme Breaking to gange lægges sammen', findMatch(P.breakingTv2Kort, [aktiv(P.breakingTv2)]));
+tjek('Politiets opfølgning (død) lægges ind via pressemeddelelsen', findMatch(P.politiDød, [aktiv(P.politiRandersvej, 120)]));
+tjek('Breaking fra Aalestrup og Kolding holdes adskilt', !findMatch(P.tvMidtvest, [aktiv(P.tvSyd)]));
+tjek('Samme Breaking-tekst tilføjes ikke to gange', (() => { const f = flet(aktiv(P.breakingTv2), P.breakingTv2Kort, 'PF-Upload'); return f.tekst === P.breakingTv2.tekst; })());
+tjek('"Færdselsuheld på Randersvej" og "Færdselsuheld E45" ved Vejle holdes adskilt', !findMatch(P.politiRandersvej, [aktiv({ titel: 'Færdselsuheld E45', tekst: 'Trafikuheld E45 ved Vejle', adresse: 'E45 ved Vejle', kategori: 'Trafik', lat: 55.72, lon: 9.5 })]));
 tjek('Gammel hændelse (over 45 min) bruges ikke', !findMatch(P.abaMast, [aktiv(P.aba112, 60)]));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

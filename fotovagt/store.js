@@ -293,6 +293,11 @@ async function simulerBesked(title, message, url, app, ignorer = []) {
     if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
     match = findMatch(h, state.haendelser);
   }
+  if (match && (match.cirka || match.lat == null) && h.lat == null && h.adresse) {
+    // den eksisterende mangler en god placering: måske kan denne besked give den
+    const pos = await geokod(h.adresse).catch(() => null);
+    if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
+  }
   if (match) {
     const felter = flet(match, h, app);
     if (felter.adresse && felter.lat === null) {

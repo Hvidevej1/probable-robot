@@ -42,13 +42,16 @@ Det kræver en **Pushover for Desktop-licens** på kontoen (engangskøb, ca. 5 $
 | PF-Upload (lægehelikopter) | `🚁🛬 Lægehelikopter landet`, `Sted: Aakjærvej, Odder (8300)`, Google Maps-link | "Lægehelikopter landet – Odder", præcis landingsplads. Lander den under 3 km fra en aktiv hændelse, lægges den ind i den. Landing ved hospital springes over |
 | PF-Upload (forsyning) | `💧 Akut vandafbrydelse – Silkeborg`, `Postnummer: 8600 Silkeborg`, "…lukke for vandet på Remstrupvej…" | Kategori Forsyning, "Remstrupvej, 8600 Silkeborg" (cirka). Planlagte afbrydelser ("Type: Planlagt") springes over |
 | PF-Upload (politi) | `👮 Østjyllands Politi`, pressemeddelelse + "Læs mere: via.ritzau.dk/pressemeddelelse/…" | Titel = første sætning. Efterlysninger hedder "Efterlysning – by", så navnet ikke står i oversigten. En opfølgning med samme pressemeddelelse lægges ind i den første. Ved "personen er fundet" fjernes den oprindelige tekst, og efterlysningen lukkes |
+| PF-Upload (Breaking) | `🚨 Breaking`, `TV2Ostjylland.dk: En person er omkommet …`, link til tv2ostjylland.dk/aarhus/… | Overskriften bliver titel. Byen tages fra linket (aarhus → Aarhus), gaden fra teksten: "Randersvej, Aarhus" (cirka). Samme Breaking to gange lægges sammen |
+| PF-Upload (fly) | `🚒 Vojens`, `🔥 Fly - standby 1/sikkerhedslanding` | Kategori Redning, cirka ved stationen |
 | Google Maps Scanner | `🚨 Muligt trafikuheld detekteret på Google Maps`, `📍 Østjyske Motorvej`, `🏙️ 7100 Vejle` | "Muligt trafikuheld – Østjyske Motorvej", cirka ved Vejle |
 
 - **Placering:** Koordinater fra links (Google Maps, 112meldinger.dk, korte maps.app.goo.gl) bruges først. Derefter slås adressen op på OpenStreetMap. Kendes kun by, station eller vejstrækning, markeres nålen som **cirka** (stiplet kant og "ca.").
 - **Samme alarm fra flere kilder bliver til én hændelse,** inden for 45 minutter, når den har
   - samme adresse (fx ABA11 og Ass.-A-sprøjte på Byvej 63),
   - samme kode/titel (fx ABA12 fra både 1-1-2 og Mast), eller
-  - ligger under 300 m fra den anden.
+  - ligger under 300 m fra den anden, eller
+  - nævner samme gade og samme slags hændelse inden for 3 timer, når den ene mangler husnummer (fx politiets melding om Randersvej og TV2's Breaking om samme ulykke).
 
   Den ekstra besked lægges ind i hændelsens tekst og logbog og kan forbedre en cirka-placering.
 - **Springes over:** Radioprøver altid. Kontoret kan under Pushover tilføje egne ord. Som standard står "(Bus)" der, så busforsinkelser ikke bliver til hændelser.

@@ -20,7 +20,7 @@ const KATEGORIER = [
   ['Brand', /🔥|🚒|\bABA\d*|bygn\.?\s?brand|brand(?!væsen)|\bild\b|røg|eksplosion|brænd|skorsten|sprøjte|tankvogn|\bass\.|\bassistance\b/i],
   ['Trafik', /🚗|🚙|🚘|trafik|færdsel|uheld|ulykke|påkørsel|motorvej|frontal|lastbil|(?:^|[\s,.])kø(?=$|[\s,.])|\bE\d{2}\b|spærret|vejarbejde|dyr på vejen/i],
   ['Politi', /🚓|👮|efterlys|varetægt|voldtægt|politi(?! og redning)|anholdt|skud|skyd|knivstik|røveri|indbrud|vold|drab|bevæbnet|aktion/i],
-  ['Redning', /🚁|🚑|lægehelikopter|akuthjælper|hjertestop|udkald til|redning|drukn|eftersøg|savnet|person i vand|helikopter|ambulance|fastklemt/i],
+  ['Redning', /🚁|\bfly\b|sikkerhedslanding|nødlanding|flystyrt|🚑|lægehelikopter|akuthjælper|hjertestop|udkald til|redning|drukn|eftersøg|savnet|person i vand|helikopter|ambulance|fastklemt/i],
   ['Miljø', /forurening|\bgas\b|kemikal|olie|udslip|lugt/i],
   ['Vejr', /storm|oversvøm|skybrud|stormflod|træ over/i],
 ];
@@ -85,9 +85,18 @@ function findGade(L) {
   return '';
 }
 
+// Regionale TV-stationers links har kommunen først i stien: tv2ostjylland.dk/aarhus/…, tvsyd.dk/kolding/…
+export function byFraLink(links) {
+  for (const u of links || []) {
+    const m = String(u).match(/^https?:\/\/(?:www\.)?(?:tv2[a-z]*|tvsyd|tvmidtvest|tv2fyn|tv2nord|tv2east|tv2kosmopol|lorry)\.dk\/([a-zæøå-]+)\//i);
+    if (m && !/^(?:nyheder|artikel|video|live|sport)$/i.test(m[1])) return m[1].split('-').map(o => o[0].toUpperCase() + o.slice(1)).join(' ');
+  }
+  return '';
+}
+
 // Giver { adresse, linje, start, cirka }: linje/start er hvor adressen står (bruges til at korte titlen af).
 // cirka = true, når det kun er en by/station/vejstrækning og ikke en præcis adresse.
-export function findAdresse(linjer, station) {
+export function findAdresse(linjer, station, byHint = '') {
   const L = Array.isArray(linjer) ? linjer : String(linjer || '').split('\n');
   const ingen = { adresse: '', linje: -1, start: -1, cirka: false };
   // 1) "Adresse: …", "Sted: …", "Lokation: …" (også midt i en linje efter et punktum)
@@ -143,17 +152,22 @@ export function findAdresse(linjer, station) {
     const gade = vej ? '' : findGade(L);   // fx "Remstrupvej" længere nede i teksten
     return { adresse: vej ? `${vej}, ${by}` : gade ? `${gade}, ${by}` : by, linje: vej ? i : -1, start: -1, cirka: true };
   }
-  // 4b) Gade i by: "i området ved Stadion Allé i Viborg"
+  // 4b) Gade + by: "ved Stadion Allé i Viborg", "Viborgvej nordøst for Aalestrup".
+  //     "Randersvej ved Djurslandsmotorvejen": byen tages fra TV-stationens link, ellers kun gaden (placeres ikke)
   for (const l of L) {
-    const m = l.match(new RegExp(`${GADE}\\s+i\\s+(${STEDNAVN})`));
-    if (m && !/motorvej/i.test(m[1])) return { adresse: `${m[1]}, ${m[2]}`, linje: -1, start: -1, cirka: true };
+    const m = l.match(new RegExp(`${GADE}[^.\\n]{0,40}?\\s(?:i|ved|nær|(?:nord|syd|øst|vest|nordøst|nordvest|sydøst|sydvest)\\s+for)\\s+(${STEDNAVN})`));
+    if (m && !/motorvej/i.test(m[1]) && !/motorvej/i.test(m[2])) return { adresse: `${m[1]}, ${m[2].replace(/\s[A-ZÆØÅ]{1,2}$/, '')}`, linje: -1, start: -1, cirka: true };
   }
+  const gade = findGade(L);
+  if (gade && byHint) return { adresse: `${gade}, ${byHint}`, linje: -1, start: -1, cirka: true };
   // 5) Motorvejsstrækning: "mellem <44> Hadsten og …", "mellem Horsens C og [57] Horsens S", "E45 fra Randers"
   for (const s of L) {
     const m = s.match(new RegExp(`\\bmellem\\s+(?:[<\\[]\\d+[>\\]]\\s*)?(${STEDNAVN})\\s+og\\b`))
-      || s.match(new RegExp(`\\b(?:E|Rute\\s?)\\d{1,3}\\b.{0,40}?\\b(?:ved|nær|fra|syd for|nord for|øst for|vest for)\\s+(${STEDNAVN})`));
+      || s.match(new RegExp(`\\b(?:E|Rute\\s?)\\d{1,3}\\b.{0,120}?\\b(?:ved|nær|fra|syd for|nord for|øst for|vest for)\\s+(${STEDNAVN})`));
     if (m) return { adresse: m[1].replace(/\s(?:N|S|Ø|V|C|Nord|Syd|Øst|Vest|Midt)$/, ''), linje: -1, start: -1, cirka: true };
   }
+  if (byHint) return { ...ingen, adresse: byHint, cirka: true };
+  if (gade) return { ...ingen, adresse: gade, cirka: true };   // kun gadenavn: vises, men placeres ikke
   // 6) Kun stationen kendes (Mast/PF-Upload uden adresse): placér ved stationens by
   if (station) return { ...ingen, adresse: station.replace(/^(?:assistance|ass\.?)\s*-\s*/i, '').trim(), cirka: true };
   return ingen;
@@ -169,7 +183,8 @@ export function findKategori(...tekster) {
 
 // Linjer, der ikke er selve meldingen (bruges ikke til titel)
 const METALINJE = /^(?:beredskab|station|adresse|lokation|featureid|se placering|se på google|detekteret kl|forventes at vare|læs mere|postnummer|by:|type:|berørte|årsag|start:|forventet slut|netselskab|akut:)|^\d{2}-\d{2}-\d{4}|^https?:\/\/|^ai-detektion/i;
-const GENERISK_TITEL = /^(?:trafikmelding|1-1-2.*|112.*|alarm|besked|.*\bpoliti)$/i;
+const GENERISK_TITEL = /^(?:trafikmelding|1-1-2.*|112.*|alarm|besked|breaking|.*\bpoliti)$/i;
+const NYHEDSKILDE = /^(?:breaking:?\s*)?[A-Za-z0-9æøå-]+\.dk:\s*/i;
 const VEJLINJE = /^(?:E\d{1,3}|Rute\s?\d+|M\d{1,2}\b)|motorvej/i;
 
 // Hele beskeden -> felter til tabellen "haendelser" (+ links, station og ignorer til serveren).
@@ -182,15 +197,16 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
   if (url) links.unshift(url);
 
   const tekst = alle.filter(l => l && !/^featureid:/i.test(l) && !/^se på google maps$/i.test(l)).join('\n');
-  const rene = alle.map(l => renEmoji(l).replace(/^assistance:\s*(?=(?:@\d+\s*)?(?:assistance|ass\.))/i, '').replace(/^@\d+\s*/, '')).filter(Boolean);
-  const rentitel = renEmoji(title).replace(/^@\d+\s*/, '');
+  const rene = alle.map(l => renEmoji(l).replace(/^assistance:\s*(?=(?:@\d+\s*)?(?:assistance|ass\.))/i, '').replace(/^@\d+\s*/, '').replace(NYHEDSKILDE, '')).filter(Boolean);
+  let rentitel = renEmoji(title).replace(/^@\d+\s*/, '');
+  if (/^breaking\b/i.test(rentitel)) rentitel = rentitel.replace(NYHEDSKILDE, '').replace(/^breaking:?\s*/i, '') || 'Breaking';
   const stationLinje = rene.find(l => /^station:/i.test(l))?.replace(/^station:\s*/i, '');
   const erStationsFormat = rene.some(l => /^(?:beredskab|station):/i.test(l));
   const harTitel = rentitel && rentitel.toLowerCase() !== String(app || '').toLowerCase() && !GENERISK_TITEL.test(rentitel) && !erStationsFormat;
   const station = stationLinje || (erStationsFormat ? rentitel : '') || '';
 
   const indhold = rene.filter(l => !METALINJE.test(l));
-  const { adresse, linje, start, cirka } = findAdresse(rene, station);
+  const { adresse, linje, start, cirka } = findAdresse(rene, station, byFraLink(links));
 
   let titel;
   if (/detekteret på google maps/i.test(rentitel)) {
@@ -204,7 +220,9 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     if (/politi$/i.test(rentitel)) {
       titel = /efterlys/i.test(titel) && !/er fundet/i.test(titel)
         ? `Efterlysning${adresse ? ' – ' + adresse.split(',').pop().replace(/^\s*\d{4}\s+/, '').trim() : ''}`
-        : titel.split(/(?<=[a-zæøå])\.\s/)[0];
+        : titel.split(/(?<=[a-zæøå]{3})\.\s/)[0];
+      const om = titel.match(/anmeldelse om (?:et|en)\s+(.+?)(?:\s+i\s+(?:nordlig|sydlig|østlig|vestlig|begge)\w*\s+retning.*)?$/i);
+      if (om) titel = om[1][0].toUpperCase() + om[1].slice(1);
     }
     // Adressen står i samme linje ("ABA12 CI-M1 + CI S1 Ny Munkegade 114 …"): skær den fra
     const i = rene.indexOf(indhold[0]);
@@ -233,7 +251,9 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     titel,
     tekst,
     adresse,
-    kategori: findKategori(rentitel, indhold.slice(0, 2).join(' '), tekst.replace(/brandvæsen/gi, '')),
+    kategori: /politi$/i.test(rentitel)
+      ? (findKategori(indhold.slice(0, 2).join(' ')) === 'Andet' ? 'Politi' : findKategori(indhold.slice(0, 2).join(' ')))
+      : findKategori(rentitel, indhold.slice(0, 2).join(' '), tekst.replace(/brandvæsen/gi, '')),
     prioritet: Number.isFinite(+priority) ? +priority : 0,
     url: bedsteLink,
     app: app || null,
@@ -247,6 +267,7 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     opfoelgning: /politi$/i.test(rentitel) && /er fundet|slette (?:foto|billede|navn)/i.test(tekst),
     ignorer: IGNORER.test(`${title}\n${tekst}`) || (helikopter && HOSPITAL.test(adresse)),
     helikopter,
+    gade: findGade(rene).toLowerCase(),
   };
 }
 
@@ -276,6 +297,7 @@ const nøgle = s => renEmoji(s).toLowerCase().replace(KODE_FORKLARING, '').repla
 const adrNøgle = a => /\d/.test(a || '') ? String(a).toLowerCase().replace(/[^a-z0-9æøå]/g, '') : '';
 const fællesStart = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i; };
 
+const gadeAf = h => findGade([h.adresse || '', ...String(h.tekst || '').split('\n').map(renEmoji)]).toLowerCase();
 const pressemeddelelse = u => (String(u || '').match(/pressemeddelelse\/(\d+)/) || [])[1] || '';
 
 export function findMatch(ny, aktive, nu = Date.now()) {
@@ -291,13 +313,19 @@ export function findMatch(ny, aktive, nu = Date.now()) {
   // Nyeste først, så en besked uden adresse havner hos den seneste alarm med samme titel
   for (const h of [...aktive].sort((x, y) => String(y.oprettet).localeCompare(String(x.oprettet)))) {
     if (!['ny', 'taget', 'ankommet'].includes(h.status)) continue;
-    if (nu - new Date(h.oprettet).getTime() > 45 * 60e3) continue;
-    if (na && na === adrNøgle(h.adresse)) return h;
+    const alder = nu - new Date(h.oprettet).getTime();
+    if (alder > 3 * 3600e3) continue;
     const begge = ny.lat != null && h.lat != null;
     const afstand = begge ? Math.hypot((ny.lat - h.lat) * 111, (ny.lon - h.lon) * 111 * Math.cos(h.lat * Math.PI / 180)) : null;
     const præcis = begge && !ny.cirka && !h.cirka;
+    // Samme gade og samme slags hændelse inden for 3 timer: politi, nyheder og 112 om samme ulykke
+    //   (kun når mindst én mangler husnummer; præcise adresser bruger reglerne herunder)
+    if (ny.gade && (!na || !adrNøgle(h.adresse)) && ny.kategori === h.kategori && ny.gade === gadeAf(h) && !(afstand > (præcis ? 2 : 25))) return h;
+    if (alder > 45 * 60e3) continue;
+    if (na && na === adrNøgle(h.adresse)) return h;
     const a = nøgle(h.titel), kort = Math.min(a.length, n.length), fælles = fællesStart(a, n);
-    const sammeTitel = (kort >= 6 && fælles === kort) || (fælles >= 10 && fælles >= 0.8 * kort);
+    // (næsten ens kun for koder med tal, fx forvanskede "Assistance VB V-1 /-`Q" – ikke for "Færdselsuheld …")
+    const sammeTitel = (kort >= 6 && fælles === kort) || (fælles >= 10 && fælles >= 0.8 * kort && /\d/.test(a.slice(0, fælles)));
     if (sammeTitel && !(afstand > (præcis ? 2 : 25))) return h;
     if (præcis && (afstand < 0.1 || (afstand < 0.3 && ny.kategori === h.kategori))) return h;
   }
@@ -318,7 +346,8 @@ export function findMatch(ny, aktive, nu = Date.now()) {
 // Felter, der skal opdateres på den eksisterende hændelse, når en ekstra besked kommer ind.
 export function flet(h, ny, app) {
   const linje = `— ${app || 'Ekstra besked'}: ${[ny.titel, ny.tekst].filter(Boolean).join(' · ').replace(/\n+/g, ' · ')}`;
-  const felter = { tekst: [h.tekst, linje].filter(Boolean).join('\n') };
+  const kendt = String(ny.tekst || '').replace(/\s+/g, ' ').slice(0, 80);
+  const felter = { tekst: kendt && String(h.tekst || '').replace(/\s+/g, ' ').includes(kendt) ? h.tekst : [h.tekst, linje].filter(Boolean).join('\n') };
   // Efterlyst person fundet: politiet beder om at slette navn og foto, så den første tekst fjernes
   if (/er fundet|slette (?:foto|billede|navn)/i.test(ny.tekst || '') && /efterlys/i.test(`${h.titel} ${h.tekst}`)) {
     felter.titel = 'Efterlysning afsluttet – personen er fundet';
@@ -326,7 +355,7 @@ export function flet(h, ny, app) {
     if (h.status === 'ny') { felter.status = 'afsluttet'; felter.afsluttet_tid = new Date().toISOString(); }
     return felter;
   }
-  const bedreAdresse = ny.adresse && (!h.adresse || (h.cirka && !ny.cirka && !ny.helikopter));
+  const bedreAdresse = ny.adresse && (!h.adresse || (h.cirka && !ny.cirka && !ny.helikopter) || (h.lat == null && ny.lat != null && !ny.helikopter));
   if (bedreAdresse) felter.adresse = ny.adresse;
   // (en lægehelikopter lander ved stedet, ikke præcis på det: placeringen forbliver cirka)
   if (ny.lat != null && (h.lat == null || (h.cirka && !ny.cirka))) { felter.lat = ny.lat; felter.lon = ny.lon; felter.cirka = !!ny.cirka || !!ny.helikopter; }
@@ -340,6 +369,7 @@ export function flet(h, ny, app) {
 // som er gratis, men højst må kaldes ca. én gang i sekundet.
 export async function geokod(adresse, { fetchFn = fetch, headers = {} } = {}) {
   if (!adresse) return null;
+  if (!/[,\d]/.test(adresse) && /(?:vej|gade|allé|alle|stræde|torv|plads|boulevard)$/i.test(adresse)) return null;
   const forsøg = [adresse];
   const [vej, ...resten] = adresse.split(',');
   const ord = vej.trim().split(/\s+/);
