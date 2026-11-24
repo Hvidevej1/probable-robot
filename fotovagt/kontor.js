@@ -236,6 +236,7 @@ const DEMO_BESKEDER = [
   ['Trafik Server', 'Trafikmelding', '<b>Uheld</b>\nE45 Nordjyske Motorvej fra Aarhus mod Randers mellem &lt;46&gt; Aarhus Nord og &lt;44&gt; Hadsten\n\nUheld, Spor blokeret, Uheldsstedet er ikke sikret'],
   ['PF-Upload', 'Trafikmelding', '🚙 Uheld\nE45 Nordjyske Motorvej fra Aarhus mod Randers mellem [46] Aarhus Nord og [44] Hadsten\nUheld, Spor blokeret\n\nNordjyske Motorvej, 8380 Spørring, Aarhus Kommune\n24-11-2026 16:22:00\n\nSe placeringen her: https://112meldinger.dk/map.php?uid=NKtJaLs'],
   ['Google Maps Scanner', '🚨 Muligt trafikuheld detekteret på Google Maps', '📍 Østjyske Motorvej\n🏙️ 7100 Vejle\n⚠️ AI-detektion af trafikmaengde var ikke mulig - meldingen er ikke verificeret\n🕒 Detekteret kl. 16:04'],
+  ['PF-Upload', '🚁🛬 Lægehelikopter landet', '🚁🛬 Lægehelikopter landet\nLN-OTS (EC45) · DOC03\nSted: Aakjærvej, Odder (8300)\nGoogle Maps: https://maps.google.com/?q=55.908027,10.127163\nFlyvetid: 1152 sek · Distance: 62.91 km'],
   ['1-1-2 Århus', '', '24-11 26 Radioprøve fra Østjyllands Brandvæsen'],
   ['PF-Upload', 'Trafikmelding - Midttrafik (Bus)', 'Forsinkelser Pga uheld på motorvejen, er der store forsinkelser på busserne i Vejle. Rejsegarantien bortfalder. Lokation: Vejle Trafikcenter'],
 ];

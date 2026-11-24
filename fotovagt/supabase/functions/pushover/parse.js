@@ -19,7 +19,7 @@ const KATEGORIER = [
   ['Brand', /🔥|🚒|\bABA\d*|bygn\.?\s?brand|brand(?!væsen)|\bild\b|røg|eksplosion|brænd|skorsten|sprøjte|tankvogn|\bass\.|\bassistance\b/i],
   ['Trafik', /🚗|🚙|🚘|trafik|færdsel|uheld|ulykke|påkørsel|motorvej|frontal|lastbil|(?:^|[\s,.])kø(?=$|[\s,.])|\bE\d{2}\b|spærret|vejarbejde|dyr på vejen/i],
   ['Politi', /🚓|politi(?! og redning)|anholdt|skud|skyd|knivstik|røveri|indbrud|vold|drab|bevæbnet|aktion/i],
-  ['Redning', /🚑|akuthjælper|hjertestop|udkald til|redning|drukn|eftersøg|savnet|person i vand|helikopter|ambulance|fastklemt/i],
+  ['Redning', /🚁|🚑|lægehelikopter|akuthjælper|hjertestop|udkald til|redning|drukn|eftersøg|savnet|person i vand|helikopter|ambulance|fastklemt/i],
   ['Miljø', /forurening|\bgas\b|kemikal|olie|udslip|lugt/i],
   ['Vejr', /storm|oversvøm|skybrud|stormflod|træ over/i],
 ];
@@ -33,6 +33,8 @@ const KODER = [
 
 // Beskeder, der aldrig skal blive til hændelser (flere kan sættes på kontoret under Pushover)
 const IGNORER = /radioprøve|prøvealarm|testalarm/i;
+// Lægehelikopter, der lander ved et hospital, er bare patienttransport
+const HOSPITAL = /hospital|sygehus|\bAUH\b|\bOUH\b|rigshospitalet|helipad|akutmodtagelse/i;
 
 const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}\u{20E3}]/gu;
 const renEmoji = s => String(s || '').replace(EMOJI, '').replace(/[ \t]+/g, ' ').trim();
@@ -80,7 +82,8 @@ export function findAdresse(linjer, station) {
   for (let i = 0; i < L.length; i++) {
     const m = L[i].match(/(?:^|[.!]\s+)(?:adresse|sted|lokation|location|address|position)\s*:\s*(.+)$/i);
     if (m) {
-      const a = m[1].trim().replace(/[.;]+$/, '').replace(/\s+,/g, ',').replace(/,?\s*[A-ZÆØÅ][a-zæøå]+ Kommune$/, '');
+      const a = m[1].trim().replace(/[.;]+$/, '').replace(/\s+,/g, ',').replace(/,?\s*[A-ZÆØÅ][a-zæøå]+ Kommune$/, '')
+        .replace(/([A-ZÆØÅ][\wæøåÆØÅ .\-]*?)\s*\((\d{4})\)$/, '$2 $1');
       return { adresse: a, linje: -1, start: -1, cirka: !/\d/.test(a) };
     }
   }
@@ -187,6 +190,8 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     .replace(/[<\[]\d+[>\]]\s*/g, '').replace(/\s{2,}/g, ' ').replace(/[\s,;:+\-–]+$/, '').trim();
   if (titel.length > 80) titel = titel.slice(0, 80).replace(/[\s,;:+\-–]+\S*$/, '') + ' …';
   titel ||= 'Ny hændelse';
+  const helikopter = /lægehelikopter|akutlægehelikopter/i.test(`${rentitel} ${indhold[0] || ''}`);
+  if (helikopter && adresse) titel = `${titel.replace(/\s*–.*$/, '')} – ${adresse.split(',').pop().replace(/^\s*\d{4}\s+/, '').trim()}`;
   const kode = KODER.find(([re]) => re.test(titel));
   if (kode && !titel.toLowerCase().includes(kode[1])) titel += ` – ${kode[1]}`;
 
@@ -206,7 +211,8 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     // Kun til serveren, gemmes ikke:
     links: [...new Set(links)],
     station: station || null,
-    ignorer: IGNORER.test(`${title}\n${tekst}`),
+    ignorer: IGNORER.test(`${title}\n${tekst}`) || (helikopter && HOSPITAL.test(adresse)),
+    helikopter,
   };
 }
 
@@ -228,7 +234,8 @@ export function skalIgnoreres(h, egne = []) {
 //  - har samme adresse (fx "ABA11 …" og "Ass.-A-sprøjte …" på Byvej 63), eller
 //  - har samme kode/titel (fx "ABA12 CI-M1 + CI-S1" fra både 1-1-2 Århus og Mast), og de ikke
 //    ligger langt fra hinanden, eller
-//  - ligger under 300 m fra hinanden med samme kategori (eller under 100 m uanset kategori).
+//  - ligger under 300 m fra hinanden med samme kategori (eller under 100 m uanset kategori), eller
+//  - er en lægehelikopter, der lander under 3 km fra hændelsen (5 km hvis den kun er cirka).
 const KODE_FORKLARING = new RegExp(` – (?:${KODER.map(k => k[1]).join('|')})$`);
 const nøgle = s => renEmoji(s).toLowerCase().replace(KODE_FORKLARING, '').replace(/[^a-z0-9æøå]/g, '');
 const adrNøgle = a => /\d/.test(a || '') ? String(a).toLowerCase().replace(/[^a-z0-9æøå]/g, '') : '';
@@ -249,6 +256,17 @@ export function findMatch(ny, aktive, nu = Date.now()) {
     if (sammeTitel && !(afstand > (præcis ? 2 : 25))) return h;
     if (præcis && (afstand < 0.1 || (afstand < 0.3 && ny.kategori === h.kategori))) return h;
   }
+  // Lægehelikopter: læg den ind i den nærmeste aktive hændelse inden for 3 km (5 km hvis den kun er cirka)
+  if (ny.helikopter && ny.lat != null) {
+    let bedst = null, bedstAfstand = Infinity;
+    for (const h of aktive) {
+      if (!['ny', 'taget', 'ankommet'].includes(h.status) || h.lat == null || /lægehelikopter/i.test(h.titel)) continue;
+      if (nu - new Date(h.oprettet).getTime() > 45 * 60e3) continue;
+      const d = Math.hypot((ny.lat - h.lat) * 111, (ny.lon - h.lon) * 111 * Math.cos(h.lat * Math.PI / 180));
+      if (d < (h.cirka ? 5 : 3) && d < bedstAfstand) { bedst = h; bedstAfstand = d; }
+    }
+    return bedst;
+  }
   return null;
 }
 
@@ -256,9 +274,10 @@ export function findMatch(ny, aktive, nu = Date.now()) {
 export function flet(h, ny, app) {
   const linje = `— ${app || 'Ekstra besked'}: ${[ny.titel, ny.tekst].filter(Boolean).join(' · ').replace(/\n+/g, ' · ')}`;
   const felter = { tekst: [h.tekst, linje].filter(Boolean).join('\n') };
-  const bedreAdresse = ny.adresse && (!h.adresse || (h.cirka && !ny.cirka));
+  const bedreAdresse = ny.adresse && (!h.adresse || (h.cirka && !ny.cirka && !ny.helikopter));
   if (bedreAdresse) felter.adresse = ny.adresse;
-  if (ny.lat != null && (h.lat == null || (h.cirka && !ny.cirka))) { felter.lat = ny.lat; felter.lon = ny.lon; felter.cirka = !!ny.cirka; }
+  // (en lægehelikopter lander ved stedet, ikke præcis på det: placeringen forbliver cirka)
+  if (ny.lat != null && (h.lat == null || (h.cirka && !ny.cirka))) { felter.lat = ny.lat; felter.lon = ny.lon; felter.cirka = !!ny.cirka || !!ny.helikopter; }
   else if (bedreAdresse && h.cirka && !ny.cirka) { felter.lat = null; felter.lon = null; felter.cirka = false; } // slås op igen
   if ((!h.kategori || h.kategori === 'Andet') && ny.kategori !== 'Andet') felter.kategori = ny.kategori;
   if (!h.url && ny.url) felter.url = ny.url;

@@ -22,11 +22,15 @@ const B = {
   hørning: { titel: 'Naturbrand-Mindre brand', adresse: 'Østjyske Motorvej, 8362 Hørning', cirka: true, kategori: 'Brand' },
   akut: { titel: 'UDKALD TIL AKUTHJÆLPER', adresse: 'Fredericia', kategori: 'Redning' },
   give: { titel: 'Assistance VB MR-6 ABA', adresse: 'Danpo Tykhøjetvej 44, 7323 Give', cirka: false },
+  heli: { titel: 'Lægehelikopter landet – Odder', adresse: 'Aakjærvej, 8300 Odder', kategori: 'Redning', lat: 55.908027, cirka: false, ignorer: false },
+  heliAUH: { ignorer: true },
   pfE45: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Uheld på E45 i nordgående retning mellem Århus og Randers\n\nSe placering her: https://112meldinger.dk/map.php?uid=NKtJaLs' },
   kolding: { app: 'Mast', title: '🚒 Kolding', message: '🔥 BMFM - (ISL SYD + KO MR-1 + KO V-1) Min. forurening-Mindre spild, #1536906\nBeredskab: TrekantBrand\nStation: Kolding\n24-11-2026 11:53' },
   hørning: { app: 'Mast', title: '🚒 Hørning', message: '🔥 @6 Naturbrand-Mindre brand ISL SY + HØ-M1 + HØ-V1 + SK-R1 MTV Ø 501 M61 166 8362 Hørning\nBeredskab: Østjyllands Brandvæsen\nStation: Hørning\n24-11-2026 08:26' },
   akut: { app: 'Mast', title: '🚒 Fredericia', message: '🔥 UDKALD TIL AKUTHJÆLPER #1536900\nBeredskab: TrekantBrand\nStation: Fredericia\n24-11-2026 08:29' },
   give: { app: 'Mast', title: '🚒 Assistance - Give', message: '🔥 Assistance: Assistance VB MR-6 /- ABA - (MR-1)\nBeredskab: Vejle Brandvæsen\nStation: Give\nAdresse: Danpo Tykhøjetvej 44, 7323 Give\n24-11-2026 08:07' },
+  heli: { app: 'PF-Upload', title: '🚁🛬 Lægehelikopter landet', message: '🚁🛬 Lægehelikopter landet\nLN-OTS (EC45) · DOC03\nSted: Aakjærvej, Odder (8300)\nGoogle Maps: https://maps.google.com/?q=55.908027,10.127163\nFlyvetid: 1152 sek · Distance: 62.91 km' },
+  heliAUH: { app: 'PF-Upload', title: '🚁🛬 Lægehelikopter landet', message: '🚁🛬 Lægehelikopter landet\nLN-OTS (EC45) · DOC03\nSted: Aarhus Universitetshospital, Aarhus N (8200)\nGoogle Maps: https://maps.google.com/?q=56.191,10.170' },
   bus: { app: 'PF-Upload', title: 'Trafikmelding - Midttrafik (Bus)', message: 'Forsinkelser Pga uheld på motorvejen, er der store forsinkelser på busserne i Vejle. Rejsegarantien bortfalder. Lokation: Vejle Trafikcenter\n\nhttps://112meldinger.dk/map.php?uid=BMGJqVb' },
 };
 
@@ -72,6 +76,9 @@ tjek('Mast-assistance på Byvej 63 lægges sammen', findMatch(P.assMast, [aktiv(
 tjek('Vejle-assistance og den skæve Mast-besked lægges sammen', findMatch(P.vejleSkæv, [aktiv({ ...P.vejle, lat: 55.70, lon: 9.53 })]));
 tjek('Trafik Server og PF-Upload om samme uheld lægges sammen', findMatch(P.pfUheld, [aktiv(P.trafikUheld)]));
 tjek('ABA12 i Aarhus og ABA41 i Viby holdes adskilt', !findMatch(P.viby, [aktiv(P.aba112)]));
+tjek('Lægehelikopter lægges ind i uheld 1,5 km væk', findMatch(P.heli, [aktiv({ ...P.trafikUheld, cirka: false, lat: 55.92, lon: 10.14 }), aktiv({ ...P.aba112, lat: 56.171, lon: 10.199 })])?.titel === P.trafikUheld.titel);
+tjek('Lægehelikopter 7 km fra en cirka-placering lægges IKKE sammen', !findMatch(P.heli, [aktiv({ ...P.odder, lat: 55.973, lon: 10.153 })]));
+tjek('Lægehelikopter langt fra alt bliver sin egen hændelse', !findMatch(P.heli, [aktiv({ ...P.aba112, lat: 56.171, lon: 10.199 })]));
 tjek('Gammel hændelse (over 45 min) bruges ikke', !findMatch(P.abaMast, [aktiv(P.aba112, 60)]));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);
