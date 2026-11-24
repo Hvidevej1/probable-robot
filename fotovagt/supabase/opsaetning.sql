@@ -70,6 +70,21 @@ create table if not exists pushover_konto (
 alter table pushover_konto add column if not exists ignorer text[] default array['(Bus)'];  -- beskeder med disse ord springes over
 insert into pushover_konto (id) values (1) on conflict do nothing;
 
+-- Interne nøgler, som serveren selv laver: hemmelighed til Pushover-hentning og nøglesæt til push.
+-- Ingen bruger kan læse tabellen; kun Edge Functions (og push_noegle() giver den offentlige nøgle).
+create table if not exists intern (
+  id int primary key default 1 check (id = 1),
+  cron_secret text not null default encode(gen_random_bytes(24), 'hex'),
+  vapid_public text,
+  vapid_private text
+);
+insert into intern (id) values (1) on conflict do nothing;
+alter table intern enable row level security;
+create or replace function push_noegle() returns text
+language sql stable security definer set search_path = public as $$ select vapid_public from intern where id = 1 $$;
+revoke execute on function push_noegle() from public, anon;
+grant execute on function push_noegle() to authenticated;
+
 -- Ny bruger i Authentication -> får automatisk en profil som fotograf ----------------
 create or replace function ny_bruger() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -243,6 +258,7 @@ create or replace function saet_status(foto uuid, s text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   if not er_kontor() then raise exception 'Kun kontoret.'; end if;
+  if s not in ('ledig', 'optaget', 'pause', 'ankommet', 'offline') then raise exception 'Ukendt status %', s; end if;
   update profiles set status = s, status_tid = now() where id = foto;
   insert into logbog (bruger, handling) values (auth.uid(),
     'satte ' || (select navn from profiles where id = foto) || ' til ' || s);
@@ -259,6 +275,15 @@ end $$;
 drop trigger if exists ny_haendelse_log on haendelser;
 create trigger ny_haendelse_log after insert on haendelser for each row execute function ny_haendelse_log();
 
+-- Kun indloggede brugere må kalde funktionerne (Supabase giver ellers også "anon" adgang)
+revoke execute on function tag_haendelse(uuid), meld_status(text), afslut_haendelse(text), slip_haendelse(),
+  meld_position(double precision, double precision), ret_profil(text, text), tildel_haendelse(uuid, uuid),
+  luk_haendelse(uuid, text), saet_status(uuid, text), er_kontor(), er_bruger() from public, anon;
+grant execute on function tag_haendelse(uuid), meld_status(text), afslut_haendelse(text), slip_haendelse(),
+  meld_position(double precision, double precision), ret_profil(text, text), tildel_haendelse(uuid, uuid),
+  luk_haendelse(uuid, text), saet_status(uuid, text), er_kontor(), er_bruger() to authenticated;
+revoke execute on function ny_bruger(), ny_haendelse_log() from public, anon, authenticated;
+
 -- Live-opdatering af kort og lister
 do $$ begin
   begin alter publication supabase_realtime add table haendelser; exception when duplicate_object then null; end;
@@ -268,3 +293,81 @@ end $$;
 
 -- Gør dig selv til kontor-bruger: ret e-mailen og kør linjen (efter du har oprettet brugeren).
 -- update profiles set rolle = 'kontor' where id = (select id from auth.users where email = 'din@mail.dk');
+
+-- SOS / alarmknap ---------------------------------------------------------------------
+-- Fotografen trykker SOS (fx overfald eller anden farlig situation). Kontoret og fotografer
+-- inden for 20 km får push med placering (se push.sql). Positionen opdateres, mens alarmen er aktiv.
+create table if not exists sos (
+  id uuid primary key default gen_random_uuid(),
+  bruger uuid not null references profiles on delete cascade,
+  start timestamptz not null default now(),
+  lat double precision,
+  lon double precision,
+  noejagtighed double precision,          -- GPS-nøjagtighed i meter
+  pos_tid timestamptz,
+  aktiv boolean not null default true,
+  kvitteret_af uuid references profiles on delete set null,   -- den første, der har trykket "Set"
+  kvitteret_tid timestamptz,
+  slut_tid timestamptz,
+  slut_af uuid references profiles on delete set null,
+  push_sendt boolean default false
+);
+create index if not exists sos_aktiv on sos (start desc) where aktiv;
+alter table sos enable row level security;
+drop policy if exists "laes" on sos;
+create policy "laes" on sos for select to authenticated using (er_bruger());
+
+-- Start SOS (eller opdatér positionen, hvis den allerede er aktiv). Giver alarmens id.
+create or replace function sos_start(la double precision default null, lo double precision default null, noej double precision default null) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare s uuid;
+begin
+  if not er_bruger() then raise exception 'Ikke logget ind.'; end if;
+  select id into s from sos where bruger = auth.uid() and aktiv order by start desc limit 1;
+  if s is null then
+    insert into sos (bruger, lat, lon, noejagtighed, pos_tid)
+    values (auth.uid(), la, lo, noej, case when la is not null then now() end) returning id into s;
+    insert into logbog (bruger, handling) values (auth.uid(), '🆘 trykkede SOS');
+  elsif la is not null then
+    update sos set lat = la, lon = lo, noejagtighed = noej, pos_tid = now() where id = s;
+  end if;
+  if la is not null then
+    update profiles set lat = la, lon = lo, pos_tid = now(), sidst_set = now() where id = auth.uid();
+  end if;
+  return s;
+end $$;
+
+-- "Jeg er OK": fotografen stopper sin egen alarm
+create or replace function sos_stop() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update sos set aktiv = false, slut_tid = now(), slut_af = auth.uid() where bruger = auth.uid() and aktiv;
+  if found then insert into logbog (bruger, handling) values (auth.uid(), '✅ stoppede sin SOS (er OK)'); end if;
+end $$;
+
+-- "Set": kontoret eller en kollega har set alarmen (den første bliver gemt, og afsenderen får besked)
+create or replace function sos_kvitter(s uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not er_bruger() then raise exception 'Ikke logget ind.'; end if;
+  update sos set kvitteret_af = auth.uid(), kvitteret_tid = now() where id = s and aktiv and kvitteret_af is null;
+  insert into logbog (bruger, handling)
+  values (auth.uid(), 'så SOS fra ' || (select p.navn from sos join profiles p on p.id = sos.bruger where sos.id = s));
+end $$;
+
+-- Kontoret afslutter en alarm (fx når fotografen er kontaktet)
+create or replace function sos_afslut(s uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not er_kontor() then raise exception 'Kun kontoret kan afslutte en SOS.'; end if;
+  update sos set aktiv = false, slut_tid = now(), slut_af = auth.uid() where id = s and aktiv;
+  insert into logbog (bruger, handling)
+  values (auth.uid(), 'afsluttede SOS fra ' || (select p.navn from sos join profiles p on p.id = sos.bruger where sos.id = s));
+end $$;
+
+revoke execute on function sos_start(double precision, double precision, double precision), sos_stop(), sos_kvitter(uuid), sos_afslut(uuid) from public, anon;
+grant execute on function sos_start(double precision, double precision, double precision), sos_stop(), sos_kvitter(uuid), sos_afslut(uuid) to authenticated;
+
+do $$ begin
+  begin alter publication supabase_realtime add table sos; exception when duplicate_object then null; end;
+end $$;

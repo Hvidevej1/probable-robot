@@ -6,8 +6,8 @@
 window.FOTOVAGT_CONFIG = {
   supabaseUrl: '',
   supabaseAnonKey: '',
-  // Offentlig nøgle til push-beskeder (VAPID). Den private del ligger kun i Supabase.
-  vapidPublicKey: 'BI-epLeYRbhLjCSqBoOggBysRaZgba5BDE5uC8t-DArN4O3KxTAZ7DxA1JRbBxzJt2unLIf5rMGWRB0fG3V4t2k',
+  // Offentlig nøgle til push hentes fra databasen (push_noegle). Kan sættes her, hvis den skal låses fast.
+  vapidPublicKey: '',
   // Hvor kortet starter (midt i Danmark) og zoom
   kortCenter: [56.1, 10.6],
   kortZoom: 7,

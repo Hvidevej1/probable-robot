@@ -372,9 +372,10 @@ export function flet(h, ny, app) {
   return felter;
 }
 
-// Slår en adresse op og giver { lat, lon, navn } eller null. Bruger OpenStreetMap (Nominatim),
-// som er gratis, men højst må kaldes ca. én gang i sekundet.
-export async function geokod(adresse, { fetchFn = fetch, headers = {} } = {}) {
+// Slår en adresse op og giver { lat, lon, navn } eller null. Bruger OpenStreetMap (Nominatim, højst
+// ca. ét kald i sekundet) og Photon (samme kortdata) som reserve, hvis Nominatim afviser eller intet finder.
+// (Den danske adresseservice DAWA er lukket.)
+export async function geokod(adresse, { fetchFn = fetch, headers = {}, log = () => {} } = {}) {
   if (!adresse) return null;
   if (!/[,\d]/.test(adresse) && /(?:vej|gade|allé|alle|stræde|torv|plads|boulevard)$/i.test(adresse)) return null;
   const forsøg = [adresse];
@@ -387,10 +388,23 @@ export async function geokod(adresse, { fetchFn = fetch, headers = {} } = {}) {
     const u = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=dk&accept-language=da&q=' + encodeURIComponent(q);
     try {
       const r = await fetchFn(u, { headers });
-      if (!r.ok) continue;
-      const [hit] = await r.json();
-      if (hit) return { lat: +hit.lat, lon: +hit.lon, navn: hit.display_name };
-    } catch { /* prøv næste */ }
+      if (r.ok) {
+        const [hit] = await r.json();
+        if (hit) return { lat: +hit.lat, lon: +hit.lon, navn: hit.display_name };
+      } else log(`Nominatim svarede ${r.status} på "${q}"`);
+    } catch (e) { log(`Nominatim fejl på "${q}": ${e?.message || e}`); }
+    const p = 'https://photon.komoot.io/api/?limit=1&bbox=7.8,54.4,15.3,57.9&q=' + encodeURIComponent(q);
+    try {
+      const r = await fetchFn(p, { headers });
+      if (r.ok) {
+        const f = (await r.json()).features?.[0];
+        if (f) {
+          const [lon, lat] = f.geometry.coordinates;
+          if (iDK(lat, lon)) return { lat, lon, navn: [f.properties.street, f.properties.housenumber, f.properties.postcode, f.properties.city].filter(Boolean).join(' ') };
+        }
+      } else log(`Photon svarede ${r.status} på "${q}"`);
+    } catch (e) { log(`Photon fejl på "${q}": ${e?.message || e}`); }
   }
+  log(`Ingen placering fundet for "${adresse}"`);
   return null;
 }

@@ -83,6 +83,87 @@ export function bip() {
 }
 
 // ------------------------------------------------------------------------------------
+// Push-beskeder (også på låst telefon / lukket fane)
+const erIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const påHjemmeskærm = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+export function pushKanBruges() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    return erIOS && !påHjemmeskærm()
+      ? 'På iPhone skal Fotovagt først lægges på hjemmeskærmen: tryk Del → "Føj til hjemmeskærm", og åbn den derfra.'
+      : 'Denne browser kan ikke modtage push-beskeder.';
+  }
+  return '';
+}
+const nøgleBytes = b64 => {
+  const s = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(s, c => c.charCodeAt(0));
+};
+export async function abonnérPush() {
+  const grund = pushKanBruges();
+  if (grund) throw new Error(grund);
+  if (await Notification.requestPermission() !== 'granted') throw new Error('Du har ikke givet lov til beskeder. Det kan ændres i indstillingerne.');
+  const nøgle = window.FOTOVAGT_CONFIG?.vapidPublicKey || await store.pushNøgle();
+  if (!nøgle) throw new Error('Push er ikke sat op endnu på serveren.');
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription()
+    || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: nøgleBytes(nøgle) });
+  await store.gemPush(sub.toJSON());
+}
+export async function afmeldPush() {
+  const reg = await navigator.serviceWorker?.ready;
+  const sub = await reg?.pushManager?.getSubscription();
+  if (sub) { await store.sletPush(sub.endpoint).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
+}
+
+// ------------------------------------------------------------------------------------
+// SOS: rød boks med fotografens navn, telefon og placering + alarmlyd
+export const SOS_RADIUS_KM = 20;
+export const aktiveSos = () => (store.state.sos || []).filter(s => s.aktiv);
+
+// Rød boks til dem, der modtager alarmen (kontoret og kolleger)
+export function sosBoks(s, { fra = null, kontor = false } = {}) {
+  const p = store.state.profiler.find(x => x.id === s.bruger) || {};
+  const kvit = s.kvitteret_af ? store.state.profiler.find(x => x.id === s.kvitteret_af) : null;
+  const d = s.lat != null && fra?.lat != null ? km(fra, s) : null;
+  const kort = s.lat != null ? `https://maps.google.com/?q=${s.lat},${s.lon}` : null;
+  const ios = /iPhone|iPad|Mac/.test(navigator.userAgent);
+  const nav = s.lat != null ? (ios ? `https://maps.apple.com/?daddr=${s.lat},${s.lon}` : `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}`) : null;
+  return `
+    <div class="sos-boks" data-sos="${s.id}" role="alert">
+      <div class="sos-top"><span class="sos-ikon">🆘</span>
+        <div><b class="sos-navn">${esc(p.navn || 'Ukendt fotograf')}</b> har trykket SOS
+          <span class="sos-tid">kl. ${klokken(s.start)} · ${siden(s.start)} siden</span></div></div>
+      <dl class="sos-info">
+        <dt>Telefon</dt><dd>${p.telefon ? `<a href="tel:${esc(p.telefon)}">${esc(p.telefon)}</a>` : 'ikke oplyst'}</dd>
+        <dt>Placering</dt><dd>${s.lat != null
+          ? `${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}${s.noejagtighed ? ` (±${Math.round(s.noejagtighed)} m)` : ''}${d != null ? ` · <b>${kmTekst(d)} fra dig</b>` : ''}<br><small>opdateret ${siden(s.pos_tid || s.start)} siden</small>`
+          : 'ukendt – ring til fotografen'}</dd>
+        <dt>Status</dt><dd>${kvit ? `Set af ${esc(kvit.navn)} kl. ${klokken(s.kvitteret_tid)}` : '<b>Ingen har set alarmen endnu</b>'}</dd>
+      </dl>
+      <div class="sos-knapper">
+        ${p.telefon ? `<a class="knap" href="tel:${esc(p.telefon)}">📞 Ring til ${esc(p.navn || 'fotografen')}</a>` : ''}
+        ${s.lat != null ? `<button data-sos-vis="${s.id}">📍 Vis på kortet</button>` : ''}
+        ${nav ? `<a class="knap" href="${nav}" target="_blank" rel="noopener">🚗 Navigér</a>` : ''}
+        ${kort ? `<a class="knap" href="${kort}" target="_blank" rel="noopener">Google Maps</a>` : ''}
+        ${!kvit ? `<button data-sos-set="${s.id}" class="hvid">✓ Set – jeg tager mig af det</button>` : ''}
+        ${kontor ? `<button data-sos-afslut="${s.id}" class="hvid">Afslut alarm</button>` : ''}
+      </div>
+      <p class="sos-112">Er der fare for liv: ring 112.</p>
+    </div>`;
+}
+
+export function sosIkon() {
+  return L.divIcon({ className: '', html: '<div class="sos-pin">SOS</div>', iconSize: [54, 54], iconAnchor: [27, 27] });
+}
+
+// Alarmlyd, der gentages, indtil den stoppes
+let alarmTimer = null;
+export function alarm(til) {
+  if (til && !alarmTimer) { bip(); alarmTimer = setInterval(() => { bip(); navigator.vibrate?.([400, 150, 400, 150, 400]); }, 1800); }
+  if (!til && alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
+}
+
+// ------------------------------------------------------------------------------------
 // Kort (Leaflet + OpenStreetMap)
 // ------------------------------------------------------------------------------------
 export function lavKort(el) {

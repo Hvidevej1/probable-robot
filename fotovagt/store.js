@@ -6,7 +6,7 @@ import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './s
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
 const lyttere = new Set();
-const state = { haendelser: [], profiler: [], log: [], mig: null };
+const state = { haendelser: [], profiler: [], log: [], sos: [], mig: null };
 const fejlTekst = e => (e && (e.message || e.error_description)) || String(e);
 const ændret = () => lyttere.forEach(f => f(state));
 
@@ -32,13 +32,14 @@ function supabaseBackend() {
 
   async function hentAlt() {
     const døgn = new Date(Date.now() - 24 * 3600e3).toISOString();
-    const [h, p, l] = await Promise.all([
+    const [h, p, l, s] = await Promise.all([
       sb.from('haendelser').select('*').or(`status.in.(ny,taget,ankommet),oprettet.gt.${døgn}`).order('oprettet', { ascending: false }).limit(300),
       sb.from('profiles').select('*').order('navn'),
       sb.from('logbog').select('*').order('tid', { ascending: false }).limit(150),
+      sb.from('sos').select('*').or(`aktiv.eq.true,start.gt.${døgn}`).order('start', { ascending: false }).limit(50),
     ]);
-    for (const r of [h, p, l]) if (r.error) throw new Error(r.error.message);
-    state.haendelser = h.data; state.profiler = p.data; state.log = l.data;
+    for (const r of [h, p, l, s]) if (r.error) throw new Error(r.error.message);
+    state.haendelser = h.data; state.profiler = p.data; state.log = l.data; state.sos = s.data;
     state.mig = state.profiler.find(x => x.id === state.mig?.id) || state.mig;
     ændret();
   }
@@ -57,6 +58,11 @@ function supabaseBackend() {
         else upsertListe(state.profiler, e.new);
         if (state.mig && e.new?.id === state.mig.id) state.mig = { ...state.mig, ...e.new };
         ændret();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sos' }, e => {
+        if (e.eventType === 'DELETE') state.sos = state.sos.filter(x => x.id !== e.old.id);
+        else { const ny = !state.sos.some(x => x.id === e.new.id); upsertListe(state.sos, e.new); if (ny) state.nySos = e.new; }
+        ændret(); state.nySos = null;
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'logbog' }, e => {
         state.log.unshift(e.new); state.log.length = Math.min(state.log.length, 150); ændret();
@@ -110,7 +116,21 @@ function supabaseBackend() {
       const { error } = await sb.from('haendelser').insert({ kilde: 'manuel', ...felter });
       if (error) throw new Error(error.message);
     },
+    // SOS
+    async sosStart(la, lo, noej) {
+      const { data, error } = await sb.rpc('sos_start', { la, lo, noej });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    sosStop: () => rpc('sos_stop'),
+    sosKvitter: id => rpc('sos_kvitter', { s: id }),
+    sosAfslut: id => rpc('sos_afslut', { s: id }),
     // Push-beskeder til den låste telefon
+    async pushNøgle() {
+      const { data, error } = await sb.rpc('push_noegle');
+      if (error) throw new Error(error.message);
+      return data;
+    },
     gemPush: s => rpc('gem_push', { ep: s.endpoint, nøgle: s.keys.p256dh, hemmelig: s.keys.auth }),
     sletPush: endpoint => rpc('slet_push', { ep: endpoint }),
     async testPush() {
@@ -130,7 +150,7 @@ function supabaseBackend() {
 // Demo i browseren
 // ------------------------------------------------------------------------------------
 function demoBackend() {
-  const NØGLE = 'fotovagt-demo-v1';
+  const NØGLE = 'fotovagt-demo-v2';
   const bc = 'BroadcastChannel' in window ? new BroadcastChannel('fotovagt-demo') : null;
   const nu = () => new Date().toISOString();
   const minSiden = m => new Date(Date.now() - m * 60e3).toISOString();
@@ -142,8 +162,9 @@ function demoBackend() {
       haendelse_id: null, lat, lon, pos_tid: minSiden(2), sidst_set: minSiden(1), ...extra,
     });
     const profiler = [
-      p('f1', 'Mads', 'ledig', 56.162, 10.203),
-      p('f2', 'Sofie', 'optaget', 55.69, 12.56, { haendelse_id: 'h2' }),
+      p('f1', 'Mads', 'ledig', 56.162, 10.203, { telefon: '20 00 00 01' }),
+      p('f7', 'Anna', 'ledig', 56.13, 10.15, { telefon: '20 00 00 07' }),
+      p('f2', 'Sofie', 'optaget', 55.69, 12.56, { haendelse_id: 'h2', telefon: '20 00 00 02' }),
       p('f3', 'Jonas', 'pause', 55.396, 10.388),
       p('f4', 'Ida', 'ledig', 57.048, 9.919),
       p('f5', 'Peter', 'ankommet', 55.47, 8.45, { haendelse_id: 'h4' }),
@@ -167,7 +188,7 @@ function demoBackend() {
       { id: 2, tid: minSiden(15), bruger: 'f2', haendelse_id: 'h2', handling: 'tog hændelsen' },
       { id: 1, tid: minSiden(18), bruger: null, haendelse_id: 'h2', handling: 'ny hændelse fra pushover' },
     ];
-    return { haendelser, profiler, log, pushover: { forbundet: false, kun_apps: null, ignorer: ['(Bus)'] } };
+    return { haendelser, profiler, log, sos: [], pushover: { forbundet: false, kun_apps: null, ignorer: ['(Bus)'] } };
   }
 
   let db;
@@ -180,8 +201,12 @@ function demoBackend() {
     state.haendelser = [...db.haendelser].sort((a, b) => b.oprettet.localeCompare(a.oprettet));
     state.profiler = [...db.profiler].sort((a, b) => a.navn.localeCompare(b.navn));
     state.log = db.log.slice(0, 150);
+    db.sos ||= [];
+    const førSos = new Set(state.sos.map(x => x.id));
+    state.sos = [...db.sos].sort((a, b) => b.start.localeCompare(a.start));
+    state.nySos = state.sos.find(x => !førSos.has(x.id) && x.aktiv && x.bruger !== state.mig?.id) || null;
     if (state.mig) state.mig = db.profiler.find(p => p.id === state.mig.id) || state.mig;
-    state.nyHaendelse = nyH; ændret(); state.nyHaendelse = null;
+    state.nyHaendelse = nyH; ændret(); state.nyHaendelse = null; state.nySos = null;
   };
   const udefra = () => {
     const før = new Set(db.haendelser.map(h => h.id)); læs();
@@ -214,6 +239,30 @@ function demoBackend() {
     async glemt() {},
     async hentAlt() { læs(); spejl(); },
     nulstil() { localStorage.removeItem(NØGLE); læs(); gem(); },
+    async pushNøgle() { return ''; },
+    sosStart: kør((la, lo, noej) => {
+      const m = mig(); db.sos ||= [];
+      let s = db.sos.find(x => x.bruger === m.id && x.aktiv);
+      if (!s) {
+        s = { id: uid(), bruger: m.id, start: nu(), lat: la ?? null, lon: lo ?? null, noejagtighed: noej ?? null, pos_tid: la != null ? nu() : null, aktiv: true, kvitteret_af: null };
+        db.sos.unshift(s); log(null, '🆘 trykkede SOS');
+      } else if (la != null) Object.assign(s, { lat: la, lon: lo, noejagtighed: noej, pos_tid: nu() });
+      if (la != null) Object.assign(m, { lat: la, lon: lo, pos_tid: nu() });
+      return s.id;
+    }),
+    sosStop: kør(() => {
+      const s = (db.sos || []).find(x => x.bruger === mig().id && x.aktiv);
+      if (s) { Object.assign(s, { aktiv: false, slut_tid: nu(), slut_af: mig().id }); log(null, '✅ stoppede sin SOS (er OK)'); }
+    }),
+    sosKvitter: kør(id => {
+      const s = (db.sos || []).find(x => x.id === id);
+      if (s && s.aktiv && !s.kvitteret_af) Object.assign(s, { kvitteret_af: mig().id, kvitteret_tid: nu() });
+      log(null, 'så SOS fra ' + (P(s?.bruger)?.navn || ''));
+    }),
+    sosAfslut: kør(id => {
+      kontor(); const s = (db.sos || []).find(x => x.id === id);
+      if (s) { Object.assign(s, { aktiv: false, slut_tid: nu(), slut_af: mig().id }); log(null, 'afsluttede SOS fra ' + (P(s.bruger)?.navn || '')); }
+    }),
     async gemPush() { throw new Error('Push-beskeder virker først, når Fotovagt er sat op med Supabase.'); },
     async sletPush() {},
     async testPush() { throw new Error('Push-beskeder virker først, når Fotovagt er sat op med Supabase.'); },

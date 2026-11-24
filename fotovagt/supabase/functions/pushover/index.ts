@@ -9,7 +9,8 @@
 //  2. Af kontoret i appen (med login) for at forbinde/afbryde Pushover og se status.
 //  3. Udefra med { title, message, url } og hemmeligheden, fx fra Zapier eller en anden alarmtjeneste.
 //
-// Hemmeligheder (Edge Functions -> Secrets): FOTOVAGT_SECRET (en lang tilfældig tekst).
+// Hemmeligheden, som databasens ur og webhooks sender med, ligger i tabellen intern (laves af databasen selv).
+// Den kan også sættes som FOTOVAGT_SECRET under Edge Functions -> Secrets.
 // "Verify JWT" skal være slået FRA for denne funktion (den tjekker selv login og hemmelighed).
 import { createClient } from "npm:@supabase/supabase-js@2.119.0";
 import { findKoordinater, findMatch, flet, geokod, parseBesked, pressemeddelelseNr, række, skalIgnoreres, skalSlåsOp } from "./parse.js";
@@ -25,6 +26,7 @@ const json = (data: unknown, status = 200) =>
 
 // OpenStreetMap vil have, at man fortæller, hvem man er. Kun appens navn sendes.
 const GEO_HEADERS = { "User-Agent": "Fotovagt/1.0 (supabase edge function)" };
+const GEO = { headers: GEO_HEADERS, log: (m: string) => console.warn("geokod:", m) };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Indgang = { title?: string; message?: string; url?: string; priority?: number; app?: string };
@@ -51,7 +53,7 @@ async function placér(h: Hændelse) {
     if (pos) { h.lat = pos.lat; h.lon = pos.lon; h.cirka = false; return; }
   }
   if (h.lat == null && h.adresse) {
-    const pos = await geokod(h.adresse, { headers: GEO_HEADERS });
+    const pos = await geokod(h.adresse, GEO);
     if (pos) { h.lat = pos.lat; h.lon = pos.lon; }
     await sleep(1100); // højst ét opslag i sekundet hos OpenStreetMap
   }
@@ -86,7 +88,7 @@ async function indsaet(b: Indgang, kilde: string, eksternId: string | null, igno
   if (match) {
     const felter = flet(match, h, b.app);
     if (felter.adresse && felter.lat === null) {        // bedre adresse: slå den op
-      const pos = await geokod(felter.adresse, { headers: GEO_HEADERS });
+      const pos = await geokod(felter.adresse, GEO);
       if (pos) { felter.lat = pos.lat; felter.lon = pos.lon; }
     }
     await db.from("haendelser").update(felter).eq("id", match.id);
@@ -186,7 +188,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const body = await req.json().catch(() => ({}));
   const hemmelig = req.headers.get("x-fotovagt-secret");
-  const korrekt = Deno.env.get("FOTOVAGT_SECRET");
+  const korrekt = Deno.env.get("FOTOVAGT_SECRET")
+    || (await db.from("intern").select("cron_secret").eq("id", 1).single()).data?.cron_secret;
   const medHemmelighed = !!korrekt && hemmelig === korrekt;
 
   try {

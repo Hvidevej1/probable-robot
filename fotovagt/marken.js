@@ -3,12 +3,15 @@ import { store } from './store.js';
 import {
   STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
+  pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm,
 } from './faelles.js';
 
 const pref = {
   get(k, std) { try { const v = localStorage.getItem('fotovagt-' + k); return v == null ? std : v === '1'; } catch { return std; } },
   set(k, v) { try { localStorage.setItem('fotovagt-' + k, v ? '1' : '0'); } catch { /* ok */ } },
 };
+let sLag, sosWatch = null, sosSidst = 0;
+const sosSet = new Set();   // alarmer, jeg har trykket "Set" på (stopper lyden)
 let mig, kort, hLag, fLag, minPos = null, posWatch = null, førsteZoom = true, åbenId = null;
 
 const navn = id => store.state.profiler.find(p => p.id === id)?.navn || 'en anden';
@@ -27,7 +30,7 @@ function tegn() {
     b.style.setProperty('--c', STATUS[b.dataset.status].farve);
     if (b.dataset.status === 'ankommet') b.disabled = !mig.haendelse_id;
   });
-  tegnOpgave(); tegnListe(); tegnKort();
+  tegnSos(); tegnOpgave(); tegnListe(); tegnKort();
   if (åbenId && $('#dlg-haendelse').open) visHaendelse(åbenId, false);
 }
 
@@ -94,6 +97,71 @@ function tegnKort() {
     if (minPos) pkt.push([minPos.lat, minPos.lon]);
     if (pkt.length) { kort.fitBounds(pkt, { padding: [40, 40], maxZoom: 12 }); førsteZoom = false; }
   }
+}
+
+// ---------------------------------------------------------------------------------
+// SOS
+const minSos = () => aktiveSos().find(s => s.bruger === mig.id);
+const andresSos = () => aktiveSos().filter(s => s.bruger !== mig.id)
+  .filter(s => s.lat == null || km(minPos || mig, s) == null || km(minPos || mig, s) <= SOS_RADIUS_KM);
+
+function tegnSos() {
+  const egen = minSos(), andre = andresSos();
+  const kvit = egen?.kvitteret_af ? store.state.profiler.find(p => p.id === egen.kvitteret_af) : null;
+  $('#sos-omraade').innerHTML = (egen ? `
+    <div class="sos-mig" role="alert">
+      <b>🆘 Din SOS er sendt</b>
+      <p>${kvit ? `✅ ${esc(kvit.navn)} har set din alarm kl. ${klokken(egen.kvitteret_tid)}.` : 'Kontoret og fotografer inden for 20 km er alarmeret. Venter på, at nogen ser den …'}
+        Din position sendes løbende${egen.lat != null ? '' : ' (placering ikke fundet endnu)'}.</p>
+      <div class="sos-knapper">
+        <a class="knap hvid" href="tel:112">📞 Ring 112</a>
+        <button id="btn-sos-ok" class="hvid">Jeg er OK – stop alarmen</button>
+      </div>
+    </div>` : '') + andre.map(s => sosBoks(s, { fra: minPos || mig })).join('');
+  $('#btn-sos').classList.toggle('aktiv', !!egen);
+  // Lyd, indtil jeg har trykket "Set" (eller nogen har kvitteret)
+  alarm(andre.some(s => !s.kvitteret_af && !sosSet.has(s.id)));
+  if (sLag) sLag.opdater(aktiveSos(), s => ({
+    ikon: sosIkon(),
+    popup: `<b>🆘 SOS: ${esc(store.state.profiler.find(p => p.id === s.bruger)?.navn || '')}</b><br>kl. ${klokken(s.start)}`,
+  }));
+  // Mens min egen alarm er aktiv, sendes positionen løbende (også hvis deling ellers er slået fra)
+  if (egen && sosWatch == null && navigator.geolocation) {
+    sosWatch = navigator.geolocation.watchPosition(p => {
+      minPos = { lat: p.coords.latitude, lon: p.coords.longitude };
+      if (Date.now() - sosSidst > 10e3) { sosSidst = Date.now(); store.sosStart(minPos.lat, minPos.lon, p.coords.accuracy).catch(() => {}); }
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 5e3, timeout: 20e3 });
+  }
+  if (!egen && sosWatch != null) { navigator.geolocation.clearWatch(sosWatch); sosWatch = null; }
+}
+
+let sosNedtælling = null;
+function åbnSos() {
+  if (minSos()) return toast('Din SOS er allerede aktiv.');
+  const dlg = $('#dlg-sos'); let n = 5;
+  $('#sos-tal').textContent = n;
+  dlg.showModal(); navigator.vibrate?.(200);
+  clearInterval(sosNedtælling);
+  sosNedtælling = setInterval(() => { n--; $('#sos-tal').textContent = n; if (n <= 0) sendSos(); }, 1000);
+}
+async function sendSos() {
+  clearInterval(sosNedtælling); $('#dlg-sos').close();
+  // Send med det samme (sidst kendte position), og opdatér, så snart GPS'en svarer
+  const kendt = minPos || (mig.lat != null ? { lat: mig.lat, lon: mig.lon } : null);
+  const ok = await prøv(() => store.sosStart(kendt?.lat ?? null, kendt?.lon ?? null, null), 'SOS er sendt.');
+  if (ok && navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(p => {
+      minPos = { lat: p.coords.latitude, lon: p.coords.longitude };
+      store.sosStart(minPos.lat, minPos.lon, p.coords.accuracy).catch(() => {});
+    }, () => toast('Din placering kunne ikke findes. Ring evt. 112 eller til kontoret.', 'fejl'),
+    { enableHighAccuracy: true, timeout: 10e3, maximumAge: 30e3 });
+  }
+}
+
+function visSos(id) {
+  const s = (store.state.sos || []).find(x => x.id === id);
+  if (!s || s.lat == null) return;
+  skiftFane('kort'); kort.setView([s.lat, s.lon], 16);
 }
 
 // ---------------------------------------------------------------------------------
@@ -172,38 +240,9 @@ function pulsSlag() {
 }
 
 // ---------------------------------------------------------------------------------
-// Push-beskeder til låst telefon
-const erIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-const påHjemmeskærm = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-function pushKanBruges() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-    return erIOS && !påHjemmeskærm()
-      ? 'På iPhone skal Fotovagt først lægges på hjemmeskærmen: tryk Del → "Føj til hjemmeskærm", og åbn den derfra.'
-      : 'Denne browser kan ikke modtage push-beskeder.';
-  }
-  if (!window.FOTOVAGT_CONFIG?.vapidPublicKey) return 'Push er ikke sat op endnu.';
-  return '';
-}
-const nøgleBytes = b64 => {
-  const s = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from(s, c => c.charCodeAt(0));
-};
-async function slåPushTil() {
-  const grund = pushKanBruges();
-  if (grund) throw new Error(grund);
-  if (await Notification.requestPermission() !== 'granted') throw new Error('Du har ikke givet lov til beskeder. Det kan ændres i telefonens indstillinger.');
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.getSubscription()
-    || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: nøgleBytes(window.FOTOVAGT_CONFIG.vapidPublicKey) });
-  await store.gemPush(sub.toJSON());
-  pref.set('push', true);
-}
-async function slåPushFra() {
-  const reg = await navigator.serviceWorker?.ready;
-  const sub = await reg?.pushManager?.getSubscription();
-  if (sub) { await store.sletPush(sub.endpoint).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
-  pref.set('push', false);
-}
+// Push-beskeder til låst telefon (selve abonnementet ligger i faelles.js)
+async function slåPushTil() { await abonnérPush(); pref.set('push', true); }
+async function slåPushFra() { await afmeldPush(); pref.set('push', false); }
 function visPushBanner() {
   const vis = store.cloud && !pushKanBruges() && Notification.permission !== 'denied'
     && !pref.get('push', false) && !pref.get('push-spurgt', false);
@@ -212,9 +251,11 @@ function visPushBanner() {
 
 // Åbn en hændelse fra et link (push-besked): ./?h=<id>
 function åbnFraLink(url = location.href) {
-  const id = new URL(url, location.href).searchParams.get('h');
-  if (!id) return;
+  const q = new URL(url, location.href).searchParams;
+  const id = q.get('h'), sos = q.get('sos');
+  if (!id && !sos) return;
   history.replaceState(null, '', location.pathname);
+  if (sos) return visSos(sos);
   if (store.state.haendelser.some(h => h.id === id)) visHaendelse(id);
 }
 
@@ -223,7 +264,7 @@ async function start() {
   mig = await logInd();
   $('#demo-mærke').hidden = !store.demo;
   kort = lavKort($('#kort'));
-  hLag = markørLag(kort); fLag = markørLag(kort);
+  hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort);
 
   // Live opdateringer: hvis teksten på min opgave (eller en ledig hændelse) bliver længere, får jeg besked
   const kendtTekst = new Map(store.state.haendelser.map(h => [h.id, h.tekst || '']));
@@ -239,6 +280,7 @@ async function start() {
         toast(`${min ? 'Opdatering på din opgave' : 'Opdatering'}: ${senesteOpdatering(h).replace(/^kl\. \d\d[.:]\d\d [^:]+: /, '').slice(0, 120)}`, min ? 'ny' : '');
       }
     }
+    if (s.nySos && s.nySos.bruger !== mig.id) toast('🆘 SOS fra en kollega – se den røde boks øverst', 'fejl');
     const ny = s.nyHaendelse;
     if (ny && ny.status === 'ny') {
       if (pref.get('lyd', true)) bip();
@@ -252,6 +294,18 @@ async function start() {
 
   // Første gang man er logget ind og ikke har en status: meld ledig
   if (mig.status === 'offline') await prøv(() => store.meldStatus('ledig'));
+
+  // SOS
+  $('#btn-sos').onclick = () => minSos() ? toast('Din SOS er aktiv. Stop den med "Jeg er OK".') : åbnSos();
+  $('#btn-sos-nu').onclick = sendSos;
+  $('#btn-sos-fortryd').onclick = () => { clearInterval(sosNedtælling); $('#dlg-sos').close(); toast('SOS er ikke sendt.'); };
+  $('#dlg-sos').addEventListener('cancel', () => clearInterval(sosNedtælling));
+  $('#sos-omraade').onclick = async e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.id === 'btn-sos-ok' && confirm('Stop din SOS-alarm? Kontoret får besked om, at du er OK.')) await prøv(() => store.sosStop(), 'Alarmen er stoppet.');
+    if (t.dataset.sosSet) { sosSet.add(t.dataset.sosSet); await prøv(() => store.sosKvitter(t.dataset.sosSet), 'Du har meldt, at du har set alarmen.'); tegnSos(); }
+    if (t.dataset.sosVis) visSos(t.dataset.sosVis);
+  };
 
   document.querySelector('.status-knapper').onclick = e => { const b = e.target.closest('[data-status]'); if (b) meldStatus(b.dataset.status); };
   document.querySelector('.faner').onclick = e => { const b = e.target.closest('[data-fane]'); if (b) skiftFane(b.dataset.fane); };

@@ -4,8 +4,10 @@ import { parseBesked } from './supabase/functions/pushover/parse.js';
 import {
   STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, set,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
+  pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm,
 } from './faelles.js';
 
+let sLag;
 let mig, kort, hLag, fLag, filter = 'aktive', valgtId = null, førsteZoom = true;
 const S = () => store.state;
 const P = id => S().profiler.find(p => p.id === id);
@@ -15,7 +17,25 @@ const STATUS_ORDEN = { ledig: 0, ankommet: 1, optaget: 2, pause: 3, offline: 4 }
 
 // ---------------------------------------------------------------------------------
 function tegn() {
+  tegnSos();
   tegnNøgletal(); tegnFotografer(); tegnHaendelser(); tegnLog(); tegnKort();
+}
+
+// SOS: rød boks øverst med navn, telefon og placering; alarmen lyder, indtil nogen har trykket "Set"
+function tegnSos() {
+  const aktive = aktiveSos();
+  $('#sos-omraade').innerHTML = aktive.map(s => sosBoks(s, { kontor: true })).join('');
+  alarm(aktive.some(s => !s.kvitteret_af));
+  document.title = aktive.length ? `🆘 SOS (${aktive.length}) – Fotovagt` : 'Fotovagt – kontoret';
+  if (sLag) sLag.opdater(aktive, s => ({
+    ikon: sosIkon(),
+    popup: `<b>🆘 SOS: ${esc(P(s.bruger)?.navn || '')}</b><br>kl. ${klokken(s.start)}${P(s.bruger)?.telefon ? `<br>📞 ${esc(P(s.bruger).telefon)}` : ''}`,
+  }));
+}
+function visSos(id) {
+  const s = (S().sos || []).find(x => x.id === id);
+  if (s?.lat != null) { kort.setView([s.lat, s.lon], 16); sLag.get(id)?.openPopup(); }
+  $('#sos-omraade').scrollIntoView({ block: 'start' });
 }
 
 function tegnNøgletal() {
@@ -39,7 +59,7 @@ function tegnFotografer() {
       <div class="foto-række${p.status === 'offline' ? ' offline' : ''}" data-foto="${p.id}">
         <i class="dot" style="--c:${st.farve}"></i>
         <div class="foto-info">
-          <b>${esc(p.navn)}</b>
+          <b>${esc(p.navn)}</b>${aktiveSos().some(x => x.bruger === p.id) ? ' <span class="sos-maerke">SOS</span>' : ''}
           <span class="lille"><span class="status-tekst" style="--c:${st.farve}">${st.tekst}</span> · ${siden(p.status_tid)}${gammel ? ` · <span class="advarsel">ikke set i ${siden(p.sidst_set) || 'lang tid'}</span>` : ''}</span>
           ${h ? `<button class="link opgave-link" data-zoom="${h.id}">${KATEGORI_IKON[h.kategori] || '📍'} ${esc(h.titel)}</button>` : ''}
         </div>
@@ -347,7 +367,7 @@ async function start() {
   mig = await logInd({ kunKontor: true });
   $('#demo-mærke').hidden = !store.demo;
   kort = lavKort($('#kort'));
-  hLag = markørLag(kort); fLag = markørLag(kort);
+  hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort);
 
   store.lyt(s => {
     tegn();
@@ -380,6 +400,33 @@ async function start() {
       return tegnHaendelser();
     }
     if (t.classList.contains('h-kort') && !e.target.closest('button,a')) vælg(t.dataset.id);
+  });
+
+  // SOS-knapper i den røde boks
+  $('#sos-omraade').onclick = async e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.sosSet) await prøv(() => store.sosKvitter(t.dataset.sosSet), 'Alarmen er markeret som set. Fotografen får besked.');
+    if (t.dataset.sosVis) visSos(t.dataset.sosVis);
+    if (t.dataset.sosAfslut && confirm('Afslut SOS-alarmen? Gør det kun, når fotografen er i sikkerhed.')) await prøv(() => store.sosAfslut(t.dataset.sosAfslut), 'Alarmen er afsluttet.');
+  };
+  // Push på kontorets computer (SOS-alarmer, også når fanen ikke er fremme)
+  const pushTekst = async () => {
+    const sub = await (await navigator.serviceWorker?.ready)?.pushManager?.getSubscription().catch(() => null);
+    $('#btn-push').textContent = sub ? '🔔 Push er slået til' : '🔕 Slå push til';
+    return !!sub;
+  };
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(pushTekst).catch(() => {});
+  $('#btn-push').onclick = async () => {
+    if (store.demo) return toast('Push-beskeder virker først, når Fotovagt er sat op med Supabase.');
+    const grund = pushKanBruges(); if (grund) return toast(grund, 'fejl');
+    if (await pushTekst()) { if (confirm('Slå push fra på denne computer?')) await prøv(afmeldPush, 'Push er slået fra.'); }
+    else await prøv(async () => { await abonnérPush(); await store.testPush().catch(() => {}); }, 'Push er slået til. Der kommer en prøve.');
+    pushTekst();
+  };
+  const sosLink = new URLSearchParams(location.search).get('sos');
+  if (sosLink) { history.replaceState(null, '', location.pathname); setTimeout(() => visSos(sosLink), 300); }
+  navigator.serviceWorker?.addEventListener('message', e => {
+    const id = e.data?.åbn && new URL(e.data.åbn, location.href).searchParams.get('sos'); if (id) visSos(id);
   });
 
   $('#btn-ny').onclick = () => åbnRet();

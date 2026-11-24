@@ -231,7 +231,7 @@ body.kontor #app { display: flex; flex-direction: column; height: 100vh; }
 }
 @media (max-width: 900px) {
   body.kontor #app { height: auto; min-height: 100vh; }
-  .top { flex-wrap: wrap; }
+  body.kontor .top { flex-wrap: wrap; }
   .nøgletal { order: 3; width: 100%; margin: 0; }
   .nøgletal .tal { flex: 1; min-width: 0; }
   .nøgletal .tal:last-child { display: block; }
@@ -252,3 +252,45 @@ body.kontor #app { display: flex; flex-direction: column; height: 100vh; }
 .push-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; background: color-mix(in srgb, var(--accent) 12%, var(--flade)); border-bottom: 1px solid var(--kant); font-size: .9rem; }
 .push-banner span { flex: 1 1 180px; }
 .push-banner button { min-height: 38px; padding: 6px 14px; }
+
+/* ---------------- SOS ---------------- */
+.sos-knap { background: #d4001a; color: #fff; border-radius: 99px; min-height: 40px; padding: 6px 14px; font-weight: 900; letter-spacing: .06em; margin-left: auto; box-shadow: 0 0 0 3px rgba(212,0,26,.35); }
+.sos-knap + .mig-knap { margin-left: 0; }
+.sos-knap.aktiv { animation: sos-blink 1s steps(2, start) infinite; }
+@keyframes sos-blink { to { background: #fff; color: #d4001a; } }
+#sos-omraade:empty { display: none; }
+#sos-omraade { padding: 10px 12px; display: grid; gap: 10px; background: #2b0005; }
+.sos-kontor { padding: 12px; }
+.sos-boks, .sos-mig { background: #d4001a; color: #fff; border-radius: 14px; padding: 14px 16px; box-shadow: 0 6px 24px rgba(212,0,26,.45); border: 3px solid #ff5a6e; }
+.sos-boks { animation: sos-puls 1.4s ease-in-out infinite; }
+@keyframes sos-puls { 50% { box-shadow: 0 0 0 8px rgba(212,0,26,.25), 0 6px 24px rgba(212,0,26,.45); } }
+@media (prefers-reduced-motion: reduce) { .sos-boks, .sos-knap.aktiv { animation: none; } }
+.sos-top { display: flex; gap: 12px; align-items: center; font-size: 1.1rem; }
+.sos-ikon { font-size: 2rem; }
+.sos-navn { font-size: 1.3rem; }
+.sos-tid { display: block; font-size: .85rem; opacity: .9; }
+.sos-info { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0; font-size: .95rem; }
+.sos-info dt { font-weight: 700; opacity: .85; }
+.sos-info dd { margin: 0; }
+.sos-info a, .sos-112 a { color: #fff; font-weight: 800; }
+.sos-knapper { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.sos-knapper .knap, .sos-knapper button { background: rgba(255,255,255,.16); color: #fff; border: 2px solid rgba(255,255,255,.7); }
+.sos-knapper .hvid, button.hvid, .knap.hvid { background: #fff; color: #b00016; border-color: #fff; }
+.sos-112 { margin: 8px 0 0; font-size: .85rem; opacity: .95; }
+.sos-mig p { margin: 6px 0; }
+.sos-maerke { background: #d4001a; color: #fff; font-size: .7rem; font-weight: 900; padding: 1px 6px; border-radius: 6px; }
+.sos-pin { width: 54px; height: 54px; border-radius: 50%; background: #d4001a; color: #fff; font-weight: 900; display: grid; place-items: center; border: 4px solid #fff; box-shadow: 0 0 0 0 rgba(212,0,26,.7); animation: sos-ring 1.2s ease-out infinite; }
+@keyframes sos-ring { to { box-shadow: 0 0 0 24px rgba(212,0,26,0); } }
+dialog.sos-dialog { border: 0; padding: 0; width: 100%; max-width: 100%; height: 100%; max-height: 100%; background: #d4001a; color: #fff; }
+dialog.sos-dialog::backdrop { background: #d4001a; }
+.sos-dialog-indhold { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 14px; }
+.sos-stor { font-size: 4rem; margin: 0; }
+.sos-dialog h2 { font-size: 1.6rem; }
+#sos-tal { font-size: 2.4rem; }
+.sos-dialog .stor-knap { width: min(360px, 100%); min-height: 64px; font-size: 1.3rem; flex: none; }
+.sos-dialog .fortryd { background: transparent; color: #fff; border: 2px solid #fff; width: min(360px, 100%); min-height: 56px; }
+
+/* Marken: topbjælken holdes på én linje */
+body.marken .top { flex-wrap: nowrap; gap: 8px; }
+body.marken .mig-knap span:first-child { max-width: 22vw; }
+@media (max-width: 380px) { body.marken .demo-chip { display: none; } }

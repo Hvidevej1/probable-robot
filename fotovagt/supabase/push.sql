@@ -71,3 +71,24 @@ end $$;
 drop trigger if exists push_kald on haendelser;
 create trigger push_kald after insert or update of status, taget_af, tekst on haendelser
   for each row execute function push_kald();
+
+-- SOS: ny alarm -> kontoret + fotografer inden for 20 km; "Set" -> besked til den, der trykkede SOS
+create or replace function sos_push() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare slags text;
+begin
+  if tg_op = 'INSERT' then slags := 'sos';
+  elsif old.kvitteret_af is null and new.kvitteret_af is not null then slags := 'sos_set';
+  end if;
+  if slags is not null then
+    perform net.http_post(
+      url := 'https://RET_MIG_PROJEKT.supabase.co/functions/v1/push',
+      body := jsonb_build_object('sos', new.id, 'slags', slags),
+      headers := jsonb_build_object('Content-Type', 'application/json')
+    );
+  end if;
+  return new;
+end $$;
+drop trigger if exists sos_push on sos;
+create trigger sos_push after insert or update of kvitteret_af on sos for each row execute function sos_push();
+revoke execute on function sos_push() from public, anon, authenticated;

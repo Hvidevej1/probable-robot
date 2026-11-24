@@ -41,8 +41,11 @@
     <header class="top">
       <div class="brand"><span class="logo-prik"></span>Fotovagt</div>
       <span id="demo-mærke" class="demo-chip" hidden>DEMO</span>
+      <button id="btn-sos" class="sos-knap" aria-label="SOS – tilkald hjælp">SOS</button>
       <button id="btn-mig" class="mig-knap" aria-label="Min profil"><span id="mig-navn"></span><span id="mig-status" class="chip"></span></button>
     </header>
+
+    <section id="sos-omraade" aria-live="assertive"></section>
 
     <nav class="status-knapper" aria-label="Meld status">
       <button data-status="ledig">Ledig</button>
@@ -91,6 +94,18 @@
       <button type="button" id="btn-logud" class="link fare">Log ud</button>
       <p class="hint">Fotovagt viser kun det, kontoret og jeres Pushover-alarmer lægger ind. Din position deles kun, når du har slået det til.</p>
     </form>
+  </dialog>
+
+  <!-- SOS: nedtælling, så alarmen ikke sendes ved et uheld -->
+  <dialog id="dlg-sos" class="sos-dialog">
+    <div class="sos-dialog-indhold">
+      <p class="sos-stor">🆘</p>
+      <h2>Sender SOS om <span id="sos-tal">5</span> sekunder</h2>
+      <p>Kontoret og fotografer inden for 20 km får besked med din placering.</p>
+      <button id="btn-sos-nu" class="hvid stor-knap">Send nu</button>
+      <button id="btn-sos-fortryd" class="fortryd">Fortryd</button>
+      <p class="sos-112">Er der fare for liv: <a href="tel:112">ring 112</a>.</p>
+    </div>
   </dialog>
 
   <!-- Afslut opgave -->

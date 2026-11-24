@@ -8,7 +8,10 @@ self.addEventListener('push', e => {
   try { b = { ...b, ...e.data.json() }; } catch { /* brug standardtekst */ }
   e.waitUntil(self.registration.showNotification(b.title, {
     body: b.body, icon: 'icon-192.png', badge: 'icon-192.png', tag: b.tag, renotify: true,
-    vibrate: [200, 100, 200], data: { url: b.url },
+    // SOS bliver stående, til man trykker, og vibrerer længe
+    requireInteraction: !!b.sos,
+    vibrate: b.sos ? [600, 200, 600, 200, 600, 200, 600] : [200, 100, 200],
+    data: { url: b.url },
   }));
 });
 
@@ -17,9 +20,10 @@ self.addEventListener('notificationclick', e => {
   const url = new URL(e.notification.data?.url || './', self.registration.scope).href;
   e.waitUntil((async () => {
     const vinduer = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const v of vinduer) {
-      if ('focus' in v) { v.postMessage({ åbn: url }); return v.focus(); }
-    }
+    // Brug et åbent vindue på samme side (kontor.html eller marken), ellers åbn et nyt
+    const side = new URL(url).pathname;
+    const v = vinduer.find(w => new URL(w.url).pathname === side) || (side.endsWith('/') ? vinduer.find(w => !w.url.includes('kontor')) : null);
+    if (v && 'focus' in v) { v.postMessage({ åbn: url }); return v.focus(); }
     return self.clients.openWindow(url);
   })());
 });

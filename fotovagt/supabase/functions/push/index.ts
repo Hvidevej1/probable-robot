@@ -4,10 +4,13 @@
 //   ny          -> fotografer, der står som "Ledig"
 //   tildelt     -> den fotograf, kontoret har givet opgaven
 //   opdatering  -> den fotograf, der har opgaven, når der er kommet ny tekst fra en anden kilde
+// Med { sos, slags } (se push.sql):
+//   sos         -> alle på kontoret + fotografer inden for 20 km (navn, telefon og afstand i beskeden)
+//   sos_set     -> den der trykkede SOS: "Din SOS er set af …"
 // Med { test: true } og brugerens login sendes en prøve til brugerens egne telefoner.
 //
-// Hemmeligheder (Edge Functions -> Secrets): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
-// og gerne FOTOVAGT_URL (appens adresse, fx https://vagt.hrc-fotos.dk).
+// Nøglesættet til push (VAPID) laver funktionen selv første gang og gemmer i tabellen intern.
+// Telefonerne henter den offentlige del med push_noegle(). Sæt gerne FOTOVAGT_URL (appens adresse).
 // "Verify JWT" skal være slået FRA for denne funktion.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.119.0";
@@ -21,20 +24,31 @@ const IKON: Record<string, string> = { Brand: "🔥", Trafik: "🚗", Politi: "�
 const seneste = (tekst: string | null) =>
   (String(tekst ?? "").split("\n").filter((l) => l.startsWith("— ")).pop() ?? "").slice(2).replace(/^kl\. \d\d[.:]\d\d [^:]+: /, "");
 
-type Besked = { title: string; body: string; tag: string; url: string };
+type Besked = { title: string; body: string; tag: string; url: string; sos?: boolean };
+const SOS_RADIUS_KM = 20;
+const km = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) =>
+  Math.hypot((a.lat - b.lat) * 111.2, (a.lon - b.lon) * 111.2 * Math.cos(a.lat * Math.PI / 180));
+
+// Nøglesættet: fra databasen, eller laves og gemmes første gang
+async function nøgler() {
+  const { data } = await db.from("intern").select("vapid_public, vapid_private").eq("id", 1).single();
+  if (data?.vapid_public && data?.vapid_private) return { pub: data.vapid_public, priv: data.vapid_private };
+  const k = webpush.generateVAPIDKeys();
+  await db.from("intern").update({ vapid_public: k.publicKey, vapid_private: k.privateKey }).eq("id", 1).is("vapid_public", null);
+  const { data: igen } = await db.from("intern").select("vapid_public, vapid_private").eq("id", 1).single();
+  return { pub: igen!.vapid_public, priv: igen!.vapid_private };
+}
 
 async function send(brugere: string[], besked: Besked) {
   if (!brugere.length) return 0;
-  webpush.setVapidDetails(
-    Deno.env.get("FOTOVAGT_URL") || "mailto:fotovagt@example.com",
-    Deno.env.get("VAPID_PUBLIC_KEY")!,
-    Deno.env.get("VAPID_PRIVATE_KEY")!,
-  );
+  const { pub, priv } = await nøgler();
+  webpush.setVapidDetails(Deno.env.get("FOTOVAGT_URL") || "mailto:fotovagt@example.com", pub, priv);
   const { data: subs } = await db.from("push_subscriptions").select("*").in("user_id", brugere);
   let sendt = 0;
   for (const s of subs ?? []) {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(besked), { TTL: 600, urgency: "high" });
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(besked),
+        { TTL: besked.sos ? 3600 : 600, urgency: "high" });
       sendt++;
     } catch (e) {
       const kode = (e as { statusCode?: number }).statusCode;
@@ -77,6 +91,44 @@ async function håndtér(id: string, slags: string) {
   return { sendt: 0, grund: "ukendt slags" };
 }
 
+// SOS fra en fotograf
+async function sos(id: string, slags: string) {
+  const { data: s } = await db.from("sos").select("*").eq("id", id).single();
+  if (!s) return { sendt: 0, grund: "ukendt SOS" };
+  const { data: afs } = await db.from("profiles").select("navn, telefon").eq("id", s.bruger).single();
+  const navn = afs?.navn || "En fotograf";
+  const tlf = afs?.telefon ? ` · tlf. ${afs.telefon}` : "";
+
+  if (slags === "sos") {
+    if (s.push_sendt || !s.aktiv || Date.now() - new Date(s.start).getTime() > NYLIG) return { sendt: 0 };
+    await db.from("sos").update({ push_sendt: true }).eq("id", id);
+    const { data: alle } = await db.from("profiles").select("id, rolle, lat, lon, status").neq("id", s.bruger);
+    let sendt = 0;
+    for (const p of alle ?? []) {
+      let afstand: number | null = null;
+      if (p.rolle === "foto") {
+        if (s.lat != null) {
+          if (p.lat == null) continue;                     // vi ved ikke, hvor fotografen er
+          afstand = km(s, p);
+          if (afstand > SOS_RADIUS_KM) continue;
+        } else if (p.status === "offline") continue;        // SOS uden placering: alle aktive fotografer
+      }
+      const hvor = s.lat == null ? "Placering ukendt – ring til fotografen"
+        : afstand != null ? `${afstand < 1 ? "under 1" : Math.round(afstand)} km fra dig` : "Tryk for at se placeringen";
+      sendt += await send([p.id], {
+        title: `🆘 SOS fra ${navn}`, body: `${hvor}${tlf}`, tag: `sos-${id}`, sos: true,
+        url: p.rolle === "kontor" ? `./kontor.html?sos=${id}` : `./?sos=${id}`,
+      });
+    }
+    return { sendt };
+  }
+  if (slags === "sos_set" && s.kvitteret_af) {
+    const { data: k } = await db.from("profiles").select("navn").eq("id", s.kvitteret_af).single();
+    return { sendt: await send([s.bruger], { title: "✅ Din SOS er set", body: `${k?.navn ?? "Kontoret"} har set din alarm.`, tag: `sos-${id}-set`, url: "./" }) };
+  }
+  return { sendt: 0 };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const body = await req.json().catch(() => ({}));
@@ -88,6 +140,8 @@ Deno.serve(async (req) => {
       const sendt = await send([data.user.id], { title: "Fotovagt", body: "Push-beskeder virker på denne telefon. 👍", tag: "test", url: "./" });
       return json({ ok: true, sendt });
     }
+    if (body.init) { await nøgler(); return json({ ok: true }); }   // laver nøglesættet, hvis det mangler
+    if (body.sos && body.slags) return json({ ok: true, ...(await sos(String(body.sos), String(body.slags))) });
     if (!body.id || !body.slags) return json({ ok: false }, 400);
     return json({ ok: true, ...(await håndtér(String(body.id), String(body.slags))) });
   } catch (e) {
