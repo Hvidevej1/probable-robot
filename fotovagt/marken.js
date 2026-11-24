@@ -68,7 +68,7 @@ function kort_(h) {
         <h3>${esc(h.titel)}</h3>
         <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
         <p class="lille">${siden(h.oprettet)} siden${d != null ? ` · ${kmTekst(d)}` : ''} ·
-          <span class="h-status">${h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
+          <span class="h-status">${h.auto_lukket && !aktiv(h) ? 'Lukket automatisk (ingen opdateringer)' : h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
       </div>
       ${tagbar ? `<button class="tag-knap" data-tag="${h.id}">Tag</button>` : ''}
     </article>`;

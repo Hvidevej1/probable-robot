@@ -497,3 +497,5 @@ body.marken .skift { flex: none; }
   body.marken .top:has(#skift:not([hidden])) .demo-chip { display: none; }
   body.kontor .top-knapper button { padding: 7px 9px; font-size: .84rem; }
 }
+
+.auto-lukket { background: #fff6e0; color: #6b4a00; border-radius: 8px; padding: 6px 9px; margin-top: 6px; }

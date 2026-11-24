@@ -139,6 +139,7 @@ Fotograferne kan se hinanden:
 - `supabase/functions/push/`: Edge Function, der sender push-beskeder
 - `supabase/tilbud.sql`: automatiske tilbud til nærmeste fotograf
 - `supabase/redning-kategori.sql`: redningskoder fra beredskabet (fx "Redn.-Silo/Brønd") får redningsikonet
+- `supabase/luk-gamle.sql`: hændelser uden opdateringer fra kontor, fotograf eller Pushover i 1,5 time lukkes automatisk (kan genåbnes af kontoret; tiden står i `indstillinger.luk_efter_min`)
 - `supabase/pushover-cron.sql`: henter Pushover hvert 15. sekund og sætter gamle fotografer offline
 - `supabase/functions/pushover/`: Edge Function og beskedparser
 - `vendor/`: Leaflet 1.9.4 (kort) og supabase-js 2.119.0

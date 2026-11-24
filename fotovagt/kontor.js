@@ -110,10 +110,11 @@ function haendelseKort(h) {
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}</p>
-        ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)} · taget kl. ${klokken(h.taget_tid)}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
+        ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)}${h.taget_tid ? ` · taget kl. ${klokken(h.taget_tid)}` : ''}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
         ${tilbudLinjer(h)}
         ${senesteOpdatering(h) ? `<p class="opdatering"><span>🔄 ${esc(senesteOpdatering(h))}</span></p>` : ''}
         ${h.note ? `<p class="lille note">Note: ${esc(h.note)}</p>` : ''}
+        ${h.auto_lukket && !aktiv(h) ? `<p class="lille auto-lukket">⏱ Lukket automatisk kl. ${klokken(h.afsluttet_tid)} – ingen opdateringer i ${String((S().indst?.luk_efter_min || 90) / 60).replace('.', ',')} time. Tryk <b>Genåbn</b> for at åbne den igen.</p>` : ''}
         <div class="h-knapper">
           ${aktiv(h) ? `<button data-tildel="${h.id}">${h.taget_af ? 'Skift fotograf' : 'Tildel'}</button>
             <button class="secondary" data-luk="${h.id}" data-s="afsluttet">Afslut</button>
