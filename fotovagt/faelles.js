@@ -300,3 +300,160 @@ setInterval(() => document.querySelectorAll('[data-udloeber]').forEach(el => { e
 if (/[?&]demo\b/.test(location.search)) {
   document.querySelectorAll('a[href="index.html"], a[href="kontor.html"]').forEach(a => { a.href = a.getAttribute('href') + '?demo'; });
 }
+
+// ---------------------------------------------------------------------------------
+// Tidslinje på en hændelse: første melding, live opdateringer fra andre kilder (Pushover, politi,
+// nyheder) og kommentarer fra fotografer og kontoret – alt i tidsrækkefølge.
+export const kommentarerTil = id => (store.state.kommentarer || []).filter(k => k.haendelse_id === id);
+
+export function tidslinjePunkter(h, kommentarer = kommentarerTil(h.id)) {
+  const linjer = String(h.tekst || '').split('\n');
+  const start = new Date(h.oprettet);
+  const punkter = [];
+  const første = linjer.filter(l => !l.startsWith('— ')).join('\n').trim();
+  punkter.push({ type: 'melding', tid: start, kilde: h.app || h.kilde || '', tekst: første });
+  for (const l of linjer.filter(l => l.startsWith('— '))) {
+    const m = l.match(/^— kl\. (\d\d)[.:](\d\d) ([^:]+): ([\s\S]*)$/);
+    let tid = start;
+    if (m) {
+      tid = new Date(start); tid.setHours(+m[1], +m[2], 0, 0);
+      if (tid < start - 60e3) tid = new Date(tid.getTime() + 864e5);   // over midnat
+    }
+    punkter.push({ type: 'opdatering', tid, kilde: m ? m[3] : 'Opdatering', tekst: m ? m[4] : l.slice(2) });
+  }
+  for (const k of kommentarer) punkter.push({ type: 'kommentar', tid: new Date(k.oprettet), k });
+  return punkter.sort((a, b) => a.tid - b.tid);
+}
+
+// Seneste nye ting på hændelsen (til kortene i listerne)
+export function senesteNyt(h) {
+  const p = tidslinjePunkter(h).filter(x => x.type !== 'melding').pop();
+  if (!p) return null;
+  const navn = id => store.state.profiler.find(x => x.id === id)?.navn || 'Kontoret';
+  return p.type === 'kommentar'
+    ? { ikon: '💬', tekst: `${navn(p.k.bruger)}: ${p.k.tekst}`, tid: p.tid }
+    : { ikon: '🔄', tekst: `${p.kilde}: ${p.tekst}`, tid: p.tid };
+}
+
+export function tidslinjeHtml(h) {
+  const mig = store.state.mig || {};
+  const navn = id => store.state.profiler.find(x => x.id === id)?.navn || 'Ukendt';
+  const kl = d => d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+  const punkter = tidslinjePunkter(h);
+  return `
+    <section class="tidslinje-boks" aria-label="Tidslinje">
+      <h3 class="tl-titel">Tidslinje <small>${punkter.length - 1 ? `${punkter.length - 1} opdatering${punkter.length > 2 ? 'er' : ''}` : 'ingen opdateringer endnu'}</small></h3>
+      <ol class="tidslinje">${punkter.map(p => {
+        if (p.type === 'kommentar') {
+          const k = p.k, kanRette = k.bruger === mig.id || mig.rolle === 'kontor';
+          return `<li class="tl-punkt tl-kommentar${k.offentlig ? ' offentlig' : ''}">
+            <div class="tl-hoved"><b>💬 ${esc(navn(k.bruger))}</b><span class="tl-tid">${kl(p.tid)}</span>
+              <span class="tl-maerke">${k.offentlig ? '🌐 Døgnrapport' : '🔒 Intern'}</span></div>
+            <p>${esc(k.tekst).replace(/\n/g, '<br>')}</p>
+            ${kanRette ? `<div class="tl-knapper">
+              <button type="button" class="link" data-k-offentlig="${k.id}" data-v="${k.offentlig ? 0 : 1}">${k.offentlig ? 'Gør intern' : 'Vis på døgnrapporten'}</button>
+              <button type="button" class="link fare" data-k-slet="${k.id}">Slet</button></div>` : ''}
+          </li>`;
+        }
+        return `<li class="tl-punkt tl-${p.type}">
+          <div class="tl-hoved"><b>${p.type === 'melding' ? '📟 Første melding' : '🔄 ' + esc(p.kilde)}</b><span class="tl-tid">${kl(p.tid)}</span>
+            ${p.type === 'melding' && p.kilde ? `<span class="tl-kilde">${esc(p.kilde)}</span>` : ''}</div>
+          ${p.tekst ? `<p>${esc(p.tekst).replace(/\n/g, '<br>')}</p>` : ''}
+        </li>`;
+      }).join('')}</ol>
+      <form class="kommentar-form" data-kommentar="${h.id}">
+        <label class="skjult-label" for="k-${h.id}">Kommentar</label>
+        <textarea id="k-${h.id}" name="tekst" rows="2" maxlength="2000" placeholder="Skriv en kommentar til kontoret og kollegerne …"></textarea>
+        <div class="kommentar-bund">
+          <label class="check"><input type="checkbox" name="offentlig"> Vis på døgnrapporten <small>(offentlig, uden navn)</small></label>
+          <button type="submit">Send</button>
+        </div>
+      </form>
+    </section>`;
+}
+
+// Gentegn et område uden at miste det, man er ved at skrive i kommentarfeltet
+export function gentegnMedFormular(el, html) {
+  const f = el.querySelector('form.kommentar-form');
+  const gemt = f ? { tekst: f.tekst.value, off: f.offentlig.checked, fokus: document.activeElement === f.tekst, pos: f.tekst.selectionStart } : null;
+  const top = el.scrollTop;
+  el.innerHTML = html;
+  el.scrollTop = top;
+  const ny = el.querySelector('form.kommentar-form');
+  if (gemt && ny) {
+    ny.tekst.value = gemt.tekst; ny.offentlig.checked = gemt.off;
+    if (gemt.fokus) { ny.tekst.focus(); try { ny.tekst.setSelectionRange(gemt.pos, gemt.pos); } catch { /* ok */ } }
+  }
+}
+
+// Send, gør offentlig/intern og slet – virker i alle tidslinjer inde i el
+export function kommentarHandlinger(el) {
+  el.addEventListener('submit', async e => {
+    const f = e.target.closest('form.kommentar-form'); if (!f) return;
+    e.preventDefault();
+    const tekst = f.tekst.value.trim();
+    if (!tekst) return toast('Skriv en kommentar først.', 'fejl');
+    const off = f.offentlig.checked;
+    const knap = f.querySelector('button[type=submit]'); knap.disabled = true;
+    const ok = await prøv(() => store.kommenter(f.dataset.kommentar, tekst, off), off ? 'Sendt – vises også på døgnrapporten.' : 'Kommentaren er sendt.');
+    knap.disabled = false;
+    if (ok) { const g = el.querySelector(`form.kommentar-form[data-kommentar="${f.dataset.kommentar}"]`); if (g) { g.tekst.value = ''; g.offentlig.checked = false; } }
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && e.target.closest('form.kommentar-form')) e.target.closest('form').requestSubmit();
+  });
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('[data-k-offentlig],[data-k-slet]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    if (b.dataset.kSlet) { if (confirm('Slet kommentaren?')) await prøv(() => store.sletKommentar(b.dataset.kSlet), 'Kommentaren er slettet.'); return; }
+    const off = b.dataset.v === '1';
+    await prøv(() => store.retKommentar(b.dataset.kOffentlig, off), off ? 'Vises nu på døgnrapporten.' : 'Kommentaren er nu intern.');
+  }, true);
+}
+
+// Sådan står stedet på døgnrapporten: aldrig vej og husnummer
+export function offentligSted(h) {
+  if (h.omraade) return h.omraade;
+  const dele = String(h.adresse || '').split(',').map(x => x.trim()).filter(Boolean)
+    .filter(d => (/^\d{4}\s/.test(d) || !/\d/.test(d)) && (/motorvej/i.test(d) || !/(vej|gade|allé|alle|stræde|torv|plads|boulevard|vænget|parken|stien|vangen|have|bakken|toften)$/i.test(d)));
+  return dele.join(', ');
+}
+
+// Skift adgangskode (samme dialog i Marken og på Kontoret)
+export function åbnSkiftKode() {
+  let dlg = $('#dlg-kode');
+  if (!dlg) {
+    dlg = document.createElement('dialog'); dlg.id = 'dlg-kode'; dlg.className = 'ark';
+    dlg.innerHTML = `
+      <form method="dialog" class="ark-indhold" id="form-kode">
+        <h2>Skift adgangskode</h2>
+        <input type="text" name="brugernavn" autocomplete="username" hidden>
+        <label>Ny adgangskode <input name="ny" type="password" autocomplete="new-password" minlength="8" required></label>
+        <label>Gentag ny adgangskode <input name="igen" type="password" autocomplete="new-password" minlength="8" required></label>
+        <p class="hint">Mindst 8 tegn. Du forbliver logget ind på denne enhed.</p>
+        <p class="fejl-tekst" id="kode-fejl" role="alert"></p>
+        <div class="knap-række">
+          <button value="gem" type="submit">Skift adgangskode</button>
+          <button value="luk" type="button" class="secondary" data-luk-kode>Annullér</button>
+        </div>
+      </form>`;
+    document.body.append(dlg);
+    dlg.addEventListener('click', e => { if (e.target === dlg || e.target.closest('[data-luk-kode]')) dlg.close(); });
+    dlg.querySelector('form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target, fejl = $('#kode-fejl');
+      fejl.textContent = '';
+      if (f.ny.value.length < 8) { fejl.textContent = 'Adgangskoden skal være mindst 8 tegn.'; return; }
+      if (f.ny.value !== f.igen.value) { fejl.textContent = 'De to adgangskoder er ikke ens.'; return; }
+      const knap = f.querySelector('button[type=submit]'); knap.disabled = true;
+      try { await store.skiftKode(f.ny.value); dlg.close(); toast('Din adgangskode er skiftet.', 'ok'); }
+      catch (err) { fejl.textContent = store.fejlTekst(err); }
+      finally { knap.disabled = false; }
+    });
+  }
+  const f = dlg.querySelector('form'); f.reset(); $('#kode-fejl').textContent = '';
+  f.brugernavn.value = store.state.mig?.navn || '';
+  for (const d of document.querySelectorAll('dialog[open]')) if (d !== dlg) d.close();
+  dlg.showModal();
+  setTimeout(() => f.ny.focus(), 50);
+}

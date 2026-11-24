@@ -139,6 +139,7 @@ Fotograferne kan se hinanden:
 - `supabase/functions/push/`: Edge Function, der sender push-beskeder
 - `supabase/tilbud.sql`: automatiske tilbud til nærmeste fotograf
 - `supabase/redning-kategori.sql`: redningskoder fra beredskabet (fx "Redn.-Silo/Brønd") får redningsikonet
+- `supabase/kommentarer-doegnrapport.sql`: kommentarer på hændelser (interne eller til døgnrapporten), område (by/postnummer) og den offentlige døgnrapport (`doegnrapport()`)
 - `supabase/luk-gamle.sql`: hændelser uden opdateringer fra kontor, fotograf eller Pushover i 1,5 time lukkes automatisk (kan genåbnes af kontoret; tiden står i `indstillinger.luk_efter_min`)
 - `supabase/pushover-cron.sql`: henter Pushover hvert 15. sekund og sætter gamle fotografer offline
 - `supabase/functions/pushover/`: Edge Function og beskedparser
@@ -146,3 +147,19 @@ Fotograferne kan se hinanden:
 - `logo.svg`, `hrc-fotos-logo.png`, `icon-*.png`, `favicon.png`, `apple-touch-icon.png`: HRC-Fotos-logoet fra hrc-fotos.dk-temaet. Logoets fire farver (grøn, rød, gul, blå) er også statusfarverne Ledig, Optaget, Pause og Ankommet
 
 © HRC-Fotos.dk
+
+## Kommentarer og tidslinje
+Hver hændelse har en tidslinje med den første melding, live opdateringer fra Pushover (politi, nyheder, 112) og kommentarer fra fotografer og kontoret. En kommentar er **intern** som standard. Sæt flueben i "Vis på døgnrapporten", hvis den må ses offentligt (uden navn). Den, der skrev kommentaren, og kontoret kan skifte mellem intern og offentlig eller slette den. Fotografen på opgaven får push, når en anden skriver en kommentar.
+
+## Døgnrapport (hrc-fotos.dk)
+`doegn.html` viser døgnets hændelser på kort og i en liste og henter nyt hvert minut. Den kan vises alene (https://vagt.hrc-fotos.dk/doegn.html) eller indlejres på hjemmesiden:
+
+```html
+<iframe id="hrc-doegn" src="https://vagt.hrc-fotos.dk/doegn.html?indlejret" title="Døgnrapport – HRC-Fotos" style="width:100%;border:0;min-height:900px"></iframe>
+<script>addEventListener('message',function(e){if(e.origin==='https://vagt.hrc-fotos.dk'&&e.data&&e.data.hrcDoegnrapport)document.getElementById('hrc-doegn').style.height=e.data.hoejde+'px'})</script>
+```
+
+Rapporten viser kun kategori (eller kontorets egen overskrift), by/område og postnummer, aldrig vej og husnummer, plus en placering afrundet til ca. 1 km og de offentlige kommentarer. Kontoret kan skjule en hændelse fra rapporten under **Ret**. Annullerede hændelser vises ikke.
+
+## Skift adgangskode
+Fotografer: **Min profil → Skift adgangskode**. Kontoret: knappen **🔑 Kode** øverst.

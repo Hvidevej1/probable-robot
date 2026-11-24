@@ -11,11 +11,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script type="module" src="kontor.js?v=3"></script>
+  <script type="module" src="kontor.js?v=4"></script>
 </head>
 <body class="kontor">
   <section id="login" class="login" hidden>
@@ -50,6 +50,7 @@
         <button id="btn-auto" class="secondary" title="Automatiske tilbud til nærmeste fotograf">📩 Auto</button>
         <button id="btn-push" class="secondary" title="Få SOS-alarmer som push på denne computer">🔔 Push</button>
         <button id="btn-pushover" class="secondary"><span id="po-prik" class="prik"></span>Pushover</button>
+        <button id="btn-kode" class="secondary" title="Skift din adgangskode">🔑 Kode</button>
         <button id="btn-logud" class="secondary">Log ud</button>
       </div>
     </header>
@@ -114,12 +115,22 @@
       <p class="hint" id="ret-pos-hint">Tryk "Find", eller klik på kortet for at sætte nålen. Nålen kan trækkes.</p>
       <div id="ret-kort" class="mini-kort"></div>
       <input type="hidden" name="lat"><input type="hidden" name="lon">
+      <fieldset class="doegn-felt">
+        <legend>Døgnrapport på hrc-fotos.dk</legend>
+        <label class="check"><input type="checkbox" name="offentlig" checked> Vis hændelsen på døgnrapporten</label>
+        <label>Overskrift på døgnrapporten <small>(valgfri – ellers kategorien, fx "Brand")</small>
+          <input name="offentlig_titel" maxlength="80" placeholder="Fx Brand i villa"></label>
+        <p class="hint">Stedet vises uden vej og husnummer: <b id="ret-offentlig-sted"></b></p>
+      </fieldset>
       <div class="knap-række">
         <button value="gem" type="submit">Gem</button>
         <button value="luk" type="submit" class="secondary" formnovalidate>Annullér</button>
       </div>
     </form>
   </dialog>
+
+  <!-- Tidslinje og kommentarer -->
+  <dialog id="dlg-tidslinje" class="ark"><div class="ark-indhold"></div></dialog>
 
   <!-- Tildel -->
   <dialog id="dlg-tildel" class="ark"><div class="ark-indhold"></div></dialog>

@@ -15,11 +15,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script type="module" src="marken.js?v=3"></script>
+  <script type="module" src="marken.js?v=4"></script>
 </head>
 <body class="marken">
   <section id="login" class="login" hidden>
@@ -100,6 +100,7 @@
         <button value="gem" type="submit">Gem</button>
         <button value="luk" type="submit" class="secondary" formnovalidate>Luk</button>
       </div>
+      <button type="button" id="btn-kode" class="secondary">🔑 Skift adgangskode</button>
       <button type="button" id="btn-logud" class="link fare">Log ud</button>
       <p class="hint">Fotovagt viser kun det, kontoret og jeres Pushover-alarmer lægger ind. Din position deles kun, når du har slået det til (og mens en SOS er aktiv).</p>
       <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a></p>

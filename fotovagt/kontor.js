@@ -5,6 +5,7 @@ import {
   STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, set,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm, nedtælling,
+  tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
 } from './faelles.js';
 
 let sLag;
@@ -112,7 +113,8 @@ function haendelseKort(h) {
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}</p>
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)}${h.taget_tid ? ` · taget kl. ${klokken(h.taget_tid)}` : ''}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
         ${tilbudLinjer(h)}
-        ${senesteOpdatering(h) ? `<p class="opdatering"><span>🔄 ${esc(senesteOpdatering(h))}</span></p>` : ''}
+        ${(n => n ? `<p class="opdatering"><span>${n.ikon} ${esc(n.tekst)}</span></p>` : '')(senesteNyt(h))}
+        <p class="lille doegn-linje">${h.offentlig === false ? '🚫 Ikke på døgnrapporten' : `🌐 Døgnrapport: <b>${esc(h.offentlig_titel || (h.kategori === 'Andet' || !h.kategori ? 'Hændelse' : h.kategori))}</b>${offentligSted(h) ? ` · ${esc(offentligSted(h))}` : ''}`}</p>
         ${h.note ? `<p class="lille note">Note: ${esc(h.note)}</p>` : ''}
         ${h.auto_lukket && !aktiv(h) ? `<p class="lille auto-lukket">⏱ Lukket automatisk kl. ${klokken(h.afsluttet_tid)} – ingen opdateringer i ${String((S().indst?.luk_efter_min || 90) / 60).replace('.', ',')} time. Tryk <b>Genåbn</b> for at åbne den igen.</p>` : ''}
         <div class="h-knapper">
@@ -121,6 +123,7 @@ function haendelseKort(h) {
             <button class="secondary" data-luk="${h.id}" data-s="annulleret">Annullér</button>`
             : `<button class="secondary" data-luk="${h.id}" data-s="ny">Genåbn</button>`}
           <button class="secondary" data-ret="${h.id}">Ret</button>
+          <button class="secondary" data-kommentarer="${h.id}">💬${kommentarerTil(h.id).length ? ` ${kommentarerTil(h.id).length}` : ' Kommentér'}</button>
         </div>
       </div>
     </article>`;
@@ -168,6 +171,27 @@ function vælg(id, zoom = true) {
 }
 
 // ---------------------------------------------------------------------------------
+// Tidslinje og kommentarer
+let tidslinjeId = null;
+function tegnTidslinje() {
+  const dlg = $('#dlg-tidslinje'), h = H(tidslinjeId);
+  if (!h || !dlg.open) return;
+  gentegnMedFormular(dlg.querySelector('.ark-indhold'), `
+    <div class="ark-top"><span class="kat stor">${KATEGORI_IKON[h.kategori] || '📍'}</span><button class="luk" data-luk-tl aria-label="Luk">✕</button></div>
+    <h2>${esc(h.titel)}</h2>
+    <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${h.cirka ? ' (ca.)' : ''}</p>
+    <p class="lille">Modtaget kl. ${klokken(h.oprettet)} · ${H_STATUS[h.status]}${h.taget_af ? ` · ${esc(navn(h.taget_af))}` : ''}</p>
+    ${tidslinjeHtml(h)}`);
+}
+function åbnTidslinje(id) {
+  tidslinjeId = id;
+  const dlg = $('#dlg-tidslinje');
+  if (!dlg.open) dlg.showModal();
+  tegnTidslinje();
+  setTimeout(() => dlg.querySelector('form.kommentar-form textarea')?.focus(), 60);
+}
+
+// ---------------------------------------------------------------------------------
 // Tildel
 function åbnTildel(id) {
   const h = H(id), dlg = $('#dlg-tildel');
@@ -207,6 +231,9 @@ function åbnRet(id = null) {
   $('#indsaet-besked').hidden = !!h;
   for (const k of ['titel', 'tekst', 'adresse', 'url', 'lat', 'lon']) f[k].value = h?.[k] ?? '';
   f.kategori.value = h?.kategori || 'Andet';
+  f.offentlig.checked = h ? h.offentlig !== false : true;
+  f.offentlig_titel.value = h?.offentlig_titel || '';
+  $('#ret-offentlig-sted').textContent = h ? (offentligSted(h) || 'ingen by kendt endnu') : 'by og postnummer findes ud fra adressen';
   dlg.showModal();
   if (!retKort) {
     retKort = lavKort($('#ret-kort'));
@@ -223,6 +250,7 @@ function åbnRet(id = null) {
       titel: f.titel.value.trim(), tekst: f.tekst.value.trim() || null, adresse: f.adresse.value.trim() || null,
       kategori: f.kategori.value, url: f.url.value.trim() || null,
       lat: f.lat.value ? +f.lat.value : null, lon: f.lon.value ? +f.lon.value : null,
+      offentlig: f.offentlig.checked, offentlig_titel: f.offentlig_titel.value.trim() || null,
     };
     if (felter.lat != null && (!h || felter.lat !== h.lat || felter.lon !== h.lon || felter.adresse !== h.adresse)) felter.cirka = false;
     if (h) await prøv(() => store.ret(h.id, felter), 'Hændelsen er rettet.');
@@ -404,13 +432,18 @@ async function start() {
   store.lyt(s => {
     tegn();
     if (s.nyHaendelse) { bip(); toast(`Ny hændelse: ${s.nyHaendelse.titel}`, 'ny'); }
+    if (s.nyKommentar) {
+      const k = s.nyKommentar, h = H(k.haendelse_id);
+      toast(`💬 ${navn(k.bruger)}${h ? ` på "${h.titel}"` : ''}: ${k.tekst.slice(0, 100)}`, 'ny');
+    }
+    tegnTidslinje();
   });
   tegn();
   hentPoStatus();
 
   // Klik overalt på siden (lister, kort-popups)
   document.body.addEventListener('click', e => {
-    const t = e.target.closest('[data-giv],[data-tildel],[data-luk],[data-ret],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
+    const t = e.target.closest('[data-giv],[data-tildel],[data-luk],[data-ret],[data-kommentarer],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
     if (!t || t.closest('dialog')) return;
     const d = t.dataset;
     if (d.tildel) return åbnTildel(d.tildel);
@@ -424,6 +457,7 @@ async function start() {
       return;
     }
     if (d.ret) return åbnRet(d.ret);
+    if (d.kommentarer) return åbnTidslinje(d.kommentarer);
     if (d.zoom) return vælg(d.zoom);
     if (d.retFoto) return åbnFoto(d.retFoto);
     if (d.findFoto) { const p = P(d.findFoto); kort.setView([p.lat, p.lon], 14); fLag.get(p.id)?.openPopup(); return; }
@@ -474,6 +508,10 @@ async function start() {
   $('#btn-laes').onclick = læsBesked;
   $('#btn-pushover').onclick = åbnPushover;
   $('#btn-logud').onclick = async () => { await store.logout(); location.reload(); };
+  $('#btn-kode').onclick = () => åbnSkiftKode();
+  const dlgTl = $('#dlg-tidslinje');
+  kommentarHandlinger(dlgTl);
+  dlgTl.addEventListener('click', e => { if (e.target === dlgTl || e.target.closest('[data-luk-tl]')) dlgTl.close(); });
   for (const id of ['#dlg-ret', '#dlg-foto']) $(id).addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
   setInterval(() => { tegnFotografer(); tegnHaendelser(); tegnNøgletal(); }, 30e3);

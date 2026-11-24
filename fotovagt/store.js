@@ -6,9 +6,13 @@ import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './s
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey) && !/[?&]demo\b/.test(location.search);
 const lyttere = new Set();
-const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], indst: {}, mig: null };
+const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], indst: {}, mig: null };
 const fejlTekst = e => (e && (e.message || e.error_description)) || String(e);
 const ændret = () => lyttere.forEach(f => f(state));
+const kodeFejl = m => /different from the old/i.test(m) ? 'Den nye adgangskode skal være forskellig fra den gamle.'
+  : /at least|too short|characters/i.test(m) ? 'Adgangskoden er for kort.'
+  : /weak|pwned|leaked/i.test(m) ? 'Adgangskoden er for nem at gætte. Vælg en anden.'
+  : /reauthenticat|recent/i.test(m) ? 'Log ud og ind igen, og prøv så at skifte adgangskoden.' : m;
 
 // ------------------------------------------------------------------------------------
 // Supabase
@@ -32,17 +36,19 @@ function supabaseBackend() {
 
   async function hentAlt() {
     const døgn = new Date(Date.now() - 24 * 3600e3).toISOString();
-    const [h, p, l, s, t, ind] = await Promise.all([
+    const toDøgn = new Date(Date.now() - 48 * 3600e3).toISOString();
+    const [h, p, l, s, t, ind, k] = await Promise.all([
       sb.from('haendelser').select('*').or(`status.in.(ny,taget,ankommet),oprettet.gt.${døgn}`).order('oprettet', { ascending: false }).limit(300),
       sb.from('profiles').select('*').order('navn'),
       sb.from('logbog').select('*').order('tid', { ascending: false }).limit(150),
       sb.from('sos').select('*').or(`aktiv.eq.true,start.gt.${døgn}`).order('start', { ascending: false }).limit(50),
       sb.from('tilbud').select('*').gt('sendt', døgn).order('sendt', { ascending: false }).limit(200),
       sb.from('indstillinger').select('*').eq('id', 1).maybeSingle(),
+      sb.from('kommentarer').select('*').gt('oprettet', toDøgn).order('oprettet').limit(1000),
     ]);
     for (const r of [h, p, l, s]) if (r.error) throw new Error(r.error.message);
     state.haendelser = h.data; state.profiler = p.data; state.log = l.data; state.sos = s.data;
-    state.tilbud = t.data || []; state.indst = ind.data || {};
+    state.tilbud = t.data || []; state.indst = ind.data || {}; state.kommentarer = k.data || [];
     state.mig = state.profiler.find(x => x.id === state.mig?.id) || state.mig;
     ændret();
   }
@@ -74,6 +80,15 @@ function supabaseBackend() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'indstillinger' }, e => {
         if (e.new) state.indst = { ...state.indst, ...e.new }; ændret();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kommentarer' }, e => {
+        if (e.eventType === 'DELETE') state.kommentarer = state.kommentarer.filter(x => x.id !== e.old.id);
+        else {
+          const i = state.kommentarer.findIndex(x => x.id === e.new.id);
+          if (i >= 0) state.kommentarer[i] = { ...state.kommentarer[i], ...e.new };
+          else { state.kommentarer.push(e.new); if (e.new.bruger !== state.mig?.id) state.nyKommentar = e.new; }
+        }
+        ændret(); state.nyKommentar = null;
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'logbog' }, e => {
         state.log.unshift(e.new); state.log.length = Math.min(state.log.length, 150); ændret();
@@ -115,6 +130,14 @@ function supabaseBackend() {
     tildel: (h, foto) => rpc('tildel_haendelse', { h, foto }),
     luk: (h, status) => rpc('luk_haendelse', { h, ny_status: status }),
     saetStatus: (foto, s) => rpc('saet_status', { foto, s }),
+    // Kommentarer på hændelser (interne eller til døgnrapporten)
+    kommenter: (h, tekst, offentlig) => rpc('kommenter', { h, tekst, offentlig: !!offentlig }),
+    retKommentar: (k, offentlig) => rpc('ret_kommentar', { k, offentlig: !!offentlig }),
+    sletKommentar: k => rpc('slet_kommentar', { k }),
+    async skiftKode(ny) {
+      const { error } = await sb.auth.updateUser({ password: ny });
+      if (error) throw new Error(kodeFejl(error.message));
+    },
     async ret(id, felter) {
       const { error } = await sb.from('haendelser').update(felter).eq('id', id);
       if (error) throw new Error(error.message);
@@ -210,7 +233,7 @@ function demoBackend() {
   const DEMO_INDST = /[?&]hurtig\b/.test(location.search)
     ? { auto_tilbud: true, tilbud_sek: 6, blink_sek: 12, max_km: 35, pos_max_min: 30, kategorier_fra: ['Forsyning'] }
     : { auto_tilbud: true, tilbud_sek: 60, blink_sek: 120, max_km: 35, pos_max_min: 30, kategorier_fra: ['Forsyning'] };
-  let db;
+  let db, kSpejlet = false;
   const læs = () => { try { db = JSON.parse(localStorage.getItem(NØGLE)) || frø(); } catch { db = frø(); } };
   const gem = () => {
     try { localStorage.setItem(NØGLE, JSON.stringify(db)); } catch { /* privat vindue */ }
@@ -220,6 +243,11 @@ function demoBackend() {
     state.haendelser = [...db.haendelser].sort((a, b) => b.oprettet.localeCompare(a.oprettet));
     state.profiler = [...db.profiler].sort((a, b) => a.navn.localeCompare(b.navn));
     state.log = db.log.slice(0, 150);
+    db.kommentarer ||= [];
+    const førK = new Set(state.kommentarer.map(x => x.id));
+    state.kommentarer = [...db.kommentarer];
+    state.nyKommentar = kSpejlet ? state.kommentarer.find(x => !førK.has(x.id) && x.bruger !== state.mig?.id) || null : null;
+    kSpejlet = !!state.mig;
     db.tilbud ||= []; db.indst = { ...DEMO_INDST, ...(db.indst || {}) };
     const førTilbud = new Set(state.tilbud.map(x => x.id));
     state.tilbud = [...db.tilbud]; state.indst = db.indst;
@@ -229,7 +257,7 @@ function demoBackend() {
     state.sos = [...db.sos].sort((a, b) => b.start.localeCompare(a.start));
     state.nySos = state.sos.find(x => !førSos.has(x.id) && x.aktiv && x.bruger !== state.mig?.id) || null;
     if (state.mig) state.mig = db.profiler.find(p => p.id === state.mig.id) || state.mig;
-    state.nyHaendelse = nyH; ændret(); state.nyHaendelse = null; state.nySos = null; state.nytTilbud = null;
+    state.nyHaendelse = nyH; ændret(); state.nyHaendelse = null; state.nySos = null; state.nytTilbud = null; state.nyKommentar = null;
   };
   const udefra = () => {
     const før = new Set(db.haendelser.map(h => h.id)); læs();
@@ -405,6 +433,23 @@ function demoBackend() {
       if (s === 'ny') h.taget_af = null;
       log(id, s === 'ny' ? 'genåbnede hændelsen' : 'satte hændelsen til ' + s);
     }),
+    kommenter: kør((h, tekst, offentlig) => {
+      const t = String(tekst || '').trim(); if (!t) throw new Error('Skriv en kommentar.');
+      db.kommentarer ||= [];
+      db.kommentarer.push({ id: uid(), haendelse_id: h, bruger: mig().id, tekst: t.slice(0, 2000), offentlig: !!offentlig, oprettet: nu() });
+      log(h, `skrev en ${offentlig ? 'offentlig' : 'intern'} kommentar`);
+    }),
+    retKommentar: kør((id, offentlig) => {
+      const k = (db.kommentarer || []).find(x => x.id === id);
+      if (!k || (k.bruger !== mig().id && mig().rolle !== 'kontor')) throw new Error('Du kan kun ændre dine egne kommentarer.');
+      k.offentlig = !!offentlig;
+    }),
+    sletKommentar: kør(id => {
+      const k = (db.kommentarer || []).find(x => x.id === id);
+      if (!k || (k.bruger !== mig().id && mig().rolle !== 'kontor')) throw new Error('Du kan kun slette dine egne kommentarer.');
+      db.kommentarer = db.kommentarer.filter(x => x.id !== id);
+    }),
+    async skiftKode() { throw new Error('I demoen er der ingen adgangskoder.'); },
     saetStatus: kør((foto, s) => { kontor(); const f = P(foto); Object.assign(f, { status: s, status_tid: nu() }); log(null, `satte ${f.navn} til ${s}`); }),
     ret: kør((id, felter) => { kontor(); Object.assign(H(id), felter); }),
     retFotograf: kør((id, felter) => { kontor(); Object.assign(P(id), felter); }),

@@ -498,4 +498,36 @@ body.marken .skift { flex: none; }
   body.kontor .top-knapper button { padding: 7px 9px; font-size: .84rem; }
 }
 
-.auto-lukket { background: #fff6e0; color: #6b4a00; border-radius: 8px; padding: 6px 9px; margin-top: 6px; }
+.auto-lukket { background: color-mix(in srgb, var(--pause) 18%, var(--flade)); color: var(--tekst); border-radius: 8px; padding: 6px 9px; margin-top: 6px; }
+
+/* ---------- Tidslinje og kommentarer ---------- */
+.tidslinje-boks { margin-top: 18px; border-top: 1px solid var(--kant); padding-top: 14px; }
+.tl-titel { font-size: 1rem; margin: 0 0 10px; display: flex; align-items: baseline; gap: 8px; }
+.tl-titel small { color: var(--dæmpet); font-weight: 500; font-size: .8rem; }
+.tidslinje { list-style: none; margin: 0; padding: 0 0 0 16px; position: relative; }
+.tidslinje::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: var(--kant); border-radius: 2px; }
+.tl-punkt { position: relative; margin: 0 0 10px; padding: 9px 11px; background: var(--flade2); border-radius: var(--radius-s); border: 1px solid var(--kant); }
+.tl-punkt::before { content: ""; position: absolute; left: -16px; top: 13px; width: 10px; height: 10px; border-radius: 50%; background: var(--flade); border: 2px solid var(--dæmpet); }
+.tl-melding::before { border-color: var(--ny); background: var(--ny); }
+.tl-opdatering::before { border-color: var(--ankommet); }
+.tl-kommentar { background: var(--flade); }
+.tl-kommentar::before { border-color: var(--ledig); background: var(--ledig); }
+.tl-kommentar.offentlig { border-color: color-mix(in srgb, var(--ankommet) 45%, var(--kant)); }
+.tl-hoved { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: .86rem; }
+.tl-tid { color: var(--dæmpet); font-variant-numeric: tabular-nums; }
+.tl-kilde { color: var(--dæmpet); font-size: .78rem; }
+.tl-maerke { margin-left: auto; font-size: .72rem; font-weight: 600; padding: 2px 7px; border-radius: 99px; background: var(--flade3); color: var(--dæmpet); white-space: nowrap; }
+.tl-kommentar.offentlig .tl-maerke { background: color-mix(in srgb, var(--ankommet) 15%, var(--flade)); color: var(--ankommet); }
+.tl-punkt p { margin: 5px 0 0; font-size: .9rem; overflow-wrap: anywhere; }
+.tl-knapper { display: flex; gap: 14px; margin-top: 4px; }
+.tl-knapper .link { font-size: .8rem; padding: 2px 0; min-height: 0; }
+.kommentar-form { margin-top: 12px; display: grid; gap: 8px; }
+.kommentar-form textarea { width: 100%; min-height: 64px; resize: vertical; font: inherit; }
+.kommentar-bund { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.kommentar-bund .check { margin: 0; font-size: .86rem; }
+.kommentar-bund .check small { color: var(--dæmpet); }
+.skjult-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.k-antal { font-weight: 600; }
+.doegn-linje { margin-top: 4px; color: var(--dæmpet); }
+.doegn-felt { border: 1px solid var(--kant); border-radius: var(--radius-s); padding: 10px 12px 4px; margin: 12px 0; }
+.doegn-felt legend { font-weight: 700; font-size: .9rem; padding: 0 6px; }

@@ -9,6 +9,7 @@
 //   sos_set     -> den der trykkede SOS: "Din SOS er set af …"
 //   sos_paa_vej -> den der trykkede SOS: "Anna (5 km væk) kører til dig"
 // Med { tilbud }: tilbud om en opgave til den nærmeste fotograf (se tilbud.sql), "Tag den / Nej tak" i appen
+// Med { kommentar }: ny kommentar på en opgave -> fotografen, der har opgaven (hvis en anden skrev den)
 // Med { test: true } og brugerens login sendes en prøve til brugerens egne telefoner.
 //
 // Nøglesættet til push (VAPID) laver funktionen selv første gang og gemmer i tabellen intern.
@@ -154,6 +155,19 @@ async function tilbud(id: string) {
   }) };
 }
 
+// Ny kommentar: push til fotografen, der har opgaven (ikke til den, der selv skrev)
+async function kommentar(id: string) {
+  const { data: k } = await db.from("kommentarer").select("*").eq("id", id).single();
+  if (!k || k.push_sendt || Date.now() - new Date(k.oprettet).getTime() > NYLIG) return { sendt: 0 };
+  await db.from("kommentarer").update({ push_sendt: true }).eq("id", id);
+  const { data: h } = await db.from("haendelser").select("*").eq("id", k.haendelse_id).single();
+  if (!h || !h.taget_af || h.taget_af === k.bruger || !["taget", "ankommet"].includes(h.status)) return { sendt: 0 };
+  const { data: af } = await db.from("profiles").select("navn").eq("id", k.bruger).single();
+  return { sendt: await send([h.taget_af], {
+    title: `💬 ${af?.navn ?? "Kontoret"}: ${h.titel}`, body: String(k.tekst).slice(0, 180), tag: `${h.id}-k-${id}`, url: `./?h=${h.id}`,
+  }) };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const body = await req.json().catch(() => ({}));
@@ -166,6 +180,7 @@ Deno.serve(async (req) => {
       return json({ ok: true, sendt });
     }
     if (body.init) { await nøgler(); return json({ ok: true }); }   // laver nøglesættet, hvis det mangler
+    if (body.kommentar) return json({ ok: true, ...(await kommentar(String(body.kommentar))) });
     if (body.tilbud) return json({ ok: true, ...(await tilbud(String(body.tilbud))) });
     if (body.sos && body.slags) return json({ ok: true, ...(await sos(String(body.sos), String(body.slags))) });
     if (!body.id || !body.slags) return json({ ok: false }, 400);

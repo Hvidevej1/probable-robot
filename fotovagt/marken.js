@@ -4,6 +4,7 @@ import {
   STATUS, H_STATUS, KATEGORI_IKON, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
+  tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
 } from './faelles.js';
 
 const pref = {
@@ -46,11 +47,12 @@ function tegnOpgave() {
         <p class="lille">Din opgave · taget kl. ${klokken(h.taget_tid)}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>
         <h2>${esc(h.titel)}</h2>
         <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${h.cirka ? ' (ca.)' : ''}${afstand(h) != null ? ` · ${kmTekst(afstand(h))}` : ''}</p>
-        ${senesteOpdatering(h) ? `<p class="opdatering"><span>🔄 ${esc(senesteOpdatering(h))}</span></p>` : ''}
+        ${(n => n ? `<p class="opdatering"><span>${n.ikon} ${esc(n.tekst)}</span></p>` : '')(senesteNyt(h))}
       </div>
     </div>
     <div class="knap-række">
       ${nav ? `<a class="knap" href="${nav}" target="_blank" rel="noopener">Navigér</a>` : ''}
+      <button data-handling="tidslinje" class="secondary">💬 Kommentér${kommentarerTil(h.id).length ? ` (${kommentarerTil(h.id).length})` : ''}</button>
       ${h.status !== 'ankommet' ? '<button data-handling="ankommet">Ankommet</button>' : ''}
       <button data-handling="afslut" class="ok">Afslut</button>
       <button data-handling="slip" class="secondary">Slip</button>
@@ -68,7 +70,7 @@ function kort_(h) {
         <h3>${esc(h.titel)}</h3>
         <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
         <p class="lille">${siden(h.oprettet)} siden${d != null ? ` · ${kmTekst(d)}` : ''} ·
-          <span class="h-status">${h.auto_lukket && !aktiv(h) ? 'Lukket automatisk (ingen opdateringer)' : h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
+          ${kommentarerTil(h.id).length ? `<span class="k-antal" title="Kommentarer">💬 ${kommentarerTil(h.id).length}</span> · ` : ''}<span class="h-status">${h.auto_lukket && !aktiv(h) ? 'Lukket automatisk (ingen opdateringer)' : h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
       </div>
       ${tagbar ? `<button class="tag-knap" data-tag="${h.id}">Tag</button>` : ''}
     </article>`;
@@ -215,7 +217,7 @@ function visHaendelse(id, åbn = true) {
   const d = afstand(h), nav = navigationsLink(h);
   const min = h.taget_af === mig.id;
   const dlg = $('#dlg-haendelse');
-  dlg.querySelector('.ark-indhold').innerHTML = `
+  gentegnMedFormular(dlg.querySelector('.ark-indhold'), `
     <div class="ark-top"><span class="kat stor">${KATEGORI_IKON[h.kategori] || '📍'}</span>
       <button class="luk" data-luk aria-label="Luk">✕</button></div>
     <h2>${esc(h.titel)}</h2>
@@ -223,7 +225,6 @@ function visHaendelse(id, åbn = true) {
     ${h.cirka ? '<p class="hint">Placeringen er cirka (kun by eller station kendt). Tjek adressen i teksten.</p>' : ''}
     <p class="lille">Modtaget kl. ${klokken(h.oprettet)} (${siden(h.oprettet)} siden) · ${esc(h.kategori || '')}</p>
     <p class="status-linje h-${h.status}">${h.status === 'ny' ? 'Ingen har taget den endnu' : min ? 'Det er din opgave' : `${H_STATUS[h.status]}: ${esc(navn(h.taget_af))}`}</p>
-    ${h.tekst ? `<p class="brødtekst">${esc(h.tekst).replace(/\n/g, '<br>')}</p>` : ''}
     ${h.url ? `<p><a href="${esc(h.url)}" target="_blank" rel="noopener">Åbn link fra beskeden</a></p>` : ''}
     ${h.note ? `<p class="note">Note: ${esc(h.note)}</p>` : ''}
     <div class="knap-række">
@@ -231,7 +232,8 @@ function visHaendelse(id, åbn = true) {
       ${h.status === 'ny' && mig.haendelse_id ? '<p class="hint">Du har allerede en opgave. Afslut eller slip den først.</p>' : ''}
       ${nav ? `<a class="knap secondary" href="${nav}" target="_blank" rel="noopener">Navigér</a>` : ''}
       ${h.lat != null ? '<button class="secondary" data-vis-kort>Vis på kort</button>' : ''}
-    </div>`;
+    </div>
+    ${tidslinjeHtml(h)}`);
   if (åbn && !dlg.open) dlg.showModal();
 }
 
@@ -325,6 +327,16 @@ async function start() {
         toast(`${min ? 'Opdatering på din opgave' : 'Opdatering'}: ${senesteOpdatering(h).replace(/^kl\. \d\d[.:]\d\d [^:]+: /, '').slice(0, 120)}`, min ? 'ny' : '');
       }
     }
+    const k = s.nyKommentar;
+    if (k) {
+      const h = s.haendelser.find(x => x.id === k.haendelse_id);
+      const min = k.haendelse_id === s.mig?.haendelse_id;
+      if (h && (min || åbenId === h.id)) {
+        if (min && pref.get('lyd', true)) bip();
+        const af = s.profiler.find(p => p.id === k.bruger)?.navn || 'Kontoret';
+        toast(`💬 ${af}${min ? ' (din opgave)' : ''}: ${k.tekst.slice(0, 120)}`, min ? 'ny' : '');
+      }
+    }
     if (s.nytTilbud) { if (pref.get('lyd', true)) bip(); navigator.vibrate?.([300, 120, 300, 120, 300]); toast('📩 Du har fået et tilbud om en opgave', 'ny'); }
     if (s.nySos && s.nySos.bruger !== mig.id) toast('🆘 SOS fra en kollega – se den røde boks øverst', 'fejl');
     const ny = s.nyHaendelse;
@@ -383,6 +395,7 @@ async function start() {
     const a = b.dataset.handling;
     if (a === 'ankommet') await prøv(() => store.meldStatus('ankommet'), 'Meldt ankommet.');
     if (a === 'afslut') åbnAfslut();
+    if (a === 'tidslinje') { visHaendelse(minOpgave().id); setTimeout(() => $('#dlg-haendelse form.kommentar-form textarea')?.focus(), 80); }
     if (a === 'slip' && confirm('Slip opgaven, så en anden kan tage den?')) await prøv(() => store.slip(), 'Opgaven er sluppet. Du er ledig.');
   };
   const dlgH = $('#dlg-haendelse');
@@ -395,6 +408,8 @@ async function start() {
     }
   };
   dlgH.onclose = () => { åbenId = null; };
+  kommentarHandlinger(dlgH);
+  $('#btn-kode').onclick = () => åbnSkiftKode();
 
   // Profil
   $('#btn-mig').onclick = () => {
