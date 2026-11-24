@@ -8,10 +8,13 @@
   if (indlejret) document.body.classList.add('indlejret');
   if (q.get('tema') === 'lys' || q.get('tema') === 'mørk') document.documentElement.dataset.theme = q.get('tema') === 'lys' ? 'light' : 'dark';
 
-  const IKON = { Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Miljø: '☣️', Vejr: '🌧️', Forsyning: '🔧', Andet: '📍' };
-  const FARVE = { Brand: 'var(--brand)', Trafik: 'var(--trafik)', Politi: 'var(--politi)', Redning: 'var(--redning)', Miljø: 'var(--miljø)', Vejr: 'var(--vejr)', Forsyning: 'var(--forsyning)', Andet: 'var(--andet)' };
-  // Lægehelikopter og indsatsleder (ISL) får deres eget ikon
-  const ikon = h => h.ikon === 'helikopter' ? '🚁' : h.ikon === 'isl' ? '🧑‍🚒' : (IKON[h.kategori] || '📍');
+  const IKON = { Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Lægehelikopter: '🚁', Indsatsleder: '🧑‍🚒', Miljø: '☣️', Vejr: '🌧️', Forsyning: '🔧', Andet: '📍' };
+  const FARVE = { Brand: 'var(--brand)', Trafik: 'var(--trafik)', Politi: 'var(--politi)', Redning: 'var(--redning)', Lægehelikopter: 'var(--heli)', Indsatsleder: 'var(--isl)', Miljø: 'var(--miljø)', Vejr: 'var(--vejr)', Forsyning: 'var(--forsyning)', Andet: 'var(--andet)' };
+  // Gruppen styrer ikon, farve, overskrift og filter, så de altid passer sammen.
+  // Lægehelikopter og indsatsleder (ISL) er deres egen gruppe.
+  const gruppe = h => h.ikon === 'helikopter' ? 'Lægehelikopter' : h.ikon === 'isl' ? 'Indsatsleder' : (h.kategori || 'Andet');
+  const ikon = h => IKON[gruppe(h)] || '📍';
+  const overskrift = h => (!h.overskrift || h.overskrift === h.kategori || h.overskrift === 'Hændelse') ? (gruppe(h) === 'Andet' ? 'Hændelse' : gruppe(h)) : h.overskrift;
   const farve = k => FARVE[k] || FARVE.Andet;
   const langDag = d => new Date(d + 'T12:00:00Z').toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
   const TZ = 'Europe/Copenhagen';
@@ -69,8 +72,8 @@
   const filter = new Set((q.get('kat') || '').split(',').filter(Boolean));
   function tegn() {
     const alle = data.haendelser || [];
-    for (const k of [...filter]) if (!alle.some(h => h.kategori === k)) filter.delete(k);
-    const hs = filter.size ? alle.filter(h => filter.has(h.kategori)) : alle;
+    for (const k of [...filter]) if (!alle.some(h => gruppe(h) === k)) filter.delete(k);
+    const hs = filter.size ? alle.filter(h => filter.has(gruppe(h))) : alle;
     const vis = filter.size ? `${hs.length} af ${alle.length}` : `${alle.length}`;
     const dt = langDag(dag);
     $('#dag-titel').textContent = `${dag === iDag() ? 'I dag, ' : dag === flyt(iDag(), -1) ? 'I går, ' : ''}${dag === iDag() || dag === flyt(iDag(), -1) ? dt : dt[0].toUpperCase() + dt.slice(1)} · ${vis} hændelse${alle.length === 1 ? '' : 'r'}`;
@@ -79,17 +82,17 @@
     $('#forrige').disabled = dag <= flyt(iDag(), -60);
     // Antal pr. kategori
     const antal = {};
-    for (const h of alle) antal[h.kategori] = (antal[h.kategori] || 0) + 1;
+    for (const h of alle) antal[gruppe(h)] = (antal[gruppe(h)] || 0) + 1;
     $('#tal').innerHTML = !alle.length ? '' : `<span class="filtre-navn">Filtrér</span>`
       + `<button type="button" class="filter${filter.size ? '' : ' valgt'}" data-kat="" aria-pressed="${!filter.size}" style="--k: var(--accent)">Alle <b>${alle.length}</b></button>`
       + Object.entries(antal).sort((a, b) => b[1] - a[1])
         .map(([k, n]) => `<button type="button" class="filter${filter.has(k) ? ' valgt' : ''}" data-kat="${esc(k)}" aria-pressed="${filter.has(k)}" style="--k: ${farve(k)}" title="Vis kun ${esc(k.toLowerCase())}">${IKON[k] || '📍'} ${esc(k === 'Andet' ? 'Andet' : k)} <b>${n}</b></button>`).join('');
     // Liste
     $('#liste').innerHTML = hs.length ? hs.map(h => `
-      <article class="h${valgt === h.id ? ' valgt' : ''}" data-id="${h.id}" tabindex="0" style="--k: ${farve(h.kategori)}">
+      <article class="h${valgt === h.id ? ' valgt' : ''}" data-id="${h.id}" tabindex="0" style="--k: ${farve(gruppe(h))}">
         <div class="ikon" aria-hidden="true">${ikon(h)}</div>
         <div>
-          <h3>${esc(h.overskrift)}</h3>
+          <h3>${esc(overskrift(h))}</h3>
           ${h.sted ? `<p class="sted">${esc(h.sted)}</p>` : ''}
           <div class="mærker">
             <span class="mærke ${h.status === 'aktiv' ? 'aktiv' : ''}">${h.status === 'aktiv' ? 'I gang' : 'Afsluttet'}</span>
@@ -106,9 +109,9 @@
     for (const h of hs) {
       if (h.lat == null) continue;
       const m = L.marker([h.lat, h.lon], {
-        icon: L.divIcon({ className: '', html: `<div class="pin ${h.status === 'aktiv' ? '' : 'afsluttet'}${valgt === h.id ? ' valgt' : ''}" style="--k: ${farve(h.kategori)}">${ikon(h)}</div>`, iconSize: [36, 36], iconAnchor: [18, 18] }),
+        icon: L.divIcon({ className: '', html: `<div class="pin ${h.status === 'aktiv' ? '' : 'afsluttet'}${valgt === h.id ? ' valgt' : ''}" style="--k: ${farve(gruppe(h))}">${ikon(h)}</div>`, iconSize: [36, 36], iconAnchor: [18, 18] }),
         zIndexOffset: h.status === 'aktiv' ? 500 : 0,
-      }).bindPopup(`<b>${esc(h.overskrift)}</b><br>${esc(h.sted || '')}<br><small>kl. ${kl(h.tid)} · ${h.status === 'aktiv' ? 'I gang' : 'Afsluttet'}</small>`);
+      }).bindPopup(`<b>${ikon(h)} ${esc(overskrift(h))}</b><br>${esc(h.sted || '')}<br><small>kl. ${kl(h.tid)} · ${h.status === 'aktiv' ? 'I gang' : 'Afsluttet'}</small>`);
       m.on('click', () => vælg(h.id, false));
       m.addTo(lag); markører.set(h.id, m); pkt.push([h.lat, h.lon]);
     }
