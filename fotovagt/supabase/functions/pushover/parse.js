@@ -19,7 +19,7 @@ const KATEGORIER = [
   ['Brand', /🔥|🚒|\bABA\d*|bygn\.?\s?brand|brand(?!væsen)|\bild\b|røg|eksplosion|brænd|skorsten|sprøjte|tankvogn|\bass\.|\bassistance\b/i],
   ['Trafik', /🚗|🚙|🚘|trafik|færdsel|uheld|ulykke|påkørsel|motorvej|frontal|lastbil|(?:^|[\s,.])kø(?=$|[\s,.])|\bE\d{2}\b|spærret|vejarbejde|dyr på vejen/i],
   ['Politi', /🚓|politi(?! og redning)|anholdt|skud|skyd|knivstik|røveri|indbrud|vold|drab|bevæbnet|aktion/i],
-  ['Redning', /🚑|redning|drukn|eftersøg|savnet|person i vand|helikopter|ambulance|fastklemt/i],
+  ['Redning', /🚑|akuthjælper|hjertestop|udkald til|redning|drukn|eftersøg|savnet|person i vand|helikopter|ambulance|fastklemt/i],
   ['Miljø', /forurening|\bgas\b|kemikal|olie|udslip|lugt/i],
   ['Vejr', /storm|oversvøm|skybrud|stormflod|træ over/i],
 ];
@@ -84,7 +84,16 @@ export function findAdresse(linjer, station) {
       return { adresse: a, linje: -1, start: -1, cirka: !/\d/.test(a) };
     }
   }
-  // 2) Vejnavn + nummer + postnummer + by: "Ny Munkegade 114 8000 Aarhus C", "Lysholt All. 11 , 7100 Vejle"
+  // 2) Motorvej i beredskabets kortform: "MTV Ø 501 M61 166 8362 Hørning". MTV = motorvej,
+  //    Ø/N/S = Østjyske/Nordjyske/Sønderjyske. Tallene (formentlig kilometer) kendes ikke sikkert,
+  //    så placeringen bliver cirka ved postnummeret.
+  for (let i = 0; i < L.length; i++) {
+    const m = L[i].match(new RegExp(`\\bMTV\\s+(Ø|N|S|V|E\\d{1,3})(?=\\s)[^\\n]*?\\b(\\d{4})\\s+(${BY})`));
+    if (!m) continue;
+    const navn = { Ø: 'Østjyske Motorvej', N: 'Nordjyske Motorvej', S: 'Sønderjyske Motorvej', V: 'Motorvej' }[m[1]] || m[1];
+    return { adresse: `${navn}, ${m[2]} ${m[3].trim()}`, linje: i, start: m.index, cirka: true };
+  }
+  // 3) Vejnavn + nummer + postnummer + by: "Ny Munkegade 114 8000 Aarhus C", "Lysholt All. 11 , 7100 Vejle"
   const fuld = new RegExp(`(${VEJ}\\s\\d{1,4}[A-Za-z]?(?:,?\\s*(?:st|kl|\\d{1,2})\\.\\s*(?:th|tv|mf|\\d{1,3})?\\.?)?)\\s*,?\\s*(\\d{4})\\s+(${BY})`);
   for (let i = 0; i < L.length; i++) {
     const m = L[i].match(fuld);
@@ -98,7 +107,7 @@ export function findAdresse(linjer, station) {
     const vej = ord.slice(k).join(' ');
     return { adresse: `${vej}, ${m[2]} ${m[3].trim()}`, linje: i, start: L[i].indexOf(vej), cirka: false };
   }
-  // 3) Postnummer + by, evt. med vejnavn foran på samme eller forrige linje:
+  // 4) Postnummer + by, evt. med vejnavn foran på samme eller forrige linje:
   //    "Nordjyske Motorvej, 8380 Spørring, Aarhus Kommune" / "Østjyske Motorvej" + "7100 Vejle"
   const pb = new RegExp(`(?:^|[\\s,])(\\d{4})\\s+(${BY})`);
   for (let i = 0; i < L.length; i++) {
@@ -110,13 +119,13 @@ export function findAdresse(linjer, station) {
     if (vej && (/:/.test(vej) || vej.length > 40)) vej = '';
     return { adresse: vej ? `${vej}, ${by}` : by, linje: vej ? i : -1, start: -1, cirka: true };
   }
-  // 4) Motorvejsstrækning: "mellem <44> Hadsten og …", "mellem Horsens C og [57] Horsens S", "E45 fra Randers"
+  // 5) Motorvejsstrækning: "mellem <44> Hadsten og …", "mellem Horsens C og [57] Horsens S", "E45 fra Randers"
   for (const s of L) {
     const m = s.match(new RegExp(`\\bmellem\\s+(?:[<\\[]\\d+[>\\]]\\s*)?(${STEDNAVN})\\s+og\\b`))
       || s.match(new RegExp(`\\b(?:E|Rute\\s?)\\d{1,3}\\b.{0,40}?\\b(?:ved|nær|fra|syd for|nord for|øst for|vest for)\\s+(${STEDNAVN})`));
     if (m) return { adresse: m[1].replace(/\s(?:N|S|Ø|V|C|Nord|Syd|Øst|Vest|Midt)$/, ''), linje: -1, start: -1, cirka: true };
   }
-  // 5) Kun stationen kendes (Mast/PF-Upload uden adresse): placér ved stationens by
+  // 6) Kun stationen kendes (Mast/PF-Upload uden adresse): placér ved stationens by
   if (station) return { ...ingen, adresse: station.replace(/^(?:assistance|ass\.?)\s*-\s*/i, '').trim(), cirka: true };
   return ingen;
 }
@@ -170,7 +179,12 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
       titel += ' – ' + indhold[1].split(/\s(?:fra|mellem|i|ved)\s/)[0];
     }
   }
-  titel = titel.replace(/[<\[]\d+[>\]]\s*/g, '').replace(/\s{2,}/g, ' ').replace(/[\s,;:+\-–]+$/, '').trim();
+  titel = titel
+    .replace(/,?\s*#\d{5,}/g, '')                                         // sagsnummer "#1536906"
+    .replace(/\s*\([^)]*(?:\+|ISL|MR-\d|-[MVR]\d)[^)]*\)/g, '')           // enheder "(ISL SYD + KO MR-1)"
+    .replace(/^(.*[a-zæøå].{2,}?)\s+ISL\b.*$/, '$1')                        // "Naturbrand-Mindre brand ISL SY + …"
+    .replace(/\s+\/-\s*/g, ' ')
+    .replace(/[<\[]\d+[>\]]\s*/g, '').replace(/\s{2,}/g, ' ').replace(/[\s,;:+\-–]+$/, '').trim();
   if (titel.length > 80) titel = titel.slice(0, 80).replace(/[\s,;:+\-–]+\S*$/, '') + ' …';
   titel ||= 'Ny hændelse';
   const kode = KODER.find(([re]) => re.test(titel));
@@ -256,6 +270,9 @@ export function flet(h, ny, app) {
 export async function geokod(adresse, { fetchFn = fetch, headers = {} } = {}) {
   if (!adresse) return null;
   const forsøg = [adresse];
+  const [vej, ...resten] = adresse.split(',');
+  const ord = vej.trim().split(/\s+/);
+  if (ord.length >= 3 && /\d/.test(ord[ord.length - 1])) forsøg.push([ord.slice(1).join(' '), ...resten].join(','));  // uden firmanavn
   const pb = adresse.match(/\b\d{4}\s+[^,]+$/);       // "8000 Aarhus C" som reserve
   if (pb && pb[0] !== adresse) forsøg.push(pb[0]);
   for (const q of forsøg) {

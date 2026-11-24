@@ -196,9 +196,14 @@ async function findAdresse() {
 function læsBesked() {
   const f = $('#form-ret'), raa = f.raa.value.trim();
   if (!raa) return;
+  // Kopieret fra Pushover som "Titel: besked …" (fx "🚒 Odder: 🔥 Bygn.brand-Lejlighed")
   const [første, ...rest] = raa.split('\n');
-  const p = parseBesked({ title: rest.length ? første : '', message: rest.length ? rest.join('\n') : raa });
+  const m = første.match(/^(.{2,60}?):\s+(.+)$/);
+  const p = m && !/^(adresse|station|beredskab|lokation|sted)$/i.test(m[1].trim())
+    ? parseBesked({ title: m[1], message: [m[2], ...rest].join('\n') })
+    : parseBesked({ title: rest.length ? første : '', message: rest.length ? rest.join('\n') : raa });
   f.titel.value = p.titel; f.tekst.value = p.tekst; f.adresse.value = p.adresse; f.kategori.value = p.kategori;
+  if (p.cirka) toast('Beskeden har kun by/station – tjek placeringen på kortet.');
   if (p.url) f.url.value = p.url;
   if (p.lat != null) { sætNål(p.lat, p.lon); retKort.setView([p.lat, p.lon], 15); }
   else if (p.adresse) findAdresse();

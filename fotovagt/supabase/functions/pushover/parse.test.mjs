@@ -18,7 +18,15 @@ const B = {
   trafikUheld: { app: 'Trafik Server', title: 'Trafikmelding', message: '<b>Uheld</b>\nE45 Nordjyske Motorvej fra Aarhus mod Randers mellem &lt;46&gt; Aarhus Nord og &lt;44&gt; Hadsten\n\nUheld, Spor blokeret, Uheldsstedet er ikke sikret\n\nI venstre spor,\nPoliti og redning er på vej' },
   pfUheld: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Uheld\nE45 Nordjyske Motorvej fra Aarhus mod Randers mellem [46] Aarhus Nord og [44] Hadsten\nUheld, Spor blokeret, Uheldsstedet er ikke sikret\nI venstre spor,\nPoliti og redning er på vej\n\nNordjyske Motorvej, 8380 Spørring, Aarhus Kommune\n24-11-2026 16:22:00\n\nSe placeringen her: https://112meldinger.dk/map.php?uid=abc' },
   pfDyr: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Levende dyr på vejen\nE45 fra Horsens mod Vejle mellem Horsens C og [57] Horsens S\nLevende dyr på vejen\nSvane i græsrabat.\nForventes at vare indtil 24. nov. 2026 kl. 16:15.\n\nØstjyske Motorvej, 8700 Hatting, Horsens Kommune\n24-11-2026 15:35:00\n\nSe placeringen her: https://112meldinger.dk/map.php?uid=oZS7s7k' },
+  kolding: { titel: 'BMFM - Min. forurening-Mindre spild', adresse: 'Kolding', cirka: true, kategori: 'Miljø' },
+  hørning: { titel: 'Naturbrand-Mindre brand', adresse: 'Østjyske Motorvej, 8362 Hørning', cirka: true, kategori: 'Brand' },
+  akut: { titel: 'UDKALD TIL AKUTHJÆLPER', adresse: 'Fredericia', kategori: 'Redning' },
+  give: { titel: 'Assistance VB MR-6 ABA', adresse: 'Danpo Tykhøjetvej 44, 7323 Give', cirka: false },
   pfE45: { app: 'PF-Upload', title: 'Trafikmelding', message: '🚙 Uheld på E45 i nordgående retning mellem Århus og Randers\n\nSe placering her: https://112meldinger.dk/map.php?uid=NKtJaLs' },
+  kolding: { app: 'Mast', title: '🚒 Kolding', message: '🔥 BMFM - (ISL SYD + KO MR-1 + KO V-1) Min. forurening-Mindre spild, #1536906\nBeredskab: TrekantBrand\nStation: Kolding\n24-11-2026 11:53' },
+  hørning: { app: 'Mast', title: '🚒 Hørning', message: '🔥 @6 Naturbrand-Mindre brand ISL SY + HØ-M1 + HØ-V1 + SK-R1 MTV Ø 501 M61 166 8362 Hørning\nBeredskab: Østjyllands Brandvæsen\nStation: Hørning\n24-11-2026 08:26' },
+  akut: { app: 'Mast', title: '🚒 Fredericia', message: '🔥 UDKALD TIL AKUTHJÆLPER #1536900\nBeredskab: TrekantBrand\nStation: Fredericia\n24-11-2026 08:29' },
+  give: { app: 'Mast', title: '🚒 Assistance - Give', message: '🔥 Assistance: Assistance VB MR-6 /- ABA - (MR-1)\nBeredskab: Vejle Brandvæsen\nStation: Give\nAdresse: Danpo Tykhøjetvej 44, 7323 Give\n24-11-2026 08:07' },
   bus: { app: 'PF-Upload', title: 'Trafikmelding - Midttrafik (Bus)', message: 'Forsinkelser Pga uheld på motorvejen, er der store forsinkelser på busserne i Vejle. Rejsegarantien bortfalder. Lokation: Vejle Trafikcenter\n\nhttps://112meldinger.dk/map.php?uid=BMGJqVb' },
 };
 
@@ -38,6 +46,10 @@ const forvent = {
   trafikUheld: { titel: 'Uheld – E45 Nordjyske Motorvej', adresse: 'Aarhus', kategori: 'Trafik', cirka: true },
   pfUheld: { titel: 'Uheld – E45 Nordjyske Motorvej', adresse: 'Nordjyske Motorvej, 8380 Spørring', kategori: 'Trafik', url: 'https://112meldinger.dk/map.php?uid=abc' },
   pfDyr: { titel: 'Levende dyr på vejen', adresse: 'Østjyske Motorvej, 8700 Hatting', kategori: 'Trafik' },
+  kolding: { titel: 'BMFM - Min. forurening-Mindre spild', adresse: 'Kolding', cirka: true, kategori: 'Miljø' },
+  hørning: { titel: 'Naturbrand-Mindre brand', adresse: 'Østjyske Motorvej, 8362 Hørning', cirka: true, kategori: 'Brand' },
+  akut: { titel: 'UDKALD TIL AKUTHJÆLPER', adresse: 'Fredericia', kategori: 'Redning' },
+  give: { titel: 'Assistance VB MR-6 ABA', adresse: 'Danpo Tykhøjetvej 44, 7323 Give', cirka: false },
   pfE45: { titel: 'Uheld på E45 i nordgående retning mellem Århus og Randers', adresse: 'Århus', kategori: 'Trafik' },
 };
 
