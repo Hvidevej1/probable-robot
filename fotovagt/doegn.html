@@ -48,8 +48,11 @@
     .live { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 rgba(31,159,76,.5); animation: puls 2s infinite; }
     @keyframes puls { 70% { box-shadow: 0 0 0 7px rgba(31,159,76,0); } 100% { box-shadow: 0 0 0 0 rgba(31,159,76,0); } }
     .tal { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-    .tal span { background: var(--flade); border: 1px solid var(--kant); border-radius: 99px; padding: 5px 11px; font-size: .86rem; font-weight: 600; }
-    .tal .alle { background: var(--top); color: var(--top-tekst); border-color: var(--top); }
+    .tal .filter { font: inherit; font-size: .86rem; font-weight: 600; color: var(--tekst); background: var(--flade); border: 1px solid var(--kant); border-radius: 99px; padding: 6px 12px; cursor: pointer; transition: background .15s, border-color .15s, transform .1s; -webkit-tap-highlight-color: transparent; }
+    .tal .filter:hover { border-color: var(--dæmpet); }
+    .tal .filter:active { transform: scale(.96); }
+    .tal .filter.valgt { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tal .filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     @media (max-width: 520px) { .dagknapper { width: 100%; } .dagknapper button { flex: 1; } .h { padding: 11px 12px; grid-template-columns: 36px minmax(0, 1fr); } .ikon { width: 36px; height: 36px; font-size: 1.15rem; } }
     .gitter { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
     @media (max-width: 860px) { .gitter { grid-template-columns: minmax(0, 1fr); } }
@@ -106,6 +109,6 @@
     </div>
     <p class="fod">Placeringer er omtrentlige og viser kun by eller område. © <a href="https://hrc-fotos.dk" target="_top">HRC-Fotos.dk</a></p>
   </main>
-  <script src="doegn.js?v=2"></script>
+  <script src="doegn.js?v=3"></script>
 </body>
 </html>

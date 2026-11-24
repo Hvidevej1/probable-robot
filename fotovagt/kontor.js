@@ -1,6 +1,7 @@
 // Kontoret: overblik over hændelser og fotografer, tildeling, oprettelse og Pushover-forbindelse.
 import { store } from './store.js';
 import { parseBesked } from './supabase/functions/pushover/parse.js';
+import { åbnRapport } from './rapport.js';
 import {
   STATUS, H_STATUS, KATEGORI_IKON, ikonFor, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, set,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
@@ -509,6 +510,7 @@ async function start() {
   $('#btn-pushover').onclick = åbnPushover;
   $('#btn-logud').onclick = async () => { await store.logout(); location.reload(); };
   $('#btn-kode').onclick = () => åbnSkiftKode();
+  $('#btn-rapport').onclick = () => åbnRapport();
   const dlgTl = $('#dlg-tidslinje');
   kommentarHandlinger(dlgTl);
   dlgTl.addEventListener('click', e => { if (e.target === dlgTl || e.target.closest('[data-luk-tl]')) dlgTl.close(); });

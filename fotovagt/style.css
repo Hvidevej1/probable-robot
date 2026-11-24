@@ -531,3 +531,24 @@ body.marken .skift { flex: none; }
 .doegn-linje { margin-top: 4px; color: var(--dæmpet); }
 .doegn-felt { border: 1px solid var(--kant); border-radius: var(--radius-s); padding: 10px 12px 4px; margin: 12px 0; }
 .doegn-felt legend { font-weight: 700; font-size: .9rem; padding: 0 6px; }
+
+/* ---------- Fotografrapport ---------- */
+.rapport-dialog { width: min(1100px, calc(100% - 24px)); }
+.rapport-perioder { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.rapport-perioder button { padding: 7px 12px; font-size: .86rem; min-height: 0; }
+.rapport-valg { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.rapport-valg label { flex: 1 1 150px; margin: 0; }
+.rapport-valg button { flex: none; }
+.rapport-knapper { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 4px; }
+.rapport-visning { margin-top: 10px; }
+.rapport-periode { margin: 8px 0; }
+.rapport-rul { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.rapport-tabel { width: 100%; border-collapse: collapse; font-size: .86rem; margin: 6px 0 14px; }
+.rapport-tabel th, .rapport-tabel td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--kant); vertical-align: top; }
+.rapport-tabel th { background: var(--flade2); font-weight: 700; white-space: nowrap; }
+.rapport-tabel td small { color: var(--dæmpet); }
+.rapport-tabel tfoot td { font-weight: 700; background: var(--flade2); }
+.rapport-tabel.oversigt { max-width: 640px; }
+.rapport-navn { margin: 18px 0 2px; font-size: 1.05rem; scroll-margin-top: 10px; }
+.rapport-navn small { color: var(--dæmpet); font-weight: 500; font-size: .82rem; }
+.tom-rapport { color: var(--dæmpet); padding: 12px 0; }

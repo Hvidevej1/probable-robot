@@ -134,6 +134,21 @@ function supabaseBackend() {
     kommenter: (h, tekst, offentlig) => rpc('kommenter', { h, tekst, offentlig: !!offentlig }),
     retKommentar: (k, offentlig) => rpc('ret_kommentar', { k, offentlig: !!offentlig }),
     sletKommentar: k => rpc('slet_kommentar', { k }),
+    // Fotografrapport: alle hændelser i perioden, som en fotograf har taget/fået, + deres kommentarer
+    async fotografRapport(fra, til) {
+      const { data: hs, error } = await sb.from('haendelser')
+        .select('id, oprettet, titel, kategori, adresse, status, taget_af, taget_tid, ankommet_tid, afsluttet_tid, note, auto_lukket')
+        .gte('oprettet', fra).lt('oprettet', til).not('taget_af', 'is', null).order('oprettet').limit(5000);
+      if (error) throw new Error(error.message);
+      const kommentarer = [];
+      for (let i = 0; i < hs.length; i += 150) {
+        const { data: k, error: e } = await sb.from('kommentarer').select('haendelse_id, bruger, tekst, oprettet')
+          .in('haendelse_id', hs.slice(i, i + 150).map(h => h.id)).order('oprettet');
+        if (e) throw new Error(e.message);
+        kommentarer.push(...k);
+      }
+      return { haendelser: hs, kommentarer };
+    },
     async skiftKode(ny) {
       const { error } = await sb.auth.updateUser({ password: ny });
       if (error) throw new Error(kodeFejl(error.message));
@@ -450,6 +465,11 @@ function demoBackend() {
       db.kommentarer = db.kommentarer.filter(x => x.id !== id);
     }),
     async skiftKode() { throw new Error('I demoen er der ingen adgangskoder.'); },
+    async fotografRapport(fra, til) {
+      læs();
+      const hs = db.haendelser.filter(h => h.taget_af && h.oprettet >= fra && h.oprettet < til).sort((a, b) => a.oprettet.localeCompare(b.oprettet));
+      return { haendelser: hs, kommentarer: (db.kommentarer || []).filter(k => hs.some(h => h.id === k.haendelse_id)) };
+    },
     saetStatus: kør((foto, s) => { kontor(); const f = P(foto); Object.assign(f, { status: s, status_tid: nu() }); log(null, `satte ${f.navn} til ${s}`); }),
     ret: kør((id, felter) => { kontor(); Object.assign(H(id), felter); }),
     retFotograf: kør((id, felter) => { kontor(); Object.assign(P(id), felter); }),

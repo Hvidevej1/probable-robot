@@ -58,17 +58,23 @@
     }
   }
 
+  // Filtrering: tryk på en kategori for kun at se den (flere kan vælges). "I alt" viser alle igen.
+  const filter = new Set((q.get('kat') || '').split(',').filter(Boolean));
   function tegn() {
-    const hs = data.haendelser || [];
-    $('#dag-titel').textContent = `${dagTekst(dag)[0].toUpperCase()}${dagTekst(dag).slice(1)} · ${hs.length} hændelse${hs.length === 1 ? '' : 'r'}`;
+    const alle = data.haendelser || [];
+    for (const k of [...filter]) if (!alle.some(h => h.kategori === k)) filter.delete(k);
+    const hs = filter.size ? alle.filter(h => filter.has(h.kategori)) : alle;
+    const vis = filter.size ? `${hs.length} af ${alle.length}` : `${alle.length}`;
+    $('#dag-titel').textContent = `${dagTekst(dag)[0].toUpperCase()}${dagTekst(dag).slice(1)} · ${vis} hændelse${alle.length === 1 ? '' : 'r'}`;
     $('#naeste').disabled = dag >= iDag();
     $('#idag').disabled = dag === iDag();
     $('#forrige').disabled = dag <= flyt(iDag(), -60);
     // Antal pr. kategori
     const antal = {};
-    for (const h of hs) antal[h.kategori] = (antal[h.kategori] || 0) + 1;
-    $('#tal').innerHTML = (hs.length ? `<span class="alle">${hs.length} i alt</span>` : '') + Object.entries(antal).sort((a, b) => b[1] - a[1])
-      .map(([k, n]) => `<span>${IKON[k] || '📍'} ${n} ${esc(k === 'Andet' ? 'andet' : k.toLowerCase())}</span>`).join('');
+    for (const h of alle) antal[h.kategori] = (antal[h.kategori] || 0) + 1;
+    $('#tal').innerHTML = (alle.length ? `<button type="button" class="filter${filter.size ? '' : ' valgt'}" data-kat="" aria-pressed="${!filter.size}">${alle.length} i alt</button>` : '')
+      + Object.entries(antal).sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => `<button type="button" class="filter${filter.has(k) ? ' valgt' : ''}" data-kat="${esc(k)}" aria-pressed="${filter.has(k)}" title="Vis kun ${esc(k.toLowerCase())}">${IKON[k] || '📍'} ${n} ${esc(k === 'Andet' ? 'andet' : k.toLowerCase())}</button>`).join('');
     // Liste
     $('#liste').innerHTML = hs.length ? hs.map(h => `
       <article class="h${valgt === h.id ? ' valgt' : ''}" data-id="${h.id}" tabindex="0">
@@ -83,7 +89,7 @@
           ${h.kommentarer?.length ? `<ul class="kommentarer">${h.kommentarer.map(k => `<li><time>${kl(k.tid)}</time>${esc(k.tekst)}</li>`).join('')}</ul>` : ''}
         </div>
       </article>`).join('')
-      : `<div class="tom">${dag === iDag() ? 'Ingen hændelser endnu i dag.' : 'Ingen hændelser denne dag.'}</div>`;
+      : `<div class="tom">${filter.size ? 'Ingen hændelser i det valgte filter.' : dag === iDag() ? 'Ingen hændelser endnu i dag.' : 'Ingen hændelser denne dag.'}</div>`;
     // Kort
     lag.clearLayers(); markører.clear();
     const pkt = [];
@@ -118,6 +124,14 @@
   $('#forrige').onclick = () => skift(-1);
   $('#naeste').onclick = () => skift(1);
   $('#idag').onclick = () => skift(0);
+  $('#tal').addEventListener('click', e => {
+    const b = e.target.closest('[data-kat]'); if (!b) return;
+    const k = b.dataset.kat;
+    if (!k) filter.clear(); else if (filter.has(k)) filter.delete(k); else filter.add(k);
+    valgt = null; brugerFlyttet = false; førsteVisning = true;
+    try { const u = new URL(location.href); filter.size ? u.searchParams.set('kat', [...filter].join(',')) : u.searchParams.delete('kat'); history.replaceState(null, '', u); } catch { /* ok */ }
+    tegn();
+  });
   $('#liste').addEventListener('click', e => { const a = e.target.closest('.h'); if (a) vælg(a.dataset.id); });
   $('#liste').addEventListener('keydown', e => { const a = e.target.closest('.h'); if (a && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); vælg(a.dataset.id); } });
 

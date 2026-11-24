@@ -163,3 +163,9 @@ Rapporten viser kun kategori (eller kontorets egen overskrift), by/område og po
 
 ## Skift adgangskode
 Fotografer: **Min profil → Skift adgangskode**. Kontoret: knappen **🔑 Kode** øverst.
+
+## Fotografrapport (kontoret)
+Knappen **📄 Rapport** på kontoret samler alle hændelser i en periode under den fotograf, der tog eller fik opgaven: dato, tid, hændelse, sted, hvornår opgaven blev taget, fotografen ankom og opgaven blev afsluttet, tid på opgaven, status og fotografens note/kommentarer. Vælg en fast periode (i dag, denne uge, sidste måned …) eller selv fra/til, og evt. én fotograf. Hent som **PDF** (A4 liggende) eller **CSV**, der åbner i Excel. PDF'en laves i browseren med jsPDF (`vendor/jspdf-2.5.2`).
+
+## Filtrering på døgnrapporten
+Tryk på en kategori (fx 🔥 brand) for kun at se den på kort og liste. Flere kan vælges. "I alt" viser alle igen. Filteret står i adressen (`?kat=Brand`), så et link kan deles.
