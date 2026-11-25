@@ -435,9 +435,13 @@ async function åbnPushover() {
         <input name="apps" value="${esc((s.kun_apps || []).join(', '))}" placeholder="Fx 1-1-2 Århus, Mast, PF-Upload, Trafik Server, Google Maps Scanner"></label>
       <label>Spring beskeder over, der indeholder (adskil med komma)
         <input name="ignorer" value="${esc((s.ignorer || []).join(', '))}" placeholder="Fx (Bus), Vejarbejde"></label>
-      <p class="hint">Radioprøver springes altid over.</p>
+      <p class="hint">Radioprøver og testalarmer springes altid over.</p>
       <button type="submit" class="secondary">Gem</button>
     </form>
+    <hr>
+    <h3>Sprunget over (seneste døgn)</h3>
+    <p class="hint">Beskeder, der ikke blev til hændelser, og hvorfor. Står der noget her, der burde have været med, så ret listen ovenfor.</p>
+    <div id="po-ignorerede" class="po-ignorerede"><p class="hint">Henter …</p></div>
     <hr>
     <h3>Prøv med en testbesked</h3>
     <p class="hint">Skriv en besked, som den ser ud i Pushover. Den bliver læst og placeret på kortet præcis som de rigtige.</p>
@@ -491,6 +495,10 @@ async function åbnPushover() {
   };
   dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
   if (!dlg.open) dlg.showModal();
+  store.hentIgnorerede().then(l => {
+    $('#po-ignorerede').innerHTML = l.length ? `<ul>${l.map(i => `<li><span class="lille">kl. ${klokken(i.tid)} · ${esc(i.app || '')}</span><br>${esc(i.titel || '')} <small>– ${esc(i.grund || '')}</small></li>`).join('')}</ul>`
+      : '<p class="hint">Ingen beskeder er sprunget over det seneste døgn.</p>';
+  }).catch(() => { $('#po-ignorerede').innerHTML = ''; });
 }
 
 // ---------------------------------------------------------------------------------

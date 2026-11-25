@@ -35,7 +35,8 @@ const KODER = [
 ];
 
 // Beskeder, der aldrig skal blive til hændelser (flere kan sættes på kontoret under Pushover)
-const IGNORER = /radioprøve|prøvealarm|testalarm|type:\s*planlagt|welcome to pushover/i;
+// (Planlagte strømafbrydelser kommer med – de får tidsrummet i titlen)
+const IGNORER = /radioprøve|prøvealarm|testalarm|welcome to pushover/i;
 // Lægehelikopter, der lander ved et hospital, er bare patienttransport
 const HOSPITAL = /hospital|sygehus|\bAUH\b|\bOUH\b|rigshospitalet|helipad|akutmodtagelse/i;
 
@@ -254,6 +255,16 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
   titel ||= 'Ny hændelse';
   const helikopter = /lægehelikopter|akutlægehelikopter/i.test(`${rentitel} ${indhold[0] || ''}`);
   if (helikopter && adresse) titel = `${titel.replace(/\s*–.*$/, '')} – ${adresse.split(',').pop().replace(/^\s*\d{4}\s+/, '').trim()}`;
+  // Planlagt afbrydelse (strøm, vand, varme): tidsrummet i titlen, fx "Strømafbrydelse – Sindal (planlagt kl. 12.00–15.00)"
+  if (rene.some(l => /^type:\s*planlagt/i.test(l))) {
+    const tid = navn => (rene.find(l => new RegExp(`^${navn}:`, 'i').test(l)) || '').match(/(\d{2})-(\d{2})-\d{4}\s*kl\.\s*(\d{1,2})[:.](\d{2})/);
+    const fra = tid('start'), til = tid('forventet slut');
+    if (fra && !/planlagt/i.test(titel)) {
+      const idag = new Intl.DateTimeFormat('da-DK', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Copenhagen' }).format(new Date()).replace('.', '-').replace(/\.$/, '');
+      const dag = `${fra[1]}-${fra[2]}` === idag ? '' : `${+fra[1]}/${+fra[2]} `;
+      titel += ` (planlagt ${dag}kl. ${fra[3]}.${fra[4]}${til ? `–${til[3]}.${til[4]}` : ''})`;
+    }
+  }
   const kode = KODER.find(([re]) => re.test(titel));
   if (kode && !titel.toLowerCase().includes(kode[1])) titel += ` – ${kode[1]}`;
 

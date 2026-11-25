@@ -48,3 +48,16 @@ do $$ declare t text; begin
   end loop;
 end $$;
 alter default privileges in schema public revoke all on tables from anon;
+
+-- Beskeder, Fotovagt springer over (radioprøver, kontorets ignorér-liste m.m.), så kontoret kan se dem i 7 dage
+create table if not exists ignorerede (
+  id bigserial primary key,
+  tid timestamptz not null default now(),
+  app text, titel text, grund text
+);
+alter table ignorerede enable row level security;
+drop policy if exists "kontor" on ignorerede;
+create policy "kontor" on ignorerede for select to authenticated using (er_kontor());
+revoke all on table ignorerede from anon;
+select cron.unschedule('ryd-ignorerede') where exists (select 1 from cron.job where jobname = 'ryd-ignorerede');
+select cron.schedule('ryd-ignorerede', '23 3 * * *', $$ delete from public.ignorerede where tid < now() - interval '7 days' $$);

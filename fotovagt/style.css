@@ -634,3 +634,7 @@ body.marken #app { overflow: hidden; }
 @media (pointer: coarse), (max-width: 899px) {
   input, textarea, select, .kommentar-form textarea { font-size: 16px !important; }
 }
+
+.po-ignorerede ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.po-ignorerede li { background: var(--flade2); border-radius: 10px; padding: 7px 10px; font-size: .9rem; }
+.po-ignorerede small { color: var(--dæmpet); }

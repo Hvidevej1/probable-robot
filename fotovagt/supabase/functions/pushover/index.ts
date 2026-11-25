@@ -76,7 +76,12 @@ async function nyligeAktive(h?: Hændelse) {
 // lægges beskeden ind i den. Radioprøver og kontorets ignorér-liste (fx "(Bus)") springes over.
 async function indsaet(b: Indgang, kilde: string, eksternId: string | null, ignorer: string[] = []) {
   const h = parseBesked(b);
-  if (skalIgnoreres(h, ignorer)) return { ...h, ignoreret: true };
+  if (skalIgnoreres(h, ignorer)) {
+    // Gem, hvad der blev sprunget over, så kontoret kan se det (Pushover → Sprunget over)
+    const egen = (ignorer || []).find((o) => o && `${h.titel}\n${h.tekst}`.toLowerCase().includes(String(o).toLowerCase().trim()));
+    await db.from("ignorerede").insert({ app: b.app || kilde, titel: h.titel, grund: egen ? `kontorets liste: "${egen}"` : h.helikopter ? "lægehelikopter ved hospital" : "radioprøve/test" });
+    return { ...h, ignoreret: true };
+  }
   const aktive = await nyligeAktive(h);
   let match = findMatch(h, aktive);
   if (!match) {

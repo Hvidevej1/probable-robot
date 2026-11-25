@@ -135,6 +135,11 @@ function supabaseBackend() {
       const { error } = await sb.from('invitationer').insert({ email: email.trim().toLowerCase(), navn: navn || null, telefon: telefon || null, rolle: rolle || 'foto', inviteret_af: state.mig?.id });
       if (error) throw new Error(/duplicate|unique/i.test(error.message) ? 'Den e-mail er allerede inviteret.' : error.message);
     },
+    async hentIgnorerede() {
+      const { data, error } = await sb.from('ignorerede').select('*').gt('tid', new Date(Date.now() - 24 * 3600e3).toISOString()).order('tid', { ascending: false }).limit(100);
+      if (error) throw new Error(error.message);
+      return data;
+    },
     async sletInvitation(email) {
       const { error } = await sb.from('invitationer').delete().eq('email', email);
       if (error) throw new Error(error.message);
@@ -490,6 +495,7 @@ function demoBackend() {
     }),
     async skiftKode() { throw new Error('I demoen er der ingen adgangskoder.'); },
     async opretBruger() { throw new Error('I demoen logger man ind ved at vælge en bruger.'); },
+    async hentIgnorerede() { return []; },
     async hentInvitationer() { læs(); return [...(db.invitationer || [])]; },
     inviter: kør(({ email, navn, telefon, rolle }) => {
       kontor(); db.invitationer ||= [];

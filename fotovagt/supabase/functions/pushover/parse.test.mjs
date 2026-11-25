@@ -132,5 +132,9 @@ tjek('ISL-Forespørgsel fra Allerød og St. Lellinge holdes adskilt (forskellig 
 tjek('Samme ISL-Forespørgsel fra samme station lægges sammen', !!findMatch(isl('Allerød'), [aktiv({ ...isl('Allerød'), lat: 55.87, lon: 12.36 })]));
 const nakskov = parseBesked({ app: 'PF-Upload', title: '👮🏼‍♂️ Midt- og Vestsjællands Politi', message: 'Vi er nu færdige med vores foreløbige undersøgelser i området ved Bredgade i forbindelse med det mistænkelige dødsfald.\nLæs mere: https://via.ritzau.dk/pressemeddelelse/15309885/mistaenkeligt-dodsfald-i-nakskov-vidner-soges?lang=da#sm-15310548' });
 tjek('Politiets opfølgning: byen findes i linket (Bredgade, Nakskov)', nakskov.adresse === 'Bredgade, Nakskov');
+const sindal = parseBesked({ app: 'PF-Upload', title: '⚡ Strømafbrydelse – Sindal', message: '⚡ STRØMAFBRYDELSE\n📍 By: Sindal\n📮 Postnummer: 9870\n🔔 Type: Planlagt\n👥 Berørte kunder: 131\n🔧 Årsag:\nPå grund af anlægsarbejde er vi nødsaget til at afbryde strømmen onsdag d. 25. november fra kl. 12:00 til 15:00\n\ni Sindal: Baldersvej (14 adr.), Frejasvej (35 adr.)\n🕒 Start: 25-11-2026 kl. 12:00\n🕓 Forventet slut: 25-11-2026 kl. 15:00\n🏢 Netselskab: KONSTANT Net A/S' });
+console.log('  planlagt:', sindal.titel, '|', sindal.adresse, '|', sindal.kategori);
+tjek('Planlagt strømafbrydelse kommer med (Sindal)', !sindal.ignorer && sindal.kategori === 'Forsyning' && /planlagt/.test(sindal.titel) && /12\.00–15\.00/.test(sindal.titel));
+tjek('Planlagt strømafbrydelse placeres i byen (9870 Sindal)', /9870 Sindal/.test(sindal.adresse));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);
