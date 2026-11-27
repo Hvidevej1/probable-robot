@@ -440,6 +440,10 @@ async function start() {
   $('#btn-mig').onclick = () => {
     const f = $('#form-profil');
     f.navn.value = mig.navn || ''; f.telefon.value = mig.telefon || '';
+    const sel = $('#sel-omraade'), mitOmr = store.state.profiler.find(p => p.id === mig.id)?.omraade_id ?? mig.omraade_id;
+    sel.innerHTML = '<option value="">– Intet område –</option>' + (store.state.omraader || [])
+      .map(o => `<option value="${o.id}"${o.id === mitOmr ? ' selected' : ''}>${esc(o.navn)}</option>`).join('');
+    sel.onchange = () => prøv(() => store.skiftOmraade(sel.value), `Dit område er nu ${sel.selectedOptions[0].textContent}.`);
     f.position.checked = pref.get('position', false); f.lyd.checked = pref.get('lyd', true);
     f.push.checked = pref.get('push', false);
     const grund = store.demo ? 'Push-beskeder virker først, når Fotovagt er sat op med Supabase.' : pushKanBruges();

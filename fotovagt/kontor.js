@@ -8,7 +8,7 @@ import {
   pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm, nedtælling,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
   PRIO, prioAf, efterPrio, iNærheden, indsigt, indsigtHtml,
-  stationsKontrol,
+  stationsKontrol, regionFraPostnr,
 } from './faelles.js';
 
 let sLag;
@@ -250,7 +250,7 @@ async function åbnInvitationer() {
           <label>E-mail <input name="email" type="email" required autocomplete="off"></label>
           <label>Telefon <input name="telefon" type="tel" autocomplete="off"></label>
           <label>Rolle <select name="rolle"><option value="foto">Fotograf</option><option value="kontor">Kontor</option></select></label>
-          <label>Område <select name="omraade_id"></select></label>
+          <label>Region <select name="omraade_id"></select></label>
           <button type="submit">Opret og send</button>
         </form>
         <div class="kopi-boks" id="inv-kopi" hidden></div>
@@ -439,14 +439,20 @@ function åbnFoto(id) {
     knap.disabled = false; knap.textContent = 'Find';
     if (!pos) return toast('Adressen blev ikke fundet. Prøv med postnummer og by.', 'fejl');
     f.base_lat.value = pos.lat; f.base_lon.value = pos.lon; hint();
+    sætRegion();
   };
+  // Regionen følger udgangspunktets postnummer (kan stadig vælges om)
+  function sætRegion() {
+    const navn = regionFraPostnr(f.base_adresse.value), o = (S().omraader || []).find(x => x.navn === navn);
+    if (o && f.omraade_id.value !== o.id) { f.omraade_id.value = o.id; toast(`Region sat til ${o.navn} ud fra adressen.`); }
+  }
   dlg.onclose = async () => {
     if (dlg.returnValue !== 'gem') return;
     if (f.status.value !== p.status) await prøv(() => store.saetStatus(id, f.status.value));
     const adr = f.base_adresse.value.trim();
     if (adr && !f.base_lat.value) {           // glemt at trykke Find: prøv selv
       const pos = await store.geokod(adr).catch(() => null);
-      if (pos) { f.base_lat.value = pos.lat; f.base_lon.value = pos.lon; } else toast('Udgangspunktet blev ikke fundet på kortet – ret adressen.', 'fejl');
+      if (pos) { f.base_lat.value = pos.lat; f.base_lon.value = pos.lon; sætRegion(); } else toast('Udgangspunktet blev ikke fundet på kortet – ret adressen.', 'fejl');
     }
     await prøv(() => store.retFotograf(id, {
       navn: f.navn.value.trim(), telefon: f.telefon.value.trim() || null, rolle: f.rolle.value,
@@ -458,59 +464,39 @@ function åbnFoto(id) {
 }
 
 // ---------------------------------------------------------------------------------
-// Geografiske områder (fx efter fotografernes bopæl/kontor)
-const FARVER = ['#2f80ff', '#16a34a', '#f59e0b', '#db2777', '#0891b2', '#7c3aed', '#dc2626', '#65a30d'];
+// Områder = Danmarks 5 regioner (faste). Kontoret kan ændre farven og se, hvem der hører til hvor.
 function åbnOmraader() {
   let dlg = $('#dlg-omraader');
   if (!dlg) {
     dlg = document.createElement('dialog'); dlg.id = 'dlg-omraader'; dlg.className = 'ark';
     dlg.innerHTML = `
       <div class="ark-indhold">
-        <div class="ark-top"><h2>🗺 Områder</h2><button class="luk" data-luk-omr aria-label="Luk">✕</button></div>
-        <p class="hint">Del fotograferne i områder efter, hvor de kører ud fra. En hændelse hører til det område, hvis fotograf bor/har kontor nærmest.
-          <b>Tættest på trumfer område:</b> tilbuddet går altid først til den nærmeste ledige fotograf. Er to omtrent lige tæt på (inden for 2 km), vælges fotografen fra området.
-          Vælg område og "Kører ud fra" på hver fotograf (✎).</p>
-        <form class="omr-form" id="form-omr">
-          <label>Nyt område <input name="navn" required placeholder="Fx Midtjylland" autocomplete="off"></label>
-          <input type="color" name="farve" aria-label="Farve">
-          <button type="submit">Tilføj</button>
-        </form>
+        <div class="ark-top"><h2>🗺 Regioner</h2><button class="luk" data-luk-omr aria-label="Luk">✕</button></div>
+        <p class="hint">Områderne er Danmarks fem regioner. En hændelse får sin region ud fra adressen (postnummer, bekræftet af kortopslaget).
+          <b>Tættest på trumfer område:</b> tilbuddet går altid først til den nærmeste ledige fotograf; er to omtrent lige tæt på, vælges fotografen fra hændelsens region.
+          Fotografens region skiftes løbende – her med ✎ på fotografen, eller af fotografen selv under "Min profil" i Marken.</p>
         <div class="omr-liste" id="omr-liste"></div>
       </div>`;
     document.body.append(dlg);
-    dlg.addEventListener('click', async e => {
-      if (e.target === dlg || e.target.closest('[data-luk-omr]')) return dlg.close();
-      const sl = e.target.closest('[data-slet-omr]');
-      if (sl) {
-        const o = O(sl.dataset.sletOmr), n = S().profiler.filter(p => p.omraade_id === o.id).length;
-        if (confirm(`Slet området "${o.navn}"?${n ? ` ${n} fotograf${n > 1 ? 'er' : ''} får intet område.` : ''}`)) {
-          await prøv(() => store.sletOmraade(o.id), 'Området er slettet.'); vis();
-        }
-      }
-    });
+    dlg.addEventListener('click', e => { if (e.target === dlg || e.target.closest('[data-luk-omr]')) dlg.close(); });
     dlg.addEventListener('change', async e => {
       const r = e.target.closest('[data-omr]'); if (!r) return;
-      await prøv(() => store.gemOmraade({ id: r.dataset.omr, navn: r.querySelector('[name=n]').value.trim(), farve: r.querySelector('[name=f]').value }), 'Gemt.');
+      const o = O(r.dataset.omr);
+      await prøv(() => store.gemOmraade({ id: o.id, navn: o.navn, farve: r.querySelector('[name=f]').value }), 'Farven er gemt.');
       vis();
-    });
-    dlg.querySelector('form').addEventListener('submit', async e => {
-      e.preventDefault();
-      const f = e.target;
-      if (await prøv(() => store.gemOmraade({ navn: f.navn.value.trim(), farve: f.farve.value }), `${f.navn.value.trim()} er oprettet.`)) { f.reset(); vis(); }
     });
   }
   function vis() {
-    const omr = S().omraader || [];
-    dlg.querySelector('[name=farve]').value = FARVER[omr.length % FARVER.length];
-    $('#omr-liste').innerHTML = omr.length ? omr.map(o => {
+    $('#omr-liste').innerHTML = (S().omraader || []).map(o => {
       const fot = S().profiler.filter(p => p.rolle === 'foto' && p.omraade_id === o.id);
+      const akt = S().haendelser.filter(h => aktiv(h) && h.omraade_id === o.id).length;
       return `<div class="omr-række" data-omr="${o.id}">
-        <input type="color" name="f" value="${esc(o.farve)}" aria-label="Farve">
-        <div><input name="n" value="${esc(o.navn)}" aria-label="Navn"><small class="base-lille">${fot.length ? fot.map(p => esc(p.navn)).join(', ') : 'Ingen fotografer endnu'}</small></div>
-        <span class="pille">${fot.length}</span>
-        <button class="link fare" data-slet-omr="${o.id}">Slet</button>
+        <input type="color" name="f" value="${esc(o.farve)}" aria-label="Farve for ${esc(o.navn)}">
+        <div><b>Region ${esc(o.navn)}</b><small class="base-lille">${fot.length ? fot.map(p => esc(p.navn)).join(', ') : 'Ingen fotografer endnu'}</small></div>
+        <span class="pille" title="Fotografer">👤 ${fot.length}</span>
+        <span class="pille" title="Aktive hændelser">${akt} aktive</span>
       </div>`;
-    }).join('') : '<p class="hint">Ingen områder endnu.</p>';
+    }).join('') || '<p class="hint">Regionerne er ikke oprettet endnu – kør supabase/regioner.sql.</p>';
   }
   vis();
   dlg.showModal();

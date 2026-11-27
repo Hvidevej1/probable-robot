@@ -203,7 +203,14 @@ kan sende på sms. "Send igen" på listen sender en ny mail/et nyt link.
 `https://vagt.hrc-fotos.dk/**` står under *Redirect URLs* – ellers peger linket det forkerte sted hen.
 Til mange mails: opsæt egen SMTP under Authentication → Emails (fx Simply-mail).
 
-## Geografiske områder
+## Regioner (områder)
+Områderne er **Danmarks fem regioner**: Nordjylland, Midtjylland, Syddanmark, Sjælland og Hovedstaden (faste – kontoret kan
+kun ændre farven under **Fotografer → 🗺 Regioner**). En hændelse får sin region med det samme ud fra postnummeret i adressen,
+og Nominatim-opslaget bekræfter den. Fotografens region **skiftes løbende**: af kontoret (✎ på fotografen – regionen
+foreslås automatisk ud fra "Kører ud fra"-adressen) eller af fotografen selv under **Min profil** i Marken. Skiftet logges.
+SQL: `supabase/regioner.sql`.
+
+## Geografiske områder (opbygning)
 Kontoret: **Fotografer → 🗺 Områder** opretter områder (navn og farve). På hver fotograf (✎) vælges område og
 **Kører ud fra** (bopæl/kontor, tryk Find). Fotograferne vises grupperet efter område.
 * En hændelse hører til det område, hvis fotograf har sit udgangspunkt nærmest (`haendelser.omraade_id`).

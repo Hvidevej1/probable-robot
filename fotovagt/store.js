@@ -177,6 +177,12 @@ function supabaseBackend() {
       if (r.error) throw new Error(/duplicate|unique/i.test(r.error.message) ? 'Der findes allerede et område med det navn.' : r.error.message);
       await hentOmraader();
     },
+    // Fotografen skifter selv område (region)
+    async skiftOmraade(id) {
+      const { error } = await sb.rpc('skift_omraade', { o: id || null });
+      if (error) throw new Error(error.message);
+      if (state.mig) state.mig.omraade_id = id || null;
+    },
     async sletOmraade(id) {
       const { error } = await sb.from('omraader').delete().eq('id', id);
       if (error) throw new Error(error.message);
@@ -325,7 +331,8 @@ function demoBackend() {
   const DEMO_INDST = /[?&]hurtig\b/.test(location.search)
     ? { auto_tilbud: true, tilbud_sek: 6, blink_sek: 12, max_km: 35, pos_max_min: 30, kategorier_fra: ['Forsyning'] }
     : { auto_tilbud: true, tilbud_sek: 60, blink_sek: 120, max_km: 35, pos_max_min: 30, kategorier_fra: ['Forsyning'] };
-  const DEMO_OMR = () => [{ id: 'o1', navn: 'Midtjylland', farve: '#2f80ff' }, { id: 'o2', navn: 'Østjylland', farve: '#16a34a' }];
+  const DEMO_OMR = () => [['o1', 'Nordjylland', '#0ea5e9'], ['o2', 'Midtjylland', '#16a34a'], ['o3', 'Syddanmark', '#f59e0b'], ['o4', 'Sjælland', '#8b5cf6'], ['o5', 'Hovedstaden', '#e11d48']]
+    .map(([id, navn, farve]) => ({ id, navn, farve }));
   let db, kSpejlet = false;
   const læs = () => { try { db = JSON.parse(localStorage.getItem(NØGLE)) || frø(); } catch { db = frø(); } };
   const gem = () => {
@@ -344,7 +351,7 @@ function demoBackend() {
     db.tilbud ||= []; db.indst = { ...DEMO_INDST, ...(db.indst || {}) };
     const førTilbud = new Set(state.tilbud.map(x => x.id));
     state.tilbud = [...db.tilbud]; state.indst = db.indst;
-    db.omraader ||= DEMO_OMR();
+    if (!db.omraader || db.omraader.some(o => o.navn === 'Østjylland')) db.omraader = DEMO_OMR();
     state.omraader = [...db.omraader].sort((a, b) => a.navn.localeCompare(b.navn));
     state.nytTilbud = state.tilbud.find(x => !førTilbud.has(x.id) && x.fotograf === state.mig?.id && !x.svar) || null;
     db.sos ||= [];
@@ -599,6 +606,7 @@ function demoBackend() {
       const o = id && db.omraader.find(x => x.id === id);
       if (o) Object.assign(o, { navn: navn.trim(), farve }); else db.omraader.push({ id: uid(), navn: navn.trim(), farve });
     }),
+    skiftOmraade: kør(id => { const m = P(mig().id); m.omraade_id = id || null; log(null, `skiftede område til ${(db.omraader || DEMO_OMR()).find(o => o.id === id)?.navn || 'intet'}`); }),
     sletOmraade: kør(id => {
       kontor(); db.omraader = (db.omraader || DEMO_OMR()).filter(o => o.id !== id);
       for (const p of db.profiler) if (p.omraade_id === id) p.omraade_id = null;

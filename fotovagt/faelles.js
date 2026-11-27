@@ -854,3 +854,24 @@ export function åbnTelefonliste() {
   }
   dlg.showModal();
 }
+
+// Region ud fra postnummer (samme regler som region_fra_postnr i supabase/regioner.sql)
+export function regionFraPostnr(tekst) {
+  const pn = +((/\b(\d{4})\b/.exec(tekst || '') || [])[1] || 0);
+  if (!pn) return null;
+  if (pn === 4050) return 'Hovedstaden';
+  if (pn >= 1000 && pn <= 3799) return 'Hovedstaden';
+  if (pn >= 4000 && pn <= 4999) return 'Sjælland';
+  if (pn >= 5000 && pn <= 6899) return 'Syddanmark';
+  if (pn >= 6900 && pn <= 6999) return 'Midtjylland';
+  if (pn >= 7130 && pn <= 7171) return 'Midtjylland';
+  if (pn >= 7000 && pn <= 7260) return 'Syddanmark';
+  if (pn >= 7270 && pn <= 7280) return 'Midtjylland';
+  if (pn >= 7300 && pn <= 7323) return 'Syddanmark';
+  if (pn === 7790) return 'Midtjylland';
+  if ((pn >= 7700 && pn <= 7799) || (pn >= 7900 && pn <= 7999)) return 'Nordjylland';
+  if (pn >= 7330 && pn <= 8999) return 'Midtjylland';
+  if (pn === 9632) return 'Midtjylland';
+  if (pn >= 9000 && pn <= 9999) return 'Nordjylland';
+  return null;
+}
