@@ -185,3 +185,39 @@ Desuden opgraderes titel og kategori automatisk, når en mere alvorlig melding k
 
 ## Prioritering (kontoret)
 Hver aktiv hændelse har knapperne **🔴 Høj · Normal · ⚪ Lav** på kontoret. Prioriteten kan ændres når som helst, efterhånden som der kommer oplysninger ind, og hver ændring skrives i logbogen. Høj prioritet står øverst i listerne (både kontor og fotografer), får en større, rød nål med "!" på kortet og et rødt mærke hos fotograferne, som også får en besked. Lav prioritet står nederst og er nedtonet. Ved hver hændelse står, hvor mange andre aktive hændelser der er inden for 10 km. Se `supabase/prioritet.sql`.
+
+## Kritiske ord i sammenhæng
+Ud over ord, der altid er kritiske (elbil, færge …), er **kemikalier, bombe, granat og gas** kun kritiske, når samme linje også
+nævner fx brand, udslip, læk, eksplosion, fund, trussel eller mistænkelig – også i sammensatte ord som *gasudslip*,
+*bombetrussel* og *kemikaliebrand*. "Gaslugt" eller "kemikalier, lager" alene giver ikke forslag. Stationens navn
+("Brand & Redning", "brandvæsen") tæller ikke som sammenhæng. Ordlisterne står i `indstillinger.eskaler_ord_kontekst` og
+`indstillinger.eskaler_kontekst` (se `supabase/omraader.sql`).
+
+## Nye brugere fra kontoret (mail med link)
+Kontoret: **Fotografer → ＋ Ny bruger**. Udfyld navn, e-mail, telefon, rolle og område, og tryk **Opret og send**.
+Edge function `brugere` gemmer invitationen og sender en mail fra Supabase med et link til vagt.hrc-fotos.dk
+(kontorbrugere til /kontor.html). Den nye trykker på linket og vælger sin adgangskode med det samme.
+Kan mailen ikke sendes (Supabases indbyggede mail tillader kun få mails i timen), viser Fotovagt et link, kontoret selv
+kan sende på sms. "Send igen" på listen sender en ny mail/et nyt link.
+**Tjek i Supabase → Authentication → URL Configuration**, at *Site URL* er `https://vagt.hrc-fotos.dk`, og at
+`https://vagt.hrc-fotos.dk/**` står under *Redirect URLs* – ellers peger linket det forkerte sted hen.
+Til mange mails: opsæt egen SMTP under Authentication → Emails (fx Simply-mail).
+
+## Geografiske områder
+Kontoret: **Fotografer → 🗺 Områder** opretter områder (navn og farve). På hver fotograf (✎) vælges område og
+**Kører ud fra** (bopæl/kontor, tryk Find). Fotograferne vises grupperet efter område.
+* En hændelse hører til det område, hvis fotograf har sit udgangspunkt nærmest (`haendelser.omraade_id`).
+* Tilbud går først til fotograferne i området (og fotografer uden område). **Naboområdet får kun tilbuddet, hvis
+  hændelsen har høj prioritet, og ingen i området har taget den** – eller hvis området slet ingen fotografer har.
+  Sætter kontoret høj prioritet, efter at området har sagt nej, går tilbuddet videre til naboerne med det samme.
+* Er fotografens egen position gammel eller mangler, regnes afstanden fra udgangspunktet.
+* I Marken står eget område øverst; hændelser i andre områder er nedtonet, undtagen "🆘 Naboområdet mangler en fotograf".
+SQL: `supabase/omraader.sql` og `supabase/omraade-prioritet.sql`.
+
+## Assistenten (lærer af tidligere hændelser)
+Infoboksen "🤖 Assistent" (på det valgte kort på kontoret og i hændelsen i Marken) viser for lignende hændelser:
+**forventede enheder** (typer og hvor ofte, typisk antal, og hvilke enheder der plejer at køre fra samme station/postnummer),
+et **forslag til prioritet og alvor** med begrundelse, hvor ofte en fotograf kørte, og hvor længe de varer.
+Den lærer af alle hændelser og af kontorets beslutninger (prioritet, opgradér/afvis, hvem der kørte). Indtil der er
+mindst 3 beslutninger på en type, starter den ud fra hændelsestypen. Kontoret kan trykke **Brug forslaget**.
+Alt regnes i databasen (`ai_indsigt()` i `supabase/ai-indsigt.sql`) – intet sendes til eksterne tjenester.

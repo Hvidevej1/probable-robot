@@ -667,3 +667,33 @@ body.marken #app { overflow: hidden; }
 .pin-prio { position: absolute; top: -9px; left: 50%; margin-left: -8px; transform: rotate(45deg); width: 16px; height: 16px; border-radius: 50%; background: var(--sos); color: #fff; font-size: 11px; line-height: 16px; text-align: center; font-weight: 900; border: 2px solid #fff; }
 .pin.prio-1 { position: relative; }
 .pin-prio-mini { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--sos); color: #fff; font-size: 10px; font-weight: 900; margin-right: 4px; vertical-align: -2px; }
+
+/* Områder og udgangspunkt */
+.panel-knapper { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.omraade-top { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--dæmpet); }
+.omraade-top:first-child { margin-top: 0; }
+.omraade-top .dot { width: 10px; height: 10px; }
+.omraade-top small { font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: auto; }
+.omr-række { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 8px 10px; background: var(--flade2); border-radius: var(--radius-s); }
+.omr-række input[type=color], .omr-form input[type=color] { width: 40px; height: 36px; padding: 2px; border-radius: 8px; }
+.omr-form { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 12px; }
+.omr-form label { margin: 0; }
+.omr-liste { display: grid; gap: 6px; }
+.base-lille { color: var(--dæmpet); }
+.foto-info .base-lille { display: block; }
+.omraade-tom { margin: 0 0 4px; padding: 4px 2px; color: var(--dæmpet); font-size: .82rem; }
+.inv-knapper { display: flex; gap: 8px; align-items: center; }
+.omr-mærke { --c: var(--offline); display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.omr-mærke::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.h-kort.andet-omr { opacity: .72; }
+.nabo-hjælp { color: var(--fare, #dc2626); font-weight: 700; }
+
+/* Assistenten */
+.ai-boks { margin: 8px 0; padding: 10px 12px; border-radius: var(--radius-s); border: 1px solid color-mix(in srgb, #7c3aed 35%, var(--kant)); background: color-mix(in srgb, #7c3aed 7%, var(--flade)); font-size: .88rem; }
+.ai-boks p { margin: 0 0 6px; }
+.ai-boks p:last-child { margin-bottom: 0; }
+.ai-top { font-weight: 700; }
+.ai-top small { font-weight: 500; color: var(--dæmpet); margin-left: 4px; }
+.ai-boks small { color: var(--dæmpet); }
+.prio-tekst.p1 { color: #dc2626; font-weight: 700; }
+.prio-tekst.p3 { color: var(--dæmpet); font-weight: 700; }

@@ -6,7 +6,7 @@ import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './s
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey) && !/[?&]demo\b/.test(location.search);
 const lyttere = new Set();
-const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], indst: {}, mig: null };
+const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], omraader: [], indst: {}, mig: null };
 const fejlTekst = e => (e && (e.message || e.error_description)) || String(e);
 const ændret = () => lyttere.forEach(f => f(state));
 const kodeFejl = m => /different from the old/i.test(m) ? 'Den nye adgangskode skal være forskellig fra den gamle.'
@@ -18,6 +18,8 @@ const kodeFejl = m => /different from the old/i.test(m) ? 'Den nye adgangskode s
 // Supabase
 // ------------------------------------------------------------------------------------
 function supabaseBackend() {
+  // Kommer man ind via invitationsmailen (eller et login-link), skal man vælge sin adgangskode
+  const førsteLogin = /type=(invite|magiclink|signup)/.test(location.hash);
   const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
     auth: { persistSession: true, autoRefreshToken: true },
   });
@@ -50,7 +52,14 @@ function supabaseBackend() {
     state.haendelser = h.data; state.profiler = p.data; state.log = l.data; state.sos = s.data;
     state.tilbud = t.data || []; state.indst = ind.data || {}; state.kommentarer = k.data || [];
     state.mig = state.profiler.find(x => x.id === state.mig?.id) || state.mig;
+    await hentOmraader(false);
     ændret();
+  }
+  // Områder findes først, når omraader.sql er kørt – uden den er listen bare tom
+  async function hentOmraader(vis = true) {
+    const { data, error } = await sb.from('omraader').select('*').order('navn');
+    state.omraader = error ? [] : data;
+    if (vis) ændret();
   }
 
   function abonnér() {
@@ -78,6 +87,7 @@ function supabaseBackend() {
         else { const ny = !state.tilbud.some(x => x.id === e.new.id); upsertListe(state.tilbud, e.new); if (ny && e.new.fotograf === state.mig?.id) state.nytTilbud = e.new; }
         ændret(); state.nytTilbud = null;
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'omraader' }, () => hentOmraader())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'indstillinger' }, e => {
         if (e.new) state.indst = { ...state.indst, ...e.new }; ændret();
       })
@@ -131,9 +141,37 @@ function supabaseBackend() {
       if (error) throw new Error(error.message);
       return data;
     },
-    async inviter({ email, navn, telefon, rolle }) {
-      const { error } = await sb.from('invitationer').insert({ email: email.trim().toLowerCase(), navn: navn || null, telefon: telefon || null, rolle: rolle || 'foto', inviteret_af: state.mig?.id });
-      if (error) throw new Error(/duplicate|unique/i.test(error.message) ? 'Den e-mail er allerede inviteret.' : error.message);
+    // Opretter invitationen og sender en mail med et link til Fotovagt (edge function "brugere").
+    // Svarer { mail: true } eller { mail: false, link, fejl } – så kan kontoret sende linket selv.
+    async inviter({ email, navn, telefon, rolle, omraade_id }, { igen = false } = {}) {
+      const { data, error } = await sb.functions.invoke('brugere', {
+        body: { inviter: { email: email.trim().toLowerCase(), navn: navn || null, telefon: telefon || null, rolle: rolle || 'foto', omraade_id: omraade_id || null }, igen },
+      });
+      if (error) {
+        let m = error.message;
+        try { m = (await error.context.json()).fejl || m; } catch {}
+        throw new Error(m);
+      }
+      if (!data?.ok) throw new Error(data?.fejl || 'Invitationen kunne ikke sendes.');
+      return data;
+    },
+    get førsteLogin() { return førsteLogin; },
+    // Assistenten (databasefunktionen ai_indsigt i ai-indsigt.sql)
+    async indsigt(id) {
+      const { data, error } = await sb.rpc('ai_indsigt', { h: id });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    // Geografiske områder
+    async gemOmraade({ id, navn, farve }) {
+      const r = id ? await sb.from('omraader').update({ navn, farve }).eq('id', id) : await sb.from('omraader').insert({ navn, farve });
+      if (r.error) throw new Error(/duplicate|unique/i.test(r.error.message) ? 'Der findes allerede et område med det navn.' : r.error.message);
+      await hentOmraader();
+    },
+    async sletOmraade(id) {
+      const { error } = await sb.from('omraader').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      await hentOmraader();
     },
     async hentIgnorerede() {
       const { data, error } = await sb.from('ignorerede').select('*').gt('tid', new Date(Date.now() - 24 * 3600e3).toISOString()).order('tid', { ascending: false }).limit(100);
@@ -278,6 +316,7 @@ function demoBackend() {
   const DEMO_INDST = /[?&]hurtig\b/.test(location.search)
     ? { auto_tilbud: true, tilbud_sek: 6, blink_sek: 12, max_km: 35, pos_max_min: 30, kategorier_fra: ['Forsyning'] }
     : { auto_tilbud: true, tilbud_sek: 60, blink_sek: 120, max_km: 35, pos_max_min: 30, kategorier_fra: ['Forsyning'] };
+  const DEMO_OMR = () => [{ id: 'o1', navn: 'Midtjylland', farve: '#2f80ff' }, { id: 'o2', navn: 'Østjylland', farve: '#16a34a' }];
   let db, kSpejlet = false;
   const læs = () => { try { db = JSON.parse(localStorage.getItem(NØGLE)) || frø(); } catch { db = frø(); } };
   const gem = () => {
@@ -296,6 +335,8 @@ function demoBackend() {
     db.tilbud ||= []; db.indst = { ...DEMO_INDST, ...(db.indst || {}) };
     const førTilbud = new Set(state.tilbud.map(x => x.id));
     state.tilbud = [...db.tilbud]; state.indst = db.indst;
+    db.omraader ||= DEMO_OMR();
+    state.omraader = [...db.omraader].sort((a, b) => a.navn.localeCompare(b.navn));
     state.nytTilbud = state.tilbud.find(x => !førTilbud.has(x.id) && x.fotograf === state.mig?.id && !x.svar) || null;
     db.sos ||= [];
     const førSos = new Set(state.sos.map(x => x.id));
@@ -315,11 +356,14 @@ function demoBackend() {
   const mig = () => db.profiler.find(p => p.id === state.mig?.id);
 
   // Tilbudsmotor i demoen (samme regler som tilbud.sql). Kører kun i kontorets fane.
-  const kmD = (a, b) => Math.hypot((a.lat - b.lat) * 111.2, (a.lon - b.lon) * 111.2 * Math.cos(a.lat * Math.PI / 180));
+  const kmD0 = (a, b) => Math.hypot((a.lat - b.lat) * 111.2, (a.lon - b.lon) * 111.2 * Math.cos(a.lat * Math.PI / 180));
   const sidsteOpgave = id => db.haendelser.filter(h => h.taget_af === id && h.taget_tid).map(h => h.taget_tid).sort().pop() || '';
   function demoNæste(h) {
     const ind = db.indst;
-    const kand = db.profiler.filter(p => p.rolle === 'foto' && p.status === 'ledig' && p.lat != null && !p.haendelse_id
+    // Som i databasen: aktuel position, ellers udgangspunktet (bopæl/kontor)
+    const frisk = p => p.lat != null; // demoens positioner opdateres ikke løbende, så alder tælles ikke
+    const kmD = (h, p) => kmD0(h, frisk(p) ? p : { lat: p.base_lat, lon: p.base_lon });
+    const kand = db.profiler.filter(p => p.rolle === 'foto' && p.status === 'ledig' && (frisk(p) || p.base_lat != null) && !p.haendelse_id
       && !db.tilbud.some(t => t.haendelse_id === h.id && t.fotograf === p.id) && kmD(h, p) <= ind.max_km)
       .sort((a, b) => Math.floor(kmD(h, a) / 2) - Math.floor(kmD(h, b) / 2) || sidsteOpgave(a.id).localeCompare(sidsteOpgave(b.id)) || kmD(h, a) - kmD(h, b));
     const f = kand[0];
@@ -498,12 +542,47 @@ function demoBackend() {
     async opretBruger() { throw new Error('I demoen logger man ind ved at vælge en bruger.'); },
     async hentIgnorerede() { return []; },
     async hentInvitationer() { læs(); return [...(db.invitationer || [])]; },
-    inviter: kør(({ email, navn, telefon, rolle }) => {
+    inviter: kør(({ email, navn, telefon, rolle, omraade_id }, { igen = false } = {}) => {
       kontor(); db.invitationer ||= [];
       const e = email.trim().toLowerCase();
       if (!e.includes('@')) throw new Error('Skriv en gyldig e-mail.');
-      if (db.invitationer.some(i => i.email === e)) throw new Error('Den e-mail er allerede inviteret.');
-      db.invitationer.unshift({ email: e, navn, telefon, rolle: rolle || 'foto', oprettet: nu(), brugt: null });
+      if (!igen && db.invitationer.some(i => i.email === e)) throw new Error('Den e-mail er allerede inviteret.');
+      if (!igen) db.invitationer.unshift({ email: e, navn, telefon, rolle: rolle || 'foto', omraade_id: omraade_id || null, oprettet: nu(), brugt: null });
+      return { ok: true, mail: false, link: 'https://vagt.hrc-fotos.dk/#demo-invitation', fejl: 'I demoen sendes der ikke mails.' };
+    }),
+    førsteLogin: false,
+    // Demo: samme slags svar som ai_indsigt, regnet på demoens få hændelser
+    async indsigt(id) {
+      læs();
+      const h = H(id); if (!h) return null;
+      const lign = db.haendelser.filter(x => x.id !== id && x.kategori === h.kategori);
+      if (!lign.length) return { n: 0 };
+      const koder = x => [...new Set((`${x.titel} ${x.tekst || ''}`.match(/\b([A-ZÆØÅ]{2,3}[\s-]?(?:MR|[MVSRBTKH])[\s-]?\d{1,2}|ISL\s+[A-ZÆØÅ]{2,3}|OC)\b/g) || [])
+        .map(k => k.replace(/\s+/g, ' ').replace(/^([A-ZÆØÅ]{2,3})[\s-]?(MR|[MVSRBTKH])[\s-]?(\d+)$/, '$1-$2$3')))];
+      const type = k => k.startsWith('ISL') ? 'ISL' : k === 'OC' ? 'OC' : k.replace(/^[A-ZÆØÅ]+-([A-Z]+)\d+$/, '$1');
+      const med = lign.map(koder).filter(e => e.length);
+      const tæl = {}; for (const e of med) for (const t of new Set(e.map(type))) tæl[t] = (tæl[t] || 0) + 1;
+      const høj = lign.filter(x => x.prio === 1 || x.eskaleret || x.opgraderet).length;
+      const forslag = /bygn\.?\s?brand|eksplosion|redn\.|drukn|fastklemt|frontal/i.test(h.titel) ? 1 : /aba|eftersyn|kø|advarsel/i.test(h.titel) ? 3 : 2;
+      return {
+        n: lign.length, niveau: 'samme kategori', n_med_enheder: med.length,
+        typisk_antal: med.length ? Math.round(med.reduce((s, e) => s + e.length, 0) / med.length) : null,
+        enhedstyper: Object.entries(tæl).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t, c]) => ({ type: t, andel: c / med.length })),
+        enheder_her: [], andel_hoej: høj / lign.length, andel_foto: lign.filter(x => x.taget_af).length / lign.length,
+        varighed_min: null, forslag_prio: forslag, alvor: ['', 'stor', 'normal', 'lille'][forslag],
+        grund: [`ud fra typen – lærer stadig (demo, ${lign.length} lignende)`],
+      };
+    },
+    gemOmraade: kør(({ id, navn, farve }) => {
+      kontor(); db.omraader ||= DEMO_OMR();
+      if (!navn?.trim()) throw new Error('Skriv et navn.');
+      if (db.omraader.some(o => o.navn.toLowerCase() === navn.trim().toLowerCase() && o.id !== id)) throw new Error('Der findes allerede et område med det navn.');
+      const o = id && db.omraader.find(x => x.id === id);
+      if (o) Object.assign(o, { navn: navn.trim(), farve }); else db.omraader.push({ id: uid(), navn: navn.trim(), farve });
+    }),
+    sletOmraade: kør(id => {
+      kontor(); db.omraader = (db.omraader || DEMO_OMR()).filter(o => o.id !== id);
+      for (const p of db.profiler) if (p.omraade_id === id) p.omraade_id = null;
     }),
     sletInvitation: kør(email => { kontor(); db.invitationer = (db.invitationer || []).filter(i => i.email !== email); }),
     async fotografRapport(fra, til) {

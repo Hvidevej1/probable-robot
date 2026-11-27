@@ -5,7 +5,7 @@ import {
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
-  PRIO, prioAf, efterPrio,
+  PRIO, prioAf, efterPrio, indsigt, indsigtHtml,
 } from './faelles.js';
 
 const pref = {
@@ -60,16 +60,24 @@ function tegnOpgave() {
     </div>`;
 }
 
+// Eget område først. Hændelser i et naboområde kommer kun op, når de har høj prioritet og ingen har taget dem.
+const andetOmråde = h => !!(mig.omraade_id && h.omraade_id && h.omraade_id !== mig.omraade_id);
+const naboHjælp = h => andetOmråde(h) && prioAf(h) === 1 && h.status === 'ny';
+const områdeRang = h => (andetOmråde(h) && !naboHjælp(h) ? 1 : 0);
+const omrNavn = id => (store.state.omraader || []).find(o => o.id === id)?.navn;
+
 function kort_(h) {
   const d = afstand(h);
   const tagbar = h.status === 'ny' && !mig.haendelse_id;
   const min = h.taget_af === mig.id;
   return `
-    <article class="h-kort h-${h.status} prio-${prioAf(h)}${min ? ' min' : ''}" data-id="${h.id}">
+    <article class="h-kort h-${h.status} prio-${prioAf(h)}${min ? ' min' : ''}${andetOmråde(h) && !naboHjælp(h) && !min ? ' andet-omr' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
         <h3>${prioAf(h) === 1 && aktiv(h) ? '<span class="prio-mærke">🔴 Høj prioritet</span> ' : ''}${h.eskaleret ? '<span class="stor-mærke">⬆️ Stor hændelse</span> ' : ''}${esc(h.titel)}</h3>
         <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
+        ${naboHjælp(h) ? `<p class="lille nabo-hjælp">🆘 Naboområdet${omrNavn(h.omraade_id) ? ` (${esc(omrNavn(h.omraade_id))})` : ''} mangler en fotograf</p>`
+          : andetOmråde(h) && aktiv(h) ? `<p class="lille base-lille">Andet område${omrNavn(h.omraade_id) ? `: ${esc(omrNavn(h.omraade_id))}` : ''}</p>` : ''}
         <p class="lille">${siden(h.oprettet)} siden${d != null ? ` · ${kmTekst(d)}` : ''} ·
           ${kommentarerTil(h.id).length ? `<span class="k-antal" title="Kommentarer">💬 ${kommentarerTil(h.id).length}</span> · ` : ''}<span class="h-status">${h.auto_lukket && !aktiv(h) ? 'Lukket automatisk (ingen opdateringer)' : h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
       </div>
@@ -79,7 +87,7 @@ function kort_(h) {
 
 function tegnListe() {
   const alle = store.state.haendelser;
-  const aktive = alle.filter(aktiv).sort(efterPrio);   // kontorets prioritet først
+  const aktive = alle.filter(aktiv).sort((a, b) => (områdeRang(a) - områdeRang(b)) || efterPrio(a, b));   // eget område, så kontorets prioritet
   const afsluttede = alle.filter(h => !aktiv(h)).slice(0, 15);
   const nye = aktive.filter(h => h.status === 'ny').length;
   const t = $('#antal-nye'); t.hidden = !nye; t.textContent = nye;
@@ -225,6 +233,7 @@ function visHaendelse(id, åbn = true) {
     <h2>${esc(h.titel)}</h2>
     <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${d != null ? ` · ${kmTekst(d)} væk` : ''}</p>
     ${h.antal_enheder ? `<p class="lille">🚒 ${h.antal_ass || 0} assistance${h.antal_ass === 1 ? '' : 'r'} · ${h.antal_enheder} enheder</p>` : ''}
+    ${aktiv(h) ? `<div id="ai-plads">${indsigtHtml(h, indsigt(h, d => { if (åbenId === h.id) { const el = $('#ai-plads'); if (el) el.innerHTML = indsigtHtml(h, d); } }))}</div>` : ''}
     ${h.cirka ? '<p class="hint">Placeringen er cirka (kun by eller station kendt). Tjek adressen i teksten.</p>' : ''}
     <p class="lille">Modtaget kl. ${klokken(h.oprettet)} (${siden(h.oprettet)} siden) · ${esc(h.kategori || '')}</p>
     <p class="status-linje h-${h.status}">${h.status === 'ny' ? 'Ingen har taget den endnu' : min ? 'Det er din opgave' : `${H_STATUS[h.status]}: ${esc(navn(h.taget_af))}`}</p>

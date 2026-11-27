@@ -7,7 +7,7 @@ import {
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm, nedtælling,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
-  PRIO, prioAf, efterPrio, iNærheden,
+  PRIO, prioAf, efterPrio, iNærheden, indsigt, indsigtHtml,
 } from './faelles.js';
 
 let sLag;
@@ -17,6 +17,7 @@ const S = () => store.state;
 const P = id => S().profiler.find(p => p.id === id);
 const H = id => S().haendelser.find(h => h.id === id);
 const navn = id => P(id)?.navn || '–';
+const O = id => (S().omraader || []).find(o => o.id === id);
 const STATUS_ORDEN = { ledig: 0, ankommet: 1, optaget: 2, pause: 3, offline: 4 };
 
 // ---------------------------------------------------------------------------------
@@ -65,7 +66,7 @@ function tegnNøgletal() {
 function tegnFotografer() {
   const liste = S().profiler.filter(p => p.rolle === 'foto')
     .sort((a, b) => (STATUS_ORDEN[a.status] - STATUS_ORDEN[b.status]) || a.navn.localeCompare(b.navn));
-  $('#fotografer').innerHTML = liste.length ? liste.map(p => {
+  const række = p => {
     const st = STATUS[p.status] || STATUS.offline, h = H(p.haendelse_id);
     const gammel = p.status !== 'offline' && !set(p);
     return `
@@ -74,6 +75,7 @@ function tegnFotografer() {
         <div class="foto-info">
           <b>${esc(p.navn)}</b>${aktiveSos().some(x => x.bruger === p.id) ? ' <span class="sos-maerke">SOS</span>' : ''}
           <span class="lille"><span class="status-tekst" style="--c:${st.farve}">${st.tekst}</span> · ${siden(p.status_tid)}${gammel ? ` · <span class="advarsel">ikke set i ${siden(p.sidst_set) || 'lang tid'}</span>` : ''}</span>
+          ${p.base_adresse ? `<span class="lille base-lille">🏠 ${esc(p.base_adresse)}</span>` : ''}
           ${h ? `<button class="link opgave-link" data-zoom="${h.id}">${ikonFor(h)} ${esc(h.titel)}</button>` : ''}
         </div>
         <div class="foto-knapper">
@@ -82,7 +84,17 @@ function tegnFotografer() {
           <button class="ikon-knap" data-ret-foto="${p.id}" title="Ret">✎</button>
         </div>
       </div>`;
-  }).join('') : '<p class="tom">Ingen fotografer endnu. Opret dem i Supabase under Authentication.</p>';
+  };
+  if (!liste.length) { $('#fotografer').innerHTML = '<p class="tom">Ingen fotografer endnu. Tryk "＋ Ny bruger" for at oprette en.</p>'; return; }
+  const områder = S().omraader || [];
+  if (!områder.length) { $('#fotografer').innerHTML = liste.map(række).join(''); return; }
+  // Grupperet efter område (fotografer uden område til sidst)
+  const grupper = [...områder.map(o => [o, liste.filter(p => p.omraade_id === o.id)]), [null, liste.filter(p => !O(p.omraade_id))]]
+    .filter(([o, l]) => l.length || o);
+  $('#fotografer').innerHTML = grupper.map(([o, l]) => `
+    <div class="omraade-top"><i class="dot" style="--c:${o ? esc(o.farve) : 'var(--offline)'}"></i>${o ? esc(o.navn) : 'Uden område'}
+      <small>${l.filter(p => p.status === 'ledig').length} ledig af ${l.length}</small></div>
+    ${l.length ? l.map(række).join('') : '<p class="omraade-tom">Ingen fotografer i området endnu.</p>'}`).join('');
 }
 
 // Tilbud: hvem har fået det, hvem har sagt nej, og nærmeste ledige som forslag
@@ -116,7 +128,7 @@ function haendelseKort(h) {
       <div class="h-tekst">
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
-        <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}</p>
+        <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}${O(h.omraade_id) ? ` · <span class="omr-mærke" style="--c:${esc(O(h.omraade_id).farve)}">${esc(O(h.omraade_id).navn)}</span>` : ''}</p>
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)}${h.taget_tid ? ` · taget kl. ${klokken(h.taget_tid)}` : ''}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
         ${aktiv(h) ? (() => {
           const nær = iNærheden(h, S().haendelser);
@@ -129,6 +141,7 @@ function haendelseKort(h) {
         ${h.antal_enheder || h.antal_ass ? `<p class="lille enheder-linje">🚒 ${h.antal_ass || 0} assistance${h.antal_ass === 1 ? '' : 'r'} · ${h.antal_enheder || 0} enheder${h.eskaleret ? ' · <b class="stor-mærke">⬆️ Stor hændelse</b>' : ''}</p>` : (h.eskaleret ? '<p class="lille"><b class="stor-mærke">⬆️ Stor hændelse</b></p>' : '')}
         ${forslag(h) ? `<div class="eskalering-boks"><p>⚠️ <b>Stor hændelse?</b> ${esc(h.eskalering_grund || `${h.antal_ass} assistancer · ${h.antal_enheder} enheder`)}. Skal den opgraderes på fotografernes skærm? <small>(giver også høj prioritet)</small></p>
           <div class="knap-række"><button data-eskaler="${h.id}" data-ja="1">⬆️ Opgradér for fotograferne</button><button class="secondary" data-eskaler="${h.id}" data-ja="0">Afvis</button></div></div>` : ''}
+        ${valgtId === h.id ? indsigtHtml(h, indsigt(h, () => tegnHaendelser()), { kontor: true }) : ''}
         ${tilbudLinjer(h)}
         ${(n => n ? `<p class="opdatering"><span>${n.ikon} ${esc(n.tekst)}</span></p>` : '')(senesteNyt(h))}
         <p class="lille doegn-linje">${h.offentlig === false ? '🚫 Ikke på døgnrapporten' : `🌐 Døgnrapport: <b>${esc(h.offentlig_titel || (h.kategori === 'Andet' || !h.kategori ? 'Hændelse' : h.kategori))}</b>${offentligSted(h) ? ` · ${esc(offentligSted(h))}` : ''}`}</p>
@@ -220,25 +233,27 @@ function åbnTidslinje(id) {
 }
 
 // ---------------------------------------------------------------------------------
-// Invitationer: kun inviterede e-mails kan oprette en bruger
+// Ny bruger: kontoret opretter adgangen. Fotovagt sender en mail med et link til vagt.hrc-fotos.dk,
+// hvor den nye vælger sin adgangskode. Kan mailen ikke sendes, får kontoret et link til sms.
 async function åbnInvitationer() {
   let dlg = $('#dlg-inviter');
   if (!dlg) {
     dlg = document.createElement('dialog'); dlg.id = 'dlg-inviter'; dlg.className = 'ark';
     dlg.innerHTML = `
       <div class="ark-indhold">
-        <div class="ark-top"><h2>👥 Inviter ny bruger</h2><button class="luk" data-luk-inv aria-label="Luk">✕</button></div>
-        <p class="hint">Kun e-mails på listen kan oprette en bruger i Fotovagt. Den nye åbner <b>vagt.hrc-fotos.dk</b>, trykker
-          <b>"Ny bruger? Opret din adgangskode"</b> og bruger den e-mail, du skriver her. Så kommer de automatisk med på kortet, i tilbud og i rapporterne.</p>
+        <div class="ark-top"><h2>👥 Ny bruger</h2><button class="luk" data-luk-inv aria-label="Luk">✕</button></div>
+        <p class="hint">Udfyld og tryk <b>Opret og send</b>. Den nye får en mail med et link til <b>vagt.hrc-fotos.dk</b>, vælger sin adgangskode
+          og er med det samme med på kortet, i tilbud og i rapporterne. Kun e-mails på listen kan oprette en bruger.</p>
         <form id="form-inviter" class="inviter-form">
           <label>Navn <input name="navn" required autocomplete="off"></label>
           <label>E-mail <input name="email" type="email" required autocomplete="off"></label>
           <label>Telefon <input name="telefon" type="tel" autocomplete="off"></label>
           <label>Rolle <select name="rolle"><option value="foto">Fotograf</option><option value="kontor">Kontor</option></select></label>
-          <button type="submit">Inviter</button>
+          <label>Område <select name="omraade_id"></select></label>
+          <button type="submit">Opret og send</button>
         </form>
         <div class="kopi-boks" id="inv-kopi" hidden></div>
-        <h3 class="inv-titel">Inviterede</h3>
+        <h3 class="inv-titel">Brugere og invitationer</h3>
         <div id="inv-liste" class="inv-liste"><p class="hint">Henter …</p></div>
       </div>`;
     document.body.append(dlg);
@@ -248,31 +263,54 @@ async function åbnInvitationer() {
       if (s && confirm(`Fjern invitationen til ${s.dataset.sletInv}? (En bruger, der allerede er oprettet, beholder sin adgang – den fjernes under Fotografer.)`)) {
         await prøv(() => store.sletInvitation(s.dataset.sletInv), 'Invitationen er fjernet.'); visListe();
       }
+      const ig = e.target.closest('[data-igen]');
+      if (ig) {
+        ig.disabled = true;
+        const inv = (await store.hentInvitationer()).find(i => i.email === ig.dataset.igen);
+        try { visSvar(inv, await store.inviter(inv, { igen: true })); } catch (err) { toast(store.fejlTekst(err), 'fejl'); }
+        ig.disabled = false;
+      }
       const c = e.target.closest('[data-kopi]');
-      if (c) { try { await navigator.clipboard.writeText(c.dataset.kopi); toast('Teksten er kopieret.', 'ok'); } catch { toast('Kunne ikke kopiere – markér teksten og kopiér selv.', 'fejl'); } }
+      if (c) { try { await navigator.clipboard.writeText(c.dataset.kopi); toast('Kopieret.', 'ok'); } catch { toast('Kunne ikke kopiere – markér teksten og kopiér selv.', 'fejl'); } }
     });
     dlg.querySelector('form').addEventListener('submit', async e => {
       e.preventDefault();
-      const f = e.target, data = { navn: f.navn.value.trim(), email: f.email.value.trim(), telefon: f.telefon.value.trim(), rolle: f.rolle.value };
-      if (await prøv(() => store.inviter(data), `${data.navn} er inviteret.`)) {
-        const tekst = `Hej ${data.navn}. Du er inviteret til Fotovagt. Åbn https://vagt.hrc-fotos.dk, tryk "Ny bruger? Opret din adgangskode" og brug denne e-mail: ${data.email.toLowerCase()}`;
-        $('#inv-kopi').hidden = false;
-        $('#inv-kopi').innerHTML = `<p>Send denne besked til ${esc(data.navn)} (sms eller mail):</p><p class="kopi-tekst">${esc(tekst)}</p><button type="button" class="secondary" data-kopi="${esc(tekst)}">📋 Kopiér beskeden</button>`;
-        f.reset(); visListe();
-      }
+      const f = e.target, knap = f.querySelector('button[type=submit]');
+      const data = { navn: f.navn.value.trim(), email: f.email.value.trim().toLowerCase(), telefon: f.telefon.value.trim(), rolle: f.rolle.value, omraade_id: f.omraade_id.value || null };
+      knap.disabled = true; knap.textContent = 'Sender …';
+      try { visSvar(data, await store.inviter(data)); f.reset(); visListe(); }
+      catch (err) { toast(store.fejlTekst(err), 'fejl'); }
+      finally { knap.disabled = false; knap.textContent = 'Opret og send'; }
     });
+  }
+  // Svar fra serveren: mail sendt – eller et link, kontoret selv sender
+  function visSvar(data, svar) {
+    const boks = $('#inv-kopi'); boks.hidden = false;
+    if (svar.mail) {
+      boks.innerHTML = `<p>✅ <b>${esc(data.navn || data.email)}</b> er oprettet. Der er sendt en mail til ${esc(data.email)} med et link til Fotovagt.</p>
+        <p class="lille">Kan de ikke finde mailen, så bed dem kigge i spam – eller tryk "Send igen" på listen.</p>`;
+      toast('Mailen er sendt.', 'ok');
+      return;
+    }
+    const tekst = svar.link
+      ? `Hej ${data.navn || ''}. Du har fået adgang til Fotovagt. Tryk på linket og vælg din adgangskode: ${svar.link}`
+      : `Hej ${data.navn || ''}. Du har fået adgang til Fotovagt. Åbn https://vagt.hrc-fotos.dk, tryk "Ny bruger? Opret din adgangskode" og brug denne e-mail: ${data.email}`;
+    boks.innerHTML = `<p>⚠️ <b>${esc(data.navn || data.email)}</b> er oprettet, men mailen kunne ikke sendes${svar.fejl ? ` (${esc(svar.fejl)})` : ''}.
+      Send i stedet denne besked på sms eller mail${svar.link ? ' – linket virker én gang og udløber efter et døgn' : ''}:</p>
+      <p class="kopi-tekst">${esc(tekst)}</p><button type="button" class="secondary" data-kopi="${esc(tekst)}">📋 Kopiér beskeden</button>`;
   }
   async function visListe() {
     try {
       const liste = await store.hentInvitationer();
       $('#inv-liste').innerHTML = liste.length ? liste.map(i => `
         <div class="inv-række">
-          <div><b>${esc(i.navn || i.email)}</b> <small>${i.rolle === 'kontor' ? 'Kontor' : 'Fotograf'}</small><br><small>${esc(i.email)}${i.telefon ? ` · ${esc(i.telefon)}` : ''}</small></div>
+          <div><b>${esc(i.navn || i.email)}</b> <small>${i.rolle === 'kontor' ? 'Kontor' : 'Fotograf'}${O(i.omraade_id) ? ` · ${esc(O(i.omraade_id).navn)}` : ''}</small><br><small>${esc(i.email)}${i.telefon ? ` · ${esc(i.telefon)}` : ''}</small></div>
           <span class="pille ${i.brugt ? 'p-afsluttet' : 'p-ny'}">${i.brugt ? 'Oprettet' : 'Venter'}</span>
-          ${i.brugt ? '' : `<button class="link fare" data-slet-inv="${esc(i.email)}">Fjern</button>`}
+          ${i.brugt ? '<span></span>' : `<span class="inv-knapper"><button class="link" data-igen="${esc(i.email)}">Send igen</button><button class="link fare" data-slet-inv="${esc(i.email)}">Fjern</button></span>`}
         </div>`).join('') : '<p class="hint">Ingen invitationer endnu.</p>';
     } catch (e) { $('#inv-liste').innerHTML = `<p class="fejl-tekst">${esc(store.fejlTekst(e))}</p>`; }
   }
+  dlg.querySelector('[name=omraade_id]').innerHTML = områdeValg(null);
   $('#inv-kopi').hidden = true;
   dlg.showModal();
   visListe();
@@ -379,14 +417,101 @@ function læsBesked() {
 
 // ---------------------------------------------------------------------------------
 // Fotograf
+function områdeValg(valgt) {
+  return `<option value="">– Intet område –</option>` + (S().omraader || [])
+    .map(o => `<option value="${o.id}"${o.id === valgt ? ' selected' : ''}>${esc(o.navn)}</option>`).join('');
+}
 function åbnFoto(id) {
   const p = P(id), f = $('#form-foto'), dlg = $('#dlg-foto');
   f.navn.value = p.navn; f.telefon.value = p.telefon || ''; f.status.value = p.status; f.rolle.value = p.rolle;
+  f.omraade_id.innerHTML = områdeValg(p.omraade_id);
+  f.base_adresse.value = p.base_adresse || ''; f.base_lat.value = p.base_lat ?? ''; f.base_lon.value = p.base_lon ?? '';
+  const hint = () => { $('#base-hint').textContent = f.base_lat.value
+    ? '✓ Fundet på kortet. Tilbud bruger udgangspunktet, når fotografens egen position er gammel eller mangler.'
+    : 'Tryk "Find". Udgangspunktet bruges til tilbud, når fotografens position er gammel, og til at bestemme hændelsernes område.'; };
+  hint();
+  f.base_adresse.oninput = () => { f.base_lat.value = ''; f.base_lon.value = ''; hint(); };
+  $('#btn-find-base').onclick = async () => {
+    const a = f.base_adresse.value.trim(); if (!a) return toast('Skriv en adresse først.', 'fejl');
+    const knap = $('#btn-find-base'); knap.disabled = true; knap.textContent = '…';
+    const pos = await store.geokod(a).catch(() => null);
+    knap.disabled = false; knap.textContent = 'Find';
+    if (!pos) return toast('Adressen blev ikke fundet. Prøv med postnummer og by.', 'fejl');
+    f.base_lat.value = pos.lat; f.base_lon.value = pos.lon; hint();
+  };
   dlg.onclose = async () => {
     if (dlg.returnValue !== 'gem') return;
     if (f.status.value !== p.status) await prøv(() => store.saetStatus(id, f.status.value));
-    await prøv(() => store.retFotograf(id, { navn: f.navn.value.trim(), telefon: f.telefon.value.trim() || null, rolle: f.rolle.value }), 'Gemt.');
+    const adr = f.base_adresse.value.trim();
+    if (adr && !f.base_lat.value) {           // glemt at trykke Find: prøv selv
+      const pos = await store.geokod(adr).catch(() => null);
+      if (pos) { f.base_lat.value = pos.lat; f.base_lon.value = pos.lon; } else toast('Udgangspunktet blev ikke fundet på kortet – ret adressen.', 'fejl');
+    }
+    await prøv(() => store.retFotograf(id, {
+      navn: f.navn.value.trim(), telefon: f.telefon.value.trim() || null, rolle: f.rolle.value,
+      omraade_id: f.omraade_id.value || null, base_adresse: adr || null,
+      base_lat: adr && f.base_lat.value ? +f.base_lat.value : null, base_lon: adr && f.base_lon.value ? +f.base_lon.value : null,
+    }), 'Gemt.');
   };
+  dlg.showModal();
+}
+
+// ---------------------------------------------------------------------------------
+// Geografiske områder (fx efter fotografernes bopæl/kontor)
+const FARVER = ['#2f80ff', '#16a34a', '#f59e0b', '#db2777', '#0891b2', '#7c3aed', '#dc2626', '#65a30d'];
+function åbnOmraader() {
+  let dlg = $('#dlg-omraader');
+  if (!dlg) {
+    dlg = document.createElement('dialog'); dlg.id = 'dlg-omraader'; dlg.className = 'ark';
+    dlg.innerHTML = `
+      <div class="ark-indhold">
+        <div class="ark-top"><h2>🗺 Områder</h2><button class="luk" data-luk-omr aria-label="Luk">✕</button></div>
+        <p class="hint">Del fotograferne i områder efter, hvor de kører ud fra. En hændelse hører til det område, hvis fotograf bor/har kontor nærmest.
+          Tilbud går først til fotograferne i området. Naboområderne får kun tilbuddet, hvis hændelsen har <b>høj prioritet</b> og ingen i området tager den.
+          Vælg område og "Kører ud fra" på hver fotograf (✎).</p>
+        <form class="omr-form" id="form-omr">
+          <label>Nyt område <input name="navn" required placeholder="Fx Midtjylland" autocomplete="off"></label>
+          <input type="color" name="farve" aria-label="Farve">
+          <button type="submit">Tilføj</button>
+        </form>
+        <div class="omr-liste" id="omr-liste"></div>
+      </div>`;
+    document.body.append(dlg);
+    dlg.addEventListener('click', async e => {
+      if (e.target === dlg || e.target.closest('[data-luk-omr]')) return dlg.close();
+      const sl = e.target.closest('[data-slet-omr]');
+      if (sl) {
+        const o = O(sl.dataset.sletOmr), n = S().profiler.filter(p => p.omraade_id === o.id).length;
+        if (confirm(`Slet området "${o.navn}"?${n ? ` ${n} fotograf${n > 1 ? 'er' : ''} får intet område.` : ''}`)) {
+          await prøv(() => store.sletOmraade(o.id), 'Området er slettet.'); vis();
+        }
+      }
+    });
+    dlg.addEventListener('change', async e => {
+      const r = e.target.closest('[data-omr]'); if (!r) return;
+      await prøv(() => store.gemOmraade({ id: r.dataset.omr, navn: r.querySelector('[name=n]').value.trim(), farve: r.querySelector('[name=f]').value }), 'Gemt.');
+      vis();
+    });
+    dlg.querySelector('form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      if (await prøv(() => store.gemOmraade({ navn: f.navn.value.trim(), farve: f.farve.value }), `${f.navn.value.trim()} er oprettet.`)) { f.reset(); vis(); }
+    });
+  }
+  function vis() {
+    const omr = S().omraader || [];
+    dlg.querySelector('[name=farve]').value = FARVER[omr.length % FARVER.length];
+    $('#omr-liste').innerHTML = omr.length ? omr.map(o => {
+      const fot = S().profiler.filter(p => p.rolle === 'foto' && p.omraade_id === o.id);
+      return `<div class="omr-række" data-omr="${o.id}">
+        <input type="color" name="f" value="${esc(o.farve)}" aria-label="Farve">
+        <div><input name="n" value="${esc(o.navn)}" aria-label="Navn"><small class="base-lille">${fot.length ? fot.map(p => esc(p.navn)).join(', ') : 'Ingen fotografer endnu'}</small></div>
+        <span class="pille">${fot.length}</span>
+        <button class="link fare" data-slet-omr="${o.id}">Slet</button>
+      </div>`;
+    }).join('') : '<p class="hint">Ingen områder endnu.</p>';
+  }
+  vis();
   dlg.showModal();
 }
 
@@ -641,6 +766,7 @@ async function start() {
   $('#btn-kode').onclick = () => åbnSkiftKode();
   $('#btn-rapport').onclick = () => åbnRapport();
   $('#btn-inviter').onclick = () => åbnInvitationer();
+  $('#btn-omraader').onclick = () => åbnOmraader();
   // Telefon: knapperne ligger i en menu, så toppen ikke fylder halvdelen af skærmen
   const menuKnap = $('#btn-menu'), menu = $('#top-menu');
   const lukMenu = () => { document.body.classList.remove('menu-åben'); menuKnap.setAttribute('aria-expanded', 'false'); };

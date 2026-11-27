@@ -276,7 +276,12 @@ export async function logInd({ kunKontor = false } = {}) {
   const vis = (felt) => { boks.hidden = false; $('#app').hidden = true; felt?.focus(); };
   let mig = null;
   try { mig = await store.init(); } catch (e) { $('#login-msg').textContent = store.fejlTekst(e); }
-  if (mig && (!kunKontor || mig.rolle === 'kontor')) { boks.hidden = true; $('#app').hidden = false; return mig; }
+  if (mig && (!kunKontor || mig.rolle === 'kontor')) {
+    boks.hidden = true; $('#app').hidden = false;
+    // Kom ind via invitationsmailen: vælg adgangskode med det samme
+    if (store.førsteLogin) setTimeout(() => åbnSkiftKode({ velkommen: mig.navn }), 400);
+    return mig;
+  }
 
   return new Promise(resolve => {
     const msg = $('#login-msg');
@@ -487,13 +492,14 @@ export function offentligSted(h) {
 }
 
 // Skift adgangskode (samme dialog i Marken og på Kontoret)
-export function åbnSkiftKode() {
+export function åbnSkiftKode({ velkommen = null } = {}) {
   let dlg = $('#dlg-kode');
   if (!dlg) {
     dlg = document.createElement('dialog'); dlg.id = 'dlg-kode'; dlg.className = 'ark';
     dlg.innerHTML = `
       <form method="dialog" class="ark-indhold" id="form-kode">
-        <h2>Skift adgangskode</h2>
+        <h2 id="kode-titel">Skift adgangskode</h2>
+        <p class="hint" id="kode-velkommen" hidden></p>
         <input type="text" name="brugernavn" autocomplete="username" hidden>
         <label>Ny adgangskode <input name="ny" type="password" autocomplete="new-password" minlength="8" required></label>
         <label>Gentag ny adgangskode <input name="igen" type="password" autocomplete="new-password" minlength="8" required></label>
@@ -519,6 +525,10 @@ export function åbnSkiftKode() {
     });
   }
   const f = dlg.querySelector('form'); f.reset(); $('#kode-fejl').textContent = '';
+  $('#kode-titel').textContent = velkommen ? `Velkommen til Fotovagt${typeof velkommen === 'string' ? `, ${velkommen}` : ''}` : 'Skift adgangskode';
+  $('#kode-velkommen').hidden = !velkommen;
+  $('#kode-velkommen').textContent = 'Vælg din adgangskode. Næste gang logger du ind med din e-mail og den.';
+  f.querySelector('button[type=submit]').textContent = velkommen ? 'Gem adgangskode' : 'Skift adgangskode';
   f.brugernavn.value = store.state.mig?.navn || '';
   for (const d of document.querySelectorAll('dialog[open]')) if (d !== dlg) d.close();
   dlg.showModal();
@@ -548,3 +558,37 @@ async function tjekVersion() {
 tjekVersion();
 setInterval(tjekVersion, 10 * 60e3);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') tjekVersion(); });
+
+// ---------------------------------------------------------------------------------
+// Assistenten: lærer af tidligere hændelser og kontorets beslutninger (databasefunktionen ai_indsigt).
+// Svaret gemmes et par minutter pr. hændelse og hentes igen, når der kommer nyt i teksten.
+const indsigtCache = new Map();
+export function indsigt(h, nårKlar) {
+  const c = indsigtCache.get(h.id), længde = (h.tekst || '').length + (h.prio || 0);
+  if (c && (c.henter || (c.længde === længde && Date.now() - c.t < 120e3))) return c.data;
+  indsigtCache.set(h.id, { ...(c || {}), henter: true });
+  store.indsigt(h.id)
+    .then(data => { indsigtCache.set(h.id, { data, længde, t: Date.now() }); nårKlar?.(data); })
+    .catch(() => indsigtCache.set(h.id, { data: c?.data ?? null, længde, t: Date.now() }));
+  return c?.data;
+}
+const ENHEDSNAVN = { ISL: 'indsatsleder', OC: 'operationschef', M: 'sprøjte', V: 'tankvogn', S: 'stige' };
+const pct = x => `${Math.round((x || 0) * 100)} %`;
+const varighedTekst = m => m == null ? '' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} t ${m % 60 ? `${m % 60} min` : ''}`.trim();
+export function indsigtHtml(h, d, { kontor = false } = {}) {
+  if (d === undefined) return '<div class="ai-boks"><p class="ai-top">🤖 Assistent</p><p class="lille">Tænker …</p></div>';
+  if (!d || !d.n) return '<div class="ai-boks"><p class="ai-top">🤖 Assistent</p><p class="lille">Ingen lignende hændelser endnu – assistenten lærer, efterhånden som der kommer flere.</p></div>';
+  const typer = (d.enhedstyper || []).filter(t => t.andel >= 0.2);
+  const her = d.enheder_her || [];
+  const p = d.forslag_prio, nu = prioAf(h);
+  return `<div class="ai-boks">
+    <p class="ai-top">🤖 Assistent <small>lærer af ${d.n} lignende (${esc(d.niveau)})</small></p>
+    ${typer.length ? `<p><b>Forventede enheder:</b> ${typer.map(t => `${esc(t.type)}${ENHEDSNAVN[t.type] ? ` <small>${ENHEDSNAVN[t.type]}</small>` : ''} ${pct(t.andel)}`).join(' · ')}${d.typisk_antal ? ` · typisk ${d.typisk_antal} enheder` : ''}</p>`
+      : '<p class="lille">Ingen enheder i de lignende beskeder endnu.</p>'}
+    ${her.length ? `<p><b>Plejer at køre${d.sted ? ` (${esc(d.sted)})` : ''}:</b> ${her.map(e => esc(e.enhed)).join(', ')}</p>` : ''}
+    <p><b>Forslag:</b> <span class="prio-tekst p${p}">${PRIO[p]?.navn || 'Normal'} prioritet</span> · alvor ${esc(d.alvor)}
+      <br><small>${(d.grund || []).map(esc).join(' · ')}</small></p>
+    <p class="lille">Fotograf kørte på ${pct(d.andel_foto)} af de lignende${d.varighed_min != null ? ` · de varer typisk ${varighedTekst(d.varighed_min)}` : ''}</p>
+    ${kontor && aktiv(h) && p && p !== nu ? `<button class="secondary lille-knap" data-prio="${h.id}" data-p="${p}">Brug forslaget: ${PRIO[p].navn}</button>` : ''}
+  </div>`;
+}

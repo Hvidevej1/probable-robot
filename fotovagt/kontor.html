@@ -12,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="stylesheet" href="style.css?v=19">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script type="module" src="kontor.js?v=16"></script>
+  <script type="module" src="kontor.js?v=17"></script>
 </head>
 <body class="kontor">
   <section id="login" class="login" hidden>
@@ -64,7 +64,7 @@
 
     <main class="kontor-grid">
       <section class="panel fotografer">
-        <div class="panel-top"><h2>Fotografer</h2><button id="btn-inviter" class="secondary lille-knap" title="Inviter en ny fotograf eller en fra kontoret">＋ Inviter</button></div>
+        <div class="panel-top"><h2>Fotografer</h2><span class="panel-knapper"><button id="btn-omraader" class="secondary lille-knap" title="Geografiske områder">🗺 Områder</button><button id="btn-inviter" class="secondary lille-knap" title="Opret adgang til en ny fotograf eller en fra kontoret">＋ Ny bruger</button></span></div>
         <div id="fotografer"></div>
       </section>
 
@@ -156,6 +156,12 @@
           <select name="rolle"><option value="foto">Fotograf</option><option value="kontor">Kontor</option></select>
         </label>
       </div>
+      <label>Område <select name="omraade_id"></select></label>
+      <label>Kører ud fra (bopæl eller kontor)
+        <span class="input-knap"><input name="base_adresse" autocomplete="off" placeholder="Fx Hvidevej 1, 8800 Viborg"><button type="button" class="secondary" id="btn-find-base">Find</button></span>
+      </label>
+      <p class="hint" id="base-hint"></p>
+      <input type="hidden" name="base_lat"><input type="hidden" name="base_lon">
       <div class="knap-række">
         <button value="gem" type="submit">Gem</button>
         <button value="luk" type="submit" class="secondary" formnovalidate>Luk</button>
