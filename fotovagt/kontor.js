@@ -11,6 +11,7 @@ import {
 
 let sLag;
 let mig, kort, hLag, fLag, filter = 'aktive', valgtId = null, førsteZoom = true;
+let kendteForslag = new Set(), forslagKlar = false;
 const S = () => store.state;
 const P = id => S().profiler.find(p => p.id === id);
 const H = id => S().haendelser.find(h => h.id === id);
@@ -103,16 +104,22 @@ function tilbudLinjer(h) {
   return html;
 }
 
+// Forslag om opgradering, som kontoret ikke har taget stilling til endnu
+const forslag = h => h.eskalering_forslag && !h.eskaleret && !h.eskalering_afvist && aktiv(h);
+
 function haendelseKort(h) {
   const taget = h.taget_af ? P(h.taget_af) : null;
   return `
-    <article class="h-kort h-${h.status}${valgtId === h.id ? ' valgt' : ''}${nyeKommentarer(h) ? ' har-ny-kommentar' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
+    <article class="h-kort h-${h.status}${valgtId === h.id ? ' valgt' : ''}${nyeKommentarer(h) ? ' har-ny-kommentar' : ''}${forslag(h) ? ' eskalering' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}</p>
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)}${h.taget_tid ? ` · taget kl. ${klokken(h.taget_tid)}` : ''}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
+        ${h.antal_enheder || h.antal_ass ? `<p class="lille enheder-linje">🚒 ${h.antal_ass || 0} assistance${h.antal_ass === 1 ? '' : 'r'} · ${h.antal_enheder || 0} enheder${h.eskaleret ? ' · <b class="stor-mærke">⬆️ Stor hændelse</b>' : ''}</p>` : (h.eskaleret ? '<p class="lille"><b class="stor-mærke">⬆️ Stor hændelse</b></p>' : '')}
+        ${forslag(h) ? `<div class="eskalering-boks"><p>⚠️ <b>Stor hændelse?</b> Der er kaldt ${h.antal_ass} assistancer og ${h.antal_enheder} enheder. Skal den opgraderes på fotografernes skærm?</p>
+          <div class="knap-række"><button data-eskaler="${h.id}" data-ja="1">⬆️ Opgradér for fotograferne</button><button class="secondary" data-eskaler="${h.id}" data-ja="0">Afvis</button></div></div>` : ''}
         ${tilbudLinjer(h)}
         ${(n => n ? `<p class="opdatering"><span>${n.ikon} ${esc(n.tekst)}</span></p>` : '')(senesteNyt(h))}
         <p class="lille doegn-linje">${h.offentlig === false ? '🚫 Ikke på døgnrapporten' : `🌐 Døgnrapport: <b>${esc(h.offentlig_titel || (h.kategori === 'Andet' || !h.kategori ? 'Hændelse' : h.kategori))}</b>${offentligSted(h) ? ` · ${esc(offentligSted(h))}` : ''}`}</p>
@@ -511,6 +518,15 @@ async function start() {
   store.lyt(s => {
     tegn();
     if (s.nyHaendelse) { bip(); toast(`Ny hændelse: ${s.nyHaendelse.titel}`, 'ny'); }
+    // Nye forslag om opgradering: lyd og besked
+    const nuForslag = s.haendelser.filter(forslag).map(h => h.id);
+    const nyeF = nuForslag.filter(id => !kendteForslag.has(id));
+    if (nyeF.length && kendteForslag.size >= 0 && forslagKlar) {
+      bip(); setTimeout(bip, 600);
+      const h = H(nyeF[0]);
+      toast(`⚠️ Stor hændelse? ${h.titel} – ${h.antal_ass} assistancer, ${h.antal_enheder} enheder`, 'fejl');
+    }
+    kendteForslag = new Set(nuForslag);
     if (s.nyKommentar) {
       const k = s.nyKommentar, h = H(k.haendelse_id);
       bip();
@@ -528,14 +544,19 @@ async function start() {
     tegnTidslinje();
   });
   if (!Object.keys(læst).length) { for (const h of S().haendelser) markérLæst(h.id); }
+  kendteForslag = new Set(S().haendelser.filter(forslag).map(h => h.id)); forslagKlar = true;
   tegn();
   hentPoStatus();
 
   // Klik overalt på siden (lister, kort-popups)
   document.body.addEventListener('click', e => {
-    const t = e.target.closest('[data-giv],[data-tildel],[data-luk],[data-ret],[data-kommentarer],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
+    const t = e.target.closest('[data-eskaler],[data-giv],[data-tildel],[data-luk],[data-ret],[data-kommentarer],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
     if (!t || t.closest('dialog')) return;
     const d = t.dataset;
+    if (d.eskaler) {
+      const ja = d.ja === '1';
+      return prøv(() => store.eskaler(d.eskaler, ja), ja ? 'Opgraderet. Fotograferne får besked.' : 'Forslaget er afvist.');
+    }
     if (d.tildel) return åbnTildel(d.tildel);
     if (d.giv) return prøv(() => store.tildel(d.giv, d.til), `Opgaven er givet til ${navn(d.til)}.`);
     if (d.luk) {

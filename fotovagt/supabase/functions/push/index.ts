@@ -4,6 +4,7 @@
 //   ny          -> fotografer, der står som "Ledig"
 //   tildelt     -> den fotograf, kontoret har givet opgaven
 //   opdatering  -> den fotograf, der har opgaven, når der er kommet ny tekst fra en anden kilde
+//   eskalering  -> kontoret: mange assistancer/enheder, skal hændelsen opgraderes? (se eskalering.sql)
 //   opgraderet  -> mere alvorlig melding (fx eftersyn -> bygningsbrand): ledige fotografer / fotografen på opgaven
 // Med { sos, slags } (se push.sql):
 //   sos         -> alle på kontoret + fotografer inden for 20 km (navn, telefon og afstand i beskeden)
@@ -83,6 +84,19 @@ async function håndtér(id: string, slags: string) {
     await db.from("haendelser").update({ push_tildelt: h.taget_af }).eq("id", id);
     if (!/^gav opgaven til/.test(log?.[0]?.handling ?? "")) return { sendt: 0 };
     return { sendt: await send([h.taget_af], { title: `Du har fået en opgave: ${h.titel}`, body: sted, tag: h.id, url }) };
+  }
+
+  if (slags === "eskalering") {
+    // Mange assistancer og enheder: kontoret skal tage stilling til, om hændelsen skal opgraderes
+    if (!h.eskalering_forslag || h.eskalering_forslag === h.push_eskalering || h.eskaleret || h.eskalering_afvist) return { sendt: 0 };
+    await db.from("haendelser").update({ push_eskalering: h.eskalering_forslag }).eq("id", id);
+    if (Date.now() - new Date(h.eskalering_forslag).getTime() > NYLIG) return { sendt: 0 };
+    const { data: kontor } = await db.from("profiles").select("id").eq("rolle", "kontor");
+    return { sendt: await send((kontor ?? []).map((p) => p.id), {
+      title: `⚠️ Stor hændelse? ${ikon} ${h.titel}`,
+      body: `${h.antal_ass} assistancer · ${h.antal_enheder} enheder · ${sted}. Tag stilling til opgradering.`,
+      tag: `${h.id}-esk`, url: `./kontor.html?h=${h.id}`, sos: true,
+    }) };
   }
 
   if (slags === "opgraderet") {

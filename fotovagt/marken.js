@@ -67,7 +67,7 @@ function kort_(h) {
     <article class="h-kort h-${h.status}${min ? ' min' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
-        <h3>${esc(h.titel)}</h3>
+        <h3>${h.eskaleret ? '<span class="stor-mærke">⬆️ Stor hændelse</span> ' : ''}${esc(h.titel)}</h3>
         <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
         <p class="lille">${siden(h.oprettet)} siden${d != null ? ` · ${kmTekst(d)}` : ''} ·
           ${kommentarerTil(h.id).length ? `<span class="k-antal" title="Kommentarer">💬 ${kommentarerTil(h.id).length}</span> · ` : ''}<span class="h-status">${h.auto_lukket && !aktiv(h) ? 'Lukket automatisk (ingen opdateringer)' : h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
@@ -219,8 +219,10 @@ function visHaendelse(id, åbn = true) {
   gentegnMedFormular(dlg.querySelector('.ark-indhold'), `
     <div class="ark-top"><span class="kat stor">${ikonFor(h)}</span>
       <button class="luk" data-luk aria-label="Luk">✕</button></div>
+    ${h.eskaleret ? '<p class="stor-banner">⬆️ Stor hændelse – opgraderet af kontoret</p>' : ''}
     <h2>${esc(h.titel)}</h2>
     <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${d != null ? ` · ${kmTekst(d)} væk` : ''}</p>
+    ${h.antal_enheder ? `<p class="lille">🚒 ${h.antal_ass || 0} assistance${h.antal_ass === 1 ? '' : 'r'} · ${h.antal_enheder} enheder</p>` : ''}
     ${h.cirka ? '<p class="hint">Placeringen er cirka (kun by eller station kendt). Tjek adressen i teksten.</p>' : ''}
     <p class="lille">Modtaget kl. ${klokken(h.oprettet)} (${siden(h.oprettet)} siden) · ${esc(h.kategori || '')}</p>
     <p class="status-linje h-${h.status}">${h.status === 'ny' ? 'Ingen har taget den endnu' : min ? 'Det er din opgave' : `${H_STATUS[h.status]}: ${esc(navn(h.taget_af))}`}</p>

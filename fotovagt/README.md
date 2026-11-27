@@ -177,3 +177,8 @@ Tryk på en kategori (fx 🔥 brand) for kun at se den på kort og liste. Flere 
 - Hemmeligheder (Pushover-nøgle, push-nøgler, cron-hemmelighed) ligger kun i databasen bag adgangsregler og aldrig i koden. `config.js` indeholder kun den offentlige nøgle.
 - Websiden sender sikkerheds-headers (`vercel.json`): appen kan ikke vises inde i andre sider (clickjacking); døgnrapporten må vises på hrc-fotos.dk.
 - Anbefalet i Supabase-dashboardet: **Authentication → Providers/Policies → "Leaked password protection"** slås til.
+
+## Stor hændelse (forslag til kontoret og manuel opgradering)
+Databasen tæller assistancer (meldinger med "Ass."/"assistance") og forskellige enheder (fx SY-M1, OD V1, SK MR-1, ISL NO, OC = operationschef) på hver hændelse. Er der kaldt assistance **flere end 3 gange og flere end 4 enheder**, får kontoret push og en ⚠️-boks på hændelsen: **"⬆️ Opgradér for fotograferne"** eller **Afvis**. Først når kontoret opgraderer, ser fotograferne "⬆️ Stor hændelse" og får push. Grænserne står i tabellen `indstillinger` (`eskaler_ass`, `eskaler_enheder`, `eskaler_begge`). Se `supabase/eskalering.sql`.
+
+Desuden opgraderes titel og kategori automatisk, når en mere alvorlig melding kommer på samme hændelse (fx eftersyn → bygningsbrand), se `alvor()` i `parse.js` og `supabase/opgradering.sql`.

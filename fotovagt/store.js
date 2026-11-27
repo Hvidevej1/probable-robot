@@ -158,6 +158,7 @@ function supabaseBackend() {
     retProfil: (navn, telefon) => rpc('ret_profil', { nyt_navn: navn, ny_telefon: telefon }),
     tildel: (h, foto) => rpc('tildel_haendelse', { h, foto }),
     luk: (h, status) => rpc('luk_haendelse', { h, ny_status: status }),
+    eskaler: (h, ja) => rpc('eskaler', { h, ja: !!ja }),   // kontoret: opgradér til stor hændelse eller afvis
     saetStatus: (foto, s) => rpc('saet_status', { foto, s }),
     // Kommentarer på hændelser (interne eller til døgnrapporten)
     kommenter: (h, tekst, offentlig) => rpc('kommenter', { h, tekst, offentlig: !!offentlig }),
@@ -510,6 +511,12 @@ function demoBackend() {
       const hs = db.haendelser.filter(h => h.taget_af && h.oprettet >= fra && h.oprettet < til).sort((a, b) => a.oprettet.localeCompare(b.oprettet));
       return { haendelser: hs, kommentarer: (db.kommentarer || []).filter(k => hs.some(h => h.id === k.haendelse_id)) };
     },
+    eskaler: kør((id, ja) => {
+      kontor(); const h = H(id);
+      if (ja) Object.assign(h, { eskaleret: true, eskalering_afvist: false, opgraderet: nu(), eskalering_forslag: h.eskalering_forslag || nu() });
+      else h.eskalering_afvist = true;
+      log(id, ja ? 'opgraderede hændelsen til stor hændelse' : 'afviste opgradering');
+    }),
     saetStatus: kør((foto, s) => { kontor(); const f = P(foto); Object.assign(f, { status: s, status_tid: nu() }); log(null, `satte ${f.navn} til ${s}`); }),
     ret: kør((id, felter) => { kontor(); Object.assign(H(id), felter); }),
     retFotograf: kør((id, felter) => { kontor(); Object.assign(P(id), felter); }),
