@@ -60,10 +60,9 @@ function tegnOpgave() {
     </div>`;
 }
 
-// Eget område først. Hændelser i et naboområde kommer kun op, når de har høj prioritet og ingen har taget dem.
+// Tættest på trumfer område: listen sorteres ikke efter område. Område vises kun som oplysning.
 const andetOmråde = h => !!(mig.omraade_id && h.omraade_id && h.omraade_id !== mig.omraade_id);
 const naboHjælp = h => andetOmråde(h) && prioAf(h) === 1 && h.status === 'ny';
-const områdeRang = h => (andetOmråde(h) && !naboHjælp(h) ? 1 : 0);
 const omrNavn = id => (store.state.omraader || []).find(o => o.id === id)?.navn;
 
 function kort_(h) {
@@ -71,7 +70,7 @@ function kort_(h) {
   const tagbar = h.status === 'ny' && !mig.haendelse_id;
   const min = h.taget_af === mig.id;
   return `
-    <article class="h-kort h-${h.status} prio-${prioAf(h)}${min ? ' min' : ''}${andetOmråde(h) && !naboHjælp(h) && !min ? ' andet-omr' : ''}" data-id="${h.id}">
+    <article class="h-kort h-${h.status} prio-${prioAf(h)}${min ? ' min' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
         <h3>${prioAf(h) === 1 && aktiv(h) ? '<span class="prio-mærke">🔴 Høj prioritet</span> ' : ''}${h.eskaleret ? '<span class="stor-mærke">⬆️ Stor hændelse</span> ' : ''}${esc(h.titel)}</h3>
@@ -87,7 +86,7 @@ function kort_(h) {
 
 function tegnListe() {
   const alle = store.state.haendelser;
-  const aktive = alle.filter(aktiv).sort((a, b) => (områdeRang(a) - områdeRang(b)) || efterPrio(a, b));   // eget område, så kontorets prioritet
+  const aktive = alle.filter(aktiv).sort(efterPrio);   // kontorets prioritet først
   const afsluttede = alle.filter(h => !aktiv(h)).slice(0, 15);
   const nye = aktive.filter(h => h.status === 'ny').length;
   const t = $('#antal-nye'); t.hidden = !nye; t.textContent = nye;

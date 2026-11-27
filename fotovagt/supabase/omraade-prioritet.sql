@@ -1,8 +1,7 @@
--- Fotograferne kører først i deres eget område. Hændelsen hører til det område, hvis fotograf har sit
--- udgangspunkt (bopæl/kontor) nærmest. Tilbud går først til fotografer i området (og fotografer uden
--- område). Fotografer i nabo-områderne får kun tilbuddet, hvis hændelsen har HØJ prioritet og ingen i
--- området har taget den – eller hvis området slet ingen fotografer har.
--- Sætter kontoret prioriteten til høj, efter at området har sagt nej, går tilbuddet videre til naboerne.
+-- Områder og tilbud. Hændelsen hører til det område, hvis fotograf har sit udgangspunkt (bopæl/kontor) nærmest.
+-- TÆTTEST PÅ TRUMFER OMRÅDE: tilbuddet går altid først til den nærmeste ledige fotograf. Området afgør kun
+-- rækkefølgen mellem fotografer, der er omtrent lige tæt på (samme 2-km-bånd) – så vælges fotografen fra området.
+-- Sætter kontoret høj prioritet på en hændelse, som ingen har taget, startes tilbuddene igen.
 -- Kør i Supabase -> SQL Editor efter omraader.sql. Ret RET_MIG_PROJEKT.
 
 alter table haendelser add column if not exists omraade_id uuid references omraader on delete set null;
@@ -49,9 +48,8 @@ begin
    where p.rolle = 'foto' and p.status = 'ledig' and p.haendelse_id is null and q.la is not null
      and not exists (select 1 from tilbud x where x.haendelse_id = h and x.fotograf = p.id)
      and km_mellem(hh.lat, hh.lon, q.la, q.lo) <= ind.max_km
-     and (tom or p.omraade_id is null or p.omraade_id = hh.omraade_id or hh.prio = 1)
-   order by case when hh.omraade_id is not null and p.omraade_id = hh.omraade_id then 0 when p.omraade_id is null then 1 else 2 end,
-            floor(km_mellem(hh.lat, hh.lon, q.la, q.lo) / 2),
+   order by floor(km_mellem(hh.lat, hh.lon, q.la, q.lo) / 2),
+            case when hh.omraade_id is not null and p.omraade_id = hh.omraade_id then 0 when p.omraade_id is null then 1 else 2 end,
             (select max(x.taget_tid) from haendelser x where x.taget_af = p.id) asc nulls first,
             km_mellem(hh.lat, hh.lon, q.la, q.lo)
    limit 1;
@@ -61,7 +59,7 @@ begin
   values (h, f.id, n, f.d, now() + make_interval(secs => ind.tilbud_sek)) returning id into t;
   insert into logbog (bruger, haendelse_id, handling)
   values (null, h, format('tilbød opgaven til %s (%s km%s%s)', (select navn from profiles where id = f.id), round(f.d::numeric, 1),
-    case when f.base then ' fra udgangspunkt' else '' end, case when f.nabo and not tom then ', nabo-område – høj prioritet' else '' end));
+    case when f.base then ' fra udgangspunkt' else '' end, case when f.nabo and not tom then ', andet område – tættest på' else '' end));
   perform net.http_post(
     url := 'https://RET_MIG_PROJEKT.supabase.co/functions/v1/push',
     body := jsonb_build_object('tilbud', t),

@@ -467,7 +467,7 @@ function åbnOmraader() {
       <div class="ark-indhold">
         <div class="ark-top"><h2>🗺 Områder</h2><button class="luk" data-luk-omr aria-label="Luk">✕</button></div>
         <p class="hint">Del fotograferne i områder efter, hvor de kører ud fra. En hændelse hører til det område, hvis fotograf bor/har kontor nærmest.
-          Tilbud går først til fotograferne i området. Naboområderne får kun tilbuddet, hvis hændelsen har <b>høj prioritet</b> og ingen i området tager den.
+          <b>Tættest på trumfer område:</b> tilbuddet går altid først til den nærmeste ledige fotograf. Er to omtrent lige tæt på (inden for 2 km), vælges fotografen fra området.
           Vælg område og "Kører ud fra" på hver fotograf (✎).</p>
         <form class="omr-form" id="form-omr">
           <label>Nyt område <input name="navn" required placeholder="Fx Midtjylland" autocomplete="off"></label>

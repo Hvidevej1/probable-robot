@@ -207,11 +207,10 @@ Til mange mails: opsæt egen SMTP under Authentication → Emails (fx Simply-mai
 Kontoret: **Fotografer → 🗺 Områder** opretter områder (navn og farve). På hver fotograf (✎) vælges område og
 **Kører ud fra** (bopæl/kontor, tryk Find). Fotograferne vises grupperet efter område.
 * En hændelse hører til det område, hvis fotograf har sit udgangspunkt nærmest (`haendelser.omraade_id`).
-* Tilbud går først til fotograferne i området (og fotografer uden område). **Naboområdet får kun tilbuddet, hvis
-  hændelsen har høj prioritet, og ingen i området har taget den** – eller hvis området slet ingen fotografer har.
-  Sætter kontoret høj prioritet, efter at området har sagt nej, går tilbuddet videre til naboerne med det samme.
+* **Tættest på trumfer område:** tilbuddet går altid først til den nærmeste ledige fotograf. Området afgør kun
+  rækkefølgen mellem fotografer, der er omtrent lige tæt på (samme 2-km-bånd) – så vælges fotografen fra området.
 * Er fotografens egen position gammel eller mangler, regnes afstanden fra udgangspunktet.
-* I Marken står eget område øverst; hændelser i andre områder er nedtonet, undtagen "🆘 Naboområdet mangler en fotograf".
+* I Marken vises "Andet område" som oplysning, og "🆘 Naboområdet mangler en fotograf" ved høj prioritet, som ingen har taget.
 SQL: `supabase/omraader.sql` og `supabase/omraade-prioritet.sql`.
 
 ## Assistenten (lærer af tidligere hændelser)
