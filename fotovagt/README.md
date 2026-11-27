@@ -240,7 +240,10 @@ Fra Midtjysk Brand & Rednings *Plan for risikobaseret dimensionering 2026-2029* 
 * Minimum 1+3 på første autosprøjte, +2 pr. specialkøretøj. Gennemsnitlig responstid 6,8 min (2021-2024).
 **Alle 29 kommunale redningsberedskaber** (liste fra RBIS) + Brand & Redning Stevns er registreret med region og hjemmeside
 (`BEREDSKABER` i `faelles.js`). Planer læst indtil videre: Østjyllands Brandvæsen, Midtjysk Brand & Redning, Beredskab Øst,
-Frederiksborg Brand & Redning, Helsingør Kommunes Beredskab (+ Tårnbys køretøjsliste). Flere tilføjes samme sted.
+Frederiksborg Brand & Redning, Helsingør Kommunes Beredskab (+ Tårnbys køretøjsliste), og i Jylland TrekantBrand
+(2023), Brand & Redning Sønderjylland (2022), Nordvestjyllands Brandvæsen (2022–2025), Sydøstjyllands Brandvæsen
+(2025–2028) og Nordjyllands Beredskab (NOBR2025). Vejle, Sydvestjysk, Sønderborg, Beredskab & Sikkerhed og MidtVest har
+kun oplysninger fra offentlige omtaler, da deres planer ikke ligger frit tilgængeligt. Flere tilføjes samme sted.
 
 **Typisk udrykning pr. melding** bygger på udrykningsprofilerne i Beredskab Østs plan 2025 (tabel 17), som følger den
 gængse danske opbygning – fx villa/lejlighed: sprøjte + drejestige + 2. sprøjte + vandtankvogn + indsatsleder; ABA:

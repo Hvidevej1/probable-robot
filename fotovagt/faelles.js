@@ -608,27 +608,39 @@ const BEREDSKABER = [
   B('Lejre Brandvæsen', 'Sjælland', 'https://www.lejre.dk', /lejre brandvæsen/i),
   // Syddanmark
   B('Beredskab Fyn', 'Syddanmark', 'https://beredskabfyn.dk/', /beredskab fyn/i),
-  B('TrekantBrand', 'Syddanmark', 'http://www.trekantbrand.dk/', /trekantbrand/i),
-  B('Vejle Brandvæsen', 'Syddanmark', 'https://www.vejlebrandvaesen.dk/', /vejle brandvæsen/i),
-  B('Sydvestjysk Brandvæsen', 'Syddanmark', 'http://svjb.dk/', /sydvestjysk brandvæsen/i),
-  B('Brand & Redning Sønderjylland', 'Syddanmark', 'https://www.brsj.dk/', /redning sønderjylland/i),
-  B('Beredskab Sønderborg', 'Syddanmark', 'https://sonderborgkommune.dk/', /beredskab sønderborg/i),
+  B('TrekantBrand', 'Syddanmark', 'http://www.trekantbrand.dk/', /trekantbrand/i, { kilde: 'dimensioneringsplan 2023',
+    tekst: '15 stationer: 2 hovedstationer (2+10), 11 lokalstationer (1+5) og 2 nærstationer (1+3). Dagligt på vagt: 1 operationschef, 3 indsatsledere, 17 holdledere og 81 brandfolk.',
+    minimum: () => '1+5 fra lokalstation, 1+3 fra nærstation, 2+10 fra hovedstation' }),
+  B('Vejle Brandvæsen', 'Syddanmark', 'https://www.vejlebrandvaesen.dk/', /vejle brandvæsen/i, { kilde: 'omtale af plan 2027–2030',
+    tekst: 'Responstid 10 min i byer over 5.000 indbyggere. Ny plan 2027–2030 sender flere brandfolk til færdselsuheld.' }),
+  B('Sydvestjysk Brandvæsen', 'Syddanmark', 'http://svjb.dk/', /sydvestjysk brandvæsen/i, { kilde: 'omtale i Esbjerg Kommunes dagsordener',
+    tekst: 'Esbjerg, Varde og Fanø. Opgraderet dimensionering fra 2025 med mere mandskab og slukningsrobotter; ny plan 2026–2029.' }),
+  B('Brand & Redning Sønderjylland', 'Syddanmark', 'https://www.brsj.dk/', /redning sønderjylland/i, { kilde: 'RBD 2022',
+    tekst: 'Aabenraa, Haderslev og Tønder. 31 stationer, de fleste med 1+5 og autosprøjte/tanksprøjte + vandtankvogn; mindre stationer (fx Barsmark, Bedsted, Rømø, Visby) 1+3. Skæreslukker i Haderslev og Aabenraa. Indsatsledere i vagtdistrikter.',
+    minimum: () => '1+5 (mindre stationer 1+3)' }),
+  B('Beredskab Sønderborg', 'Syddanmark', 'https://sonderborgkommune.dk/', /beredskab sønderborg/i, { kilde: 'omtale af RBD 2026–2029',
+    tekst: 'Sønderborg Kommune. Responstidsmålet på 10 min er svært at nå i Sønderborg by, Nordborg og Rinkenæs.' }),
   // Midtjylland
-  B('Østjyllands Brandvæsen', 'Midtjylland', 'https://www.ostbv.dk/', /østjyllands brandvæsen/i, { kilde: 'plan 2026–2030',
+  B('Østjyllands Brandvæsen', 'Midtjylland', 'https://www.ostbv.dk/', /(?<!syd)østjyllands brandvæsen/i, { kilde: 'plan 2026–2030',
     tekst: 'Døgnstationer: Aarhus Nord, City og Syd; deltid bl.a. Odder, Hørning, Skanderborg, Ry. Indsatsleder Nord og Syd. Nærmeste relevante enhed sendes altid.',
     minimum: t => /højhus/.test(t) && /bygn|brand/.test(t) ? '3+4+20+2 ved bekræftet brand i højhus'
       : /\baba\d*\b|automatisk brandalarm/.test(t) ? '1+5 (nogle ABA-objekter: indsatsleder med, 1+1+5, eller 1+2+10)'
       : /bygn\.?\s?brand|bygningsbrand|campingvogn|kolonihave|sommerhus|parcelhus|villa|lejlighed|etage/.test(t) ? '1+1+5 – indsatsleder, holdleder og 5 brandfolk'
       : /knallert|skraldespand|container|affald|i det fri/.test(t) ? '1+3 – holdleder og 3 brandfolk' : null }),
-  B('Beredskab & Sikkerhed', 'Midtjylland', 'http://www.bsik.dk/', /beredskab & sikkerhed|beredskab og sikkerhed/i),
+  B('Beredskab & Sikkerhed', 'Midtjylland', 'http://www.bsik.dk/', /beredskab & sikkerhed|beredskab og sikkerhed/i, { kilde: 'Beredskabsstyrelsens udtalelse 2024',
+    tekst: 'Randers, Favrskov, Norddjurs og Syddjurs. Ved samtidige hændelser i Randers dækker station Hadsten byen. Særligt fokus på højhuse over 22 m i Randers.' }),
   B('Midtjysk Brand & Redning', 'Midtjylland', 'http://mjbr.dk/', /midtjysk/i, { kilde: 'plan 2026–2029',
     tekst: 'Viborg og Silkeborg kommuner, 10 stationer. Alle har sprøjte og tankvogn – det er førsteudrykningen. Drejestige, redningsvogn og specialer kommer fra Viborg eller Silkeborg (CBRNE kun Viborg). Indsatsleder Nord (Viborg) og Syd (Silkeborg). Gennemsnitlig responstid 6,8 min.',
     minimum: t => /drejestige|højde|etage|lejlighed/.test(t) ? '1+3 på autosprøjten, +2 pr. specialkøretøj (fx drejestige)' : '1+3 på første autosprøjte' }),
-  B('Brand & Redning MidtVest', 'Midtjylland', 'http://brmv.dk/', /midtvest/i),
-  B('Nordvestjyllands Brandvæsen', 'Midtjylland', 'https://www.nvjbrand.dk/', /nordvestjyllands brandvæsen/i),
-  B('Sydøstjyllands Brandvæsen', 'Midtjylland', 'https://sojbv.dk/', /sydøstjyllands brandvæsen/i),
+  B('Brand & Redning MidtVest', 'Midtjylland', 'http://brmv.dk/', /midtvest/i, { kilde: 'vedtægter', tekst: 'Herning, Ikast-Brande og Ringkøbing-Skjern; hjemsted Herning.' }),
+  B('Nordvestjyllands Brandvæsen', 'Midtjylland', 'https://www.nvjbrand.dk/', /nordvestjyllands brandvæsen/i, { kilde: 'plan 2022–2025',
+    tekst: 'Holstebro, Skive, Lemvig og Struer. Tre udrykningsprofiler til hverdagshændelser: A = indsatsleder + holdleder + 5–7 brandfolk, B = indsatsleder + holdleder + 3 brandfolk, C = kun indsatsleder.',
+    minimum: t => /bygn|brand i |villa|lejlighed|etage|industri|landbrug/.test(t) ? 'Profil A: 1+1+5–7' : /eftersyn|forespørgsel/.test(t) ? 'Profil C: kun indsatsleder' : 'Profil B: 1+1+3 (eller A ved større melding)' }),
+  B('Sydøstjyllands Brandvæsen', 'Midtjylland', 'https://sojbv.dk/', /sydøstjyllands brandvæsen/i, { kilde: 'plan 2025–2028',
+    tekst: 'Horsens og Hedensted kommuner (ca. 150.000 indbyggere). Seks brandstationer, drevet af Falck og Horsens; frivillige enheder på Hjarnø og Endelave. Operationschef på tilkald.' }),
   // Nordjylland
-  B('Nordjyllands Beredskab', 'Nordjylland', 'https://www.nordjyllandsberedskab.dk/', /nordjyllands beredskab/i),
+  B('Nordjyllands Beredskab', 'Nordjylland', 'https://www.nordjyllandsberedskab.dk/', /nordjyllands beredskab/i, { kilde: 'NOBR2025',
+    tekst: '11 kommuner, 36 brandstationer: 35 deltidsstationer og 1 døgnbemandet station suppleret af deltid. 5 indsatsledervagter efter "taxaprincippet" – nærmeste indsatsleder kører. Op til 4 indsatsledere til store hændelser.' }),
 ];
 export function beredskabFor(h) {
   const t = `${h.titel || ''}\n${h.tekst || ''}`;
