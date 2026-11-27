@@ -393,12 +393,28 @@ export function alleredeKendt(gammel, ny) {
   return ord.length >= 6 && ord.filter(o => kendte.has(o)).length / ord.length >= 0.9;
 }
 
+// Alvor: kommer der en mere alvorlig melding på samme hændelse (fx "Eftersyn" → "Bygn.brand"), opgraderes den.
+// 3 = brand/redning/alvorlig ulykke, 2 = almindelig hændelse, 1 = eftersyn, automatisk alarm, assistance, advarsler.
+const ALVOR = [
+  [3, /bygn\.?\s?brand|bygningsbrand|naturbrand|skibsbrand|brand i |brand-(?!alarm)|eksplosion|redn\.|drukn|person i vand|fastklemt|omkommet|dræbt|dødsulykke|dødelig|frontal|hjertestop|skud|knivstik|bevæbnet/i],
+  [1, /eftersyn|\baba\d*\b|automatisk brandalarm|forespørgsel|\bass\.|assistance|advarsel|havareret|tabt gods|dyr på vejen|kør forsigtigt|vejarbejde|(?:^|\s)kø(?:$|\s)|planlagt|cyklister på vejen|personer på vejen/i],
+  [2, /uheld|ulykke|brand|\bild\b|røg|redning|politi|anholdt|efterlys/i],
+];
+export const alvor = t => (ALVOR.find(([, re]) => re.test(t || '')) || [1.5])[0];
+
 export function flet(h, ny, app) {
   const kort = String(ny.tekst || '').split('\n').map(l => renEmoji(l).replace(NYHEDSKILDE, ''))
     .filter(l => l && !/^læs mere|^https?:\/\//i.test(l)).join(' · ');
   const indhold = kort.startsWith(ny.titel) ? kort : [ny.titel, kort].filter(Boolean).join(' · ');
-  const linje = `— kl. ${klokkenDK()} ${String(app || 'Ekstra besked').trim()}: ${FÆRDIG.test(ny.tekst || '') ? '✅ ' : ''}${indhold}`;
-  const felter = { tekst: alleredeKendt(h.tekst, ny.tekst) ? h.tekst : [h.tekst, linje].filter(Boolean).join('\n') };
+  const opgrader = alvor(ny.titel) > alvor(h.titel);
+  const linje = `— kl. ${klokkenDK()} ${String(app || 'Ekstra besked').trim()}: ${opgrader ? '⬆️ Opgraderet · ' : ''}${FÆRDIG.test(ny.tekst || '') ? '✅ ' : ''}${indhold}`;
+  const felter = { tekst: alleredeKendt(h.tekst, ny.tekst) && !opgrader ? h.tekst : [h.tekst, linje].filter(Boolean).join('\n') };
+  // Mere alvorlig melding: hændelsen får den nye titel og kategori (fx eftersyn → bygningsbrand)
+  if (opgrader) {
+    felter.titel = ny.titel;
+    if (ny.kategori && ny.kategori !== 'Andet') felter.kategori = ny.kategori;
+    felter.opgraderet = new Date().toISOString();
+  }
   // Efterlyst person fundet: politiet beder om at slette navn og foto, så den første tekst fjernes
   if (/er fundet|slette (?:foto|billede|navn)/i.test(ny.tekst || '') && /efterlys/i.test(`${h.titel} ${h.tekst}`)) {
     felter.titel = 'Efterlysning afsluttet – personen er fundet';
@@ -411,7 +427,7 @@ export function flet(h, ny, app) {
   // (en lægehelikopter lander ved stedet, ikke præcis på det: placeringen forbliver cirka)
   if (ny.lat != null && (h.lat == null || (h.cirka && !ny.cirka))) { felter.lat = ny.lat; felter.lon = ny.lon; felter.cirka = !!ny.cirka || !!ny.helikopter; }
   else if (bedreAdresse && h.cirka && !ny.cirka) { felter.lat = null; felter.lon = null; felter.cirka = false; } // slås op igen
-  if ((!h.kategori || h.kategori === 'Andet') && ny.kategori !== 'Andet') felter.kategori = ny.kategori;
+  if (!felter.kategori && (!h.kategori || h.kategori === 'Andet') && ny.kategori !== 'Andet') felter.kategori = ny.kategori;
   if (!h.url && ny.url) felter.url = ny.url;
   return felter;
 }

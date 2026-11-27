@@ -4,6 +4,7 @@
 //   ny          -> fotografer, der står som "Ledig"
 //   tildelt     -> den fotograf, kontoret har givet opgaven
 //   opdatering  -> den fotograf, der har opgaven, når der er kommet ny tekst fra en anden kilde
+//   opgraderet  -> mere alvorlig melding (fx eftersyn -> bygningsbrand): ledige fotografer / fotografen på opgaven
 // Med { sos, slags } (se push.sql):
 //   sos         -> alle på kontoret + fotografer inden for 20 km (navn, telefon og afstand i beskeden)
 //   sos_set     -> den der trykkede SOS: "Din SOS er set af …"
@@ -82,6 +83,19 @@ async function håndtér(id: string, slags: string) {
     await db.from("haendelser").update({ push_tildelt: h.taget_af }).eq("id", id);
     if (!/^gav opgaven til/.test(log?.[0]?.handling ?? "")) return { sendt: 0 };
     return { sendt: await send([h.taget_af], { title: `Du har fået en opgave: ${h.titel}`, body: sted, tag: h.id, url }) };
+  }
+
+  if (slags === "opgraderet") {
+    // Mere alvorlig melding (fx eftersyn -> bygningsbrand): ledige fotografer, eller fotografen på opgaven
+    if (!h.opgraderet || h.opgraderet === h.push_opgraderet) return { sendt: 0 };
+    await db.from("haendelser").update({ push_opgraderet: h.opgraderet }).eq("id", id);
+    if (Date.now() - new Date(h.opgraderet).getTime() > NYLIG) return { sendt: 0 };
+    let modtagere: string[] = [];
+    if (h.status === "ny") {
+      const { data: ledige } = await db.from("profiles").select("id").eq("rolle", "foto").eq("status", "ledig");
+      modtagere = (ledige ?? []).map((p) => p.id);
+    } else if (h.taget_af && ["taget", "ankommet"].includes(h.status)) modtagere = [h.taget_af];
+    return { sendt: await send(modtagere, { title: `⬆️ Opgraderet: ${ikon} ${h.titel}`, body: sted, tag: `${h.id}-op`, url }) };
   }
 
   if (slags === "opdatering") {

@@ -143,5 +143,15 @@ const igen = parseBesked({ app: 'Pf-upload 3 backup ', title: 'TV MidtVest', mes
 const efter2 = flet({ ...skiveFørst, tekst: efter1.tekst }, igen, 'Pf-upload 3 backup ');
 tjek('Samme nyhed sendt igen ("for 4 minutter siden") tilføjes ikke en gang til', efter2.tekst === efter1.tekst && (efter1.tekst.match(/lastbil/g) || []).length === 1);
 tjek('Kildens navn uden mellemrum før kolon', /Pf-upload 3 backup: /.test(efter1.tekst));
+const eftersyn = parseBesked({ app: '1-1-2 Århus', title: '', message: '27-11 26 Eftersyn ISL NO Vilhelm Becks Vej 57 8260 Viby J' });
+const bygnViby = parseBesked({ app: '1-1-2 Århus', title: '', message: 'Bygn.brand-Etageejendom OC + ISL NO + SY-M1 + SY-V1 + SY S1 Vilhelm Becks Vej 57 8260 Viby J' });
+const ass = parseBesked({ app: '1-1-2 Århus', title: '', message: 'Ass.-A-sprøjte SY M1 Vilhelm Becks Vej 57 8260 Viby J' });
+const hE = aktiv({ ...eftersyn, lat: 56.12, lon: 10.16 });
+tjek('Bygningsbrand på samme adresse lægges ind i eftersynet', findMatch(bygnViby, [hE]) === hE);
+const op = flet(hE, bygnViby, '1-1-2 Århus');
+console.log('  opgraderet:', op.titel, '|', op.kategori);
+tjek('Eftersyn opgraderes til bygningsbrand (titel, kategori og markering)', /Bygn\.brand/.test(op.titel) && op.kategori === 'Brand' && op.opgraderet && /⬆️ Opgraderet/.test(op.tekst));
+tjek('Assistance opgraderer ikke et eftersyn', !flet(hE, ass, '1-1-2 Århus').opgraderet);
+tjek('En senere assistance nedgraderer ikke en bygningsbrand', !flet(aktiv({ ...bygnViby }), ass, '1-1-2 Århus').titel);
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);
