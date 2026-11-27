@@ -572,7 +572,8 @@ export function indsigt(h, nårKlar) {
     .catch(() => indsigtCache.set(h.id, { data: c?.data ?? null, længde, t: Date.now() }));
   return c?.data;
 }
-const ENHEDSNAVN = { ISL: 'indsatsleder', OC: 'operationschef', M: 'sprøjte', V: 'tankvogn', S: 'stige' };
+// Køretøjsnavne som i Beredskabsstyrelsens vejledning (automobilsprøjte, vandtankvogn, drejestige)
+const ENHEDSNAVN = { ISL: 'indsatsleder', OC: 'operationschef', M: 'autosprøjte', V: 'vandtankvogn', S: 'drejestige/lift' };
 const pct = x => `${Math.round((x || 0) * 100)} %`;
 const varighedTekst = m => m == null ? '' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} t ${m % 60 ? `${m % 60} min` : ''}`.trim();
 export function indsigtHtml(h, d, { kontor = false } = {}) {
@@ -583,9 +584,10 @@ export function indsigtHtml(h, d, { kontor = false } = {}) {
   const p = d.forslag_prio, nu = prioAf(h);
   return `<div class="ai-boks">
     <p class="ai-top">🤖 Assistent <small>lærer af ${d.n} lignende (${esc(d.niveau)})</small></p>
-    ${typer.length ? `<p><b>Forventede enheder:</b> ${typer.map(t => `${esc(t.type)}${ENHEDSNAVN[t.type] ? ` <small>${ENHEDSNAVN[t.type]}</small>` : ''} ${pct(t.andel)}`).join(' · ')}${d.typisk_antal ? ` · typisk ${d.typisk_antal} enheder` : ''}</p>`
+    ${typer.length ? `<p><b>Normal førsteudrykning:</b> ${typer.map(t => `${esc(t.type)}${ENHEDSNAVN[t.type] ? ` <small>${ENHEDSNAVN[t.type]}</small>` : ''} ${pct(t.andel)}`).join(' · ')}${d.typisk_foerste ? ` · typisk ${d.typisk_foerste} enheder` : ''}</p>`
       : '<p class="lille">Ingen enheder i de lignende beskeder endnu.</p>'}
     ${her.length ? `<p><b>Plejer at køre${d.sted ? ` (${esc(d.sted)})` : ''}:</b> ${her.map(e => esc(e.enhed)).join(', ')}</p>` : ''}
+    ${d.n_med_enheder ? `<p class="lille">Ekstra enheder/assistance tilkaldt senere ved ${pct(d.andel_ekstra)} af de lignende${(d.ekstra_nu || []).length ? ` · <b>her: ${d.ekstra_nu.map(esc).join(', ')}</b>` : ''}</p>` : ''}
     <p><b>Forslag:</b> <span class="prio-tekst p${p}">${PRIO[p]?.navn || 'Normal'} prioritet</span> · alvor ${esc(d.alvor)}
       <br><small>${(d.grund || []).map(esc).join(' · ')}</small></p>
     <p class="lille">Fotograf kørte på ${pct(d.andel_foto)} af de lignende${d.varighed_min != null ? ` · de varer typisk ${varighedTekst(d.varighed_min)}` : ''}</p>

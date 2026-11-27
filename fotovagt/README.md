@@ -221,3 +221,7 @@ et **forslag til prioritet og alvor** med begrundelse, hvor ofte en fotograf kø
 Den lærer af alle hændelser og af kontorets beslutninger (prioritet, opgradér/afvis, hvem der kørte). Indtil der er
 mindst 3 beslutninger på en type, starter den ud fra hændelsestypen. Kontoret kan trykke **Brug forslaget**.
 Alt regnes i databasen (`ai_indsigt()` i `supabase/ai-indsigt.sql`) – intet sendes til eksterne tjenester.
+Begreberne følger Beredskabsstyrelsens *Vejledning om risikobaseret dimensionering* (2025): **førsteudrykningen** er
+enhederne på selve alarmen (første besked), mens enheder i senere opdateringer tæller som tilkaldt senere (assistance/
+supplerende). Tilkaldes der flere ekstra enheder, end der plejer for typen, foreslår assistenten høj prioritet.
+Køretøjsnavne: M = automobilsprøjte, V = vandtankvogn, S = drejestige/lift, ISL = indsatsleder, OC = operationschef.

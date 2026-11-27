@@ -1,4 +1,8 @@
 -- Fotovagt-assistenten: lærer af alle tidligere hændelser og af kontorets beslutninger.
+-- Begreber fra Beredskabsstyrelsens "Vejledning om risikobaseret dimensionering" (2025): førsteudrykningen er de
+-- enheder, der sendes på selve alarmen (typisk automobilsprøjte og vandtankvogn, evt. drejestige); assistance og
+-- supplerende enheder kommer oveni. Her er førsteudrykningen enhederne i den første besked, og enheder i senere
+-- opdateringer ("— kl. …") tæller som tilkaldt senere.
 -- For en hændelse finder den lignende hændelser (samme type, fx "bygn.brand-villa/rækkehus" eller "aba"),
 -- og regner ud:
 --   * hvilke enheder der plejer at blive sendt (typer og konkrete enheder ved samme station/postnummer)
@@ -61,6 +65,7 @@ declare
   hh haendelser; fuld text; grov text; niveau text; ids uuid[]; n int; n_enh int; sted text;
   typer jsonb; konkrete jsonb; median_enh numeric; n_hoej int; n_afvist int; n_foto int; varighed numeric;
   forslag int := 2; grund text[] := '{}'; alvor text; n_beslut int; ga int;
+  n_ekstra int; median_foerste numeric; e1_nu text[]; e_nu text[]; ekstra_nu text[];
 begin
   if not er_bruger() then raise exception 'Ikke adgang'; end if;
   select * into hh from haendelser where id = h;
@@ -86,16 +91,24 @@ begin
   n := coalesce(array_length(ids, 1), 0);
   if n = 0 then return jsonb_build_object('n', 0, 'type', fuld); end if;
 
-  -- Enheder
-  with l as (select x.id, sted_noegle(x) as st, enheder_liste(coalesce(x.titel, '') || ' ' || coalesce(x.tekst, '')) as e from haendelser x where x.id = any(ids)),
+  -- Enheder: førsteudrykning (første besked) og alle (inkl. senere tilkaldte)
+  with l as (select x.id, sted_noegle(x) as st,
+                    enheder_liste(coalesce(x.titel, '') || ' ' || split_part(coalesce(x.tekst, ''), E'\n— kl.', 1)) as e1,
+                    enheder_liste(coalesce(x.titel, '') || ' ' || coalesce(x.tekst, '')) as e
+               from haendelser x where x.id = any(ids)),
        me as (select * from l where cardinality(e) > 0)
   select (select count(*) from me),
          (select percentile_cont(0.5) within group (order by cardinality(e)) from me),
-         (select coalesce(jsonb_agg(jsonb_build_object('type', t, 'andel', round(c::numeric / nullif((select count(*) from me), 0), 2)) order by c desc), '[]')
-            from (select t, count(distinct id) c from me, unnest(e) u, enhed_type(u) t group by t order by c desc limit 6) a),
+         (select percentile_cont(0.5) within group (order by cardinality(e1)) from me where cardinality(e1) > 0),
+         (select count(*) from me where cardinality(e) > cardinality(e1)),
+         (select coalesce(jsonb_agg(jsonb_build_object('type', t, 'andel', round(c::numeric / nullif((select count(*) from me where cardinality(e1) > 0), 0), 2)) order by c desc), '[]')
+            from (select t, count(distinct id) c from me, unnest(e1) u, enhed_type(u) t group by t order by c desc limit 6) a),
          (select coalesce(jsonb_agg(jsonb_build_object('enhed', u, 'gange', c) order by c desc), '[]')
-            from (select u, count(*) c from me, unnest(e) u where sted is not null and me.st = sted group by u order by c desc limit 6) b)
-    into n_enh, median_enh, typer, konkrete;
+            from (select u, count(*) c from me, unnest(e1) u where sted is not null and me.st = sted group by u order by c desc limit 6) b)
+    into n_enh, median_enh, median_foerste, n_ekstra, typer, konkrete;
+  e1_nu := enheder_liste(coalesce(hh.titel, '') || ' ' || split_part(coalesce(hh.tekst, ''), E'\n— kl.', 1));
+  e_nu := enheder_liste(coalesce(hh.titel, '') || ' ' || coalesce(hh.tekst, ''));
+  select coalesce(array_agg(u), '{}') into ekstra_nu from unnest(e_nu) u where not u = any(e1_nu);
 
   -- Kontorets beslutninger og forløb
   select count(*) filter (where x.prio = 1 or x.eskaleret or x.opgraderet is not null),
@@ -122,6 +135,11 @@ begin
     grund := grund || format('%s af %s lignende blev høj prioritet', n_hoej, n);
   end if;
   if n_afvist > 0 then grund := grund || format('kontoret afviste eskalering %s gang(e)', n_afvist); end if;
+  -- Tilkaldt flere enheder end førsteudrykningen – og sjældnere end normalt for typen
+  if n_enh >= 3 and ((cardinality(ekstra_nu) >= 2 and n_ekstra::numeric / n_enh < 0.5) or (cardinality(ekstra_nu) = 1 and n_ekstra::numeric / n_enh < 0.2)) then
+    forslag := 1; grund := grund || format('%s enhed(er) tilkaldt ud over førsteudrykningen (%s) – sker kun ved %s af %s lignende',
+      cardinality(ekstra_nu), array_to_string(ekstra_nu, ', '), n_ekstra, n_enh);
+  end if;
   if n_enh >= 3 and coalesce(hh.antal_enheder, 0) > median_enh + 1 then
     forslag := least(forslag, 1); grund := grund || format('flere enheder end normalt (%s mod typisk %s)', hh.antal_enheder, round(median_enh));
   end if;
@@ -129,7 +147,8 @@ begin
 
   return jsonb_build_object(
     'n', n, 'niveau', niveau, 'type', fuld, 'sted', sted,
-    'n_med_enheder', n_enh, 'typisk_antal', round(median_enh), 'enhedstyper', typer, 'enheder_her', konkrete,
+    'n_med_enheder', n_enh, 'typisk_antal', round(median_enh), 'typisk_foerste', round(median_foerste),
+    'andel_ekstra', round(n_ekstra::numeric / nullif(n_enh, 0), 2), 'ekstra_nu', to_jsonb(ekstra_nu), 'enhedstyper', typer, 'enheder_her', konkrete,
     'andel_hoej', round(n_hoej::numeric / n, 2), 'afvist', n_afvist, 'andel_foto', round(n_foto::numeric / n, 2),
     'varighed_min', round(varighed), 'beslutninger', n_beslut, 'forslag_prio', forslag, 'alvor', alvor, 'grund', array_to_json(grund));
 end $$;
