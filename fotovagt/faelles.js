@@ -285,6 +285,14 @@ export async function logInd({ kunKontor = false } = {}) {
 
   return new Promise(resolve => {
     const msg = $('#login-msg');
+    // Kom fra et mail-link, der er udløbet eller allerede brugt (Supabase sender fejlen med i adressen)
+    const linkFejl = new URLSearchParams(location.hash.slice(1));
+    if (linkFejl.get('error_code') || linkFejl.get('error')) {
+      msg.textContent = /expired|invalid/i.test(linkFejl.get('error_code') + linkFejl.get('error_description'))
+        ? 'Linket i mailen er udløbet eller allerede brugt. Bed kontoret trykke "Send igen" – eller log ind, hvis du allerede har valgt adgangskode.'
+        : `Linket virkede ikke: ${linkFejl.get('error_description') || linkFejl.get('error')}`;
+      history.replaceState(null, '', location.pathname + location.search);
+    }
     if (mig && kunKontor) msg.textContent = 'Denne side er kun for kontoret. Log ind med en kontor-bruger.';
     if (store.demo) {
       $('#login-form').hidden = true;
