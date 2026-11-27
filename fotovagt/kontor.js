@@ -8,6 +8,7 @@ import {
   pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm, nedtælling,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
   PRIO, prioAf, efterPrio, iNærheden, indsigt, indsigtHtml,
+  stationsKontrol,
 } from './faelles.js';
 
 let sLag;
@@ -647,6 +648,7 @@ async function start() {
   mig = await logInd({ kunKontor: true });
   $('#demo-mærke').hidden = !store.demo;
   kort = lavKort($('#kort'));
+  stationsKontrol(kort);   // brand-, politi- og ambulancestationer + telefonliste
   hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort);
 
   store.lyt(s => {

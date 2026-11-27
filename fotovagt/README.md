@@ -251,3 +251,12 @@ sprøjte + drejestige + indsatsleder; container/bål/knallert: sprøjte. Lokale 
 
 Assistenten genkender beredskabet på linjen "Beredskab:" i beskeden (eller Østjyllands enhedskoder) og viser den viden,
 der passer – andre beredskaber får kun det, assistenten har lært af historikken.
+
+## Stationer på kortet og telefonliste
+Knapperne øverst til højre på kortet (både Marken og Kontoret) viser **🚒 brandstationer**, **👮 politistationer** og
+**🚑 ambulancestationer**. Valget huskes på enheden. Tryk på en station for navn, adresse, det lokale beredskabs/politikredsens
+telefonnumre og **🧭 Navigér hertil**. Adressen slås op i DAWA (ellers OpenStreetMap), når stationen åbnes.
+**☎** åbner telefonlisten: alle 12 politikredse (kredsens nummer og presse-/vagtcheftelefon fra politi.dk) og beredskabernes
+lokale numre (vagtcentral, hvor den er offentliggjort – ellers hovednummer) fra deres egne kontaktsider. Ikke 112.
+Ambulancerne styres af regionernes AMK-vagtcentraler, som ikke har offentlige numre.
+Data: OpenStreetMap (© OpenStreetMap-bidragydere) i tabellen `stationer` – se `supabase/stationer.sql` for genindlæsning.

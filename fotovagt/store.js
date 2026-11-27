@@ -156,6 +156,15 @@ function supabaseBackend() {
       return data;
     },
     get førsteLogin() { return førsteLogin; },
+    // Brand-, politi- og ambulancestationer fra OpenStreetMap (tabellen stationer)
+    async hentStationer() {
+      const ud = [];
+      for (let fra = 0; ; fra += 1000) {
+        const { data, error } = await sb.from('stationer').select('t,n,a,op,lat,lon').range(fra, fra + 999);
+        if (error) throw new Error(error.message);
+        ud.push(...data); if (data.length < 1000) return ud;
+      }
+    },
     // Assistenten (databasefunktionen ai_indsigt i ai-indsigt.sql)
     async indsigt(id) {
       const { data, error } = await sb.rpc('ai_indsigt', { h: id });
@@ -551,6 +560,16 @@ function demoBackend() {
       return { ok: true, mail: false, link: 'https://vagt.hrc-fotos.dk/#demo-invitation', fejl: 'I demoen sendes der ikke mails.' };
     }),
     førsteLogin: false,
+    // Demo: et par stationer, så filteret kan prøves
+    async hentStationer() {
+      return [
+        { t: 'brand', n: 'Brandstation (demo)', op: 'Østjyllands Brandvæsen', lat: 56.124, lon: 10.197 },
+        { t: 'brand', n: 'Brandstation (demo)', op: 'Midtjysk Brand & Redning', lat: 56.452, lon: 9.393 },
+        { t: 'politi', n: 'Politistation (demo)', op: 'Østjyllands Politi', lat: 56.158, lon: 10.209 },
+        { t: 'politi', n: 'Politistation (demo)', op: 'Midt- og Vestjyllands Politi', lat: 56.451, lon: 9.404 },
+        { t: 'ambulance', n: 'Ambulancestation (demo)', lat: 56.170, lon: 10.190 },
+      ];
+    },
     // Demo: samme slags svar som ai_indsigt, regnet på demoens få hændelser
     async indsigt(id) {
       læs();

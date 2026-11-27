@@ -6,6 +6,7 @@ import {
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
   PRIO, prioAf, efterPrio, indsigt, indsigtHtml,
+  stationsKontrol,
 } from './faelles.js';
 
 const pref = {
@@ -322,6 +323,7 @@ async function start() {
   $('#demo-mærke').hidden = !store.demo;
   $('#skift').hidden = mig.rolle !== 'kontor';   // kontoret kan skifte mellem fotografens side og sit dashboard
   kort = lavKort($('#kort'));
+  stationsKontrol(kort);   // brand-, politi- og ambulancestationer + telefonliste
   hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort);
 
   // Live opdateringer: hvis teksten på min opgave (eller en ledig hændelse) bliver længere, får jeg besked

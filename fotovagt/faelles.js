@@ -642,6 +642,44 @@ const BEREDSKABER = [
   B('Nordjyllands Beredskab', 'Nordjylland', 'https://www.nordjyllandsberedskab.dk/', /nordjyllands beredskab/i, { kilde: 'NOBR2025',
     tekst: '11 kommuner, 36 brandstationer: 35 deltidsstationer og 1 døgnbemandet station suppleret af deltid. 5 indsatsledervagter efter "taxaprincippet" – nærmeste indsatsleder kører. Op til 4 indsatsledere til store hændelser.' }),
 ];
+// Lokale telefonnumre (ikke 112) – fra beredskabernes egne kontaktsider. "Hovednummer" = der er ikke offentliggjort
+// et særskilt vagtcentralnummer; de fleste beredskaber henviser til 112 ved akut hjælp.
+const BEREDSKAB_TLF = {
+  'Hovedstadens Beredskab': [['Vagthavende operationschef (også presse, døgnet rundt)', '24 29 75 03'], ['Hovednummer', '70 21 02 00']],
+  'Nordsjællands Brandvæsen': [['Vagtcentral (døgnbemandet)', '45 80 33 55']],
+  'Midt- og Sydsjællands Brand & Redning': [['Vagtcentral', '55 78 78 00']],
+  'Vestsjællands Brandvæsen': [['Døgnet rundt (tast 1)', '44 22 71 12']],
+  'Lolland-Falster Brandvæsen': [['Hovednummer', '61 94 80 00']],
+  'Brand & Redning Stevns': [['Døgnbemandet vagtcentral', '33 43 10 00']],
+  'Beredskab Fyn': [['Vagtcentral (dag og nat)', '65 51 18 00']],
+  'TrekantBrand': [['Vagtcentral', '70 23 60 61'], ['Hovednummer', '70 23 60 60']],
+  'Brand & Redning Sønderjylland': [['Hovednummer', '73 77 73 77']],
+  'Østjyllands Brandvæsen': [['Hovednummer', '86 76 76 76'], ['Presse', '86 76 76 49']],
+  'Midtjysk Brand & Redning': [['Hovednummer', '89 70 35 99']],
+  'Nordvestjyllands Brandvæsen': [['Hovednummer', '40 53 00 30']],
+  'Sydøstjyllands Brandvæsen': [['Hovednummer', '76 29 27 70']],
+  'Nordjyllands Beredskab': [['Hovednummer', '70 15 15 14']],
+};
+for (const b of BEREDSKABER) b.tlf = BEREDSKAB_TLF[b.navn] || [];
+
+// Politikredsene: kredsens nummer (politi.dk, "Kontakt politikreds") og pressetelefon/vagtchef (kredsens pressekontaktside)
+export const POLITI = [
+  { navn: 'Bornholms Politi', match: /bornholm/i, tlf: [['Kredsen', '56 90 14 48'], ['Presse (døgnet rundt)', '23 23 14 48']] },
+  { navn: 'Fyns Politi', match: /fyn/i, tlf: [['Kredsen', '66 14 14 48'], ['Presse (kontortid)', '91 35 79 02'], ['Vagtchef – akutte hændelser uden for kontortid', '25 47 07 35']] },
+  { navn: 'Københavns Politi', match: /københavns politi/i, tlf: [['Kredsen', '33 14 14 48'], ['Presse', '35 21 92 60']] },
+  { navn: 'Københavns Vestegns Politi', match: /vestegn/i, tlf: [['Kredsen', '43 86 14 48'], ['Vagtchefens pressetelefon (døgnet rundt)', '50 85 00 44']] },
+  { navn: 'Midt- og Vestjyllands Politi', match: /midt- og vestjylland/i, tlf: [['Kredsen', '96 10 14 48'], ['Vagtchefens pressetelefon', '96 10 14 68']] },
+  { navn: 'Midt- og Vestsjællands Politi', match: /midt- og vestsjælland/i, tlf: [['Kredsen', '46 35 14 48'], ['Presse (døgnet rundt)', '25 42 62 10']] },
+  { navn: 'Nordjyllands Politi', match: /nordjylland/i, tlf: [['Kredsen', '96 30 14 48'], ['Vagtchefens pressetelefon', '51 54 15 55']] },
+  { navn: 'Nordsjællands Politi', match: /nordsjælland/i, tlf: [['Kredsen', '49 27 14 48'], ['Presse', '41 33 15 76']] },
+  { navn: 'Syd- og Sønderjyllands Politi', match: /sønderjylland/i, tlf: [['Kredsen', '76 11 14 48'], ['Presse', '20 52 64 60']] },
+  { navn: 'Sydsjællands og Lolland-Falsters Politi', match: /sydsjælland|lolland/i, tlf: [['Kredsen', '55 31 14 48'], ['Vagtchefens pressetelefon (kl. 8–14, 16–22, 01–06)', '41 32 87 18']] },
+  { navn: 'Sydøstjyllands Politi', match: /sydøstjylland/i, tlf: [['Kredsen', '76 28 14 48'], ['Presse', '40 41 52 49']] },
+  { navn: 'Østjyllands Politi', match: /(?<!syd)østjylland/i, tlf: [['Kredsen', '87 31 14 48'], ['Presse (hverdage i kontortid)', '22 69 10 87'], ['Vagtchef efter kl. 16 og i weekenden', '86 18 28 77']] },
+];
+export const BEREDSKABSLISTE = BEREDSKABER;
+export const tlfLinks = tlf => tlf.map(([hvad, nr]) => `<a href="tel:+45${nr.replace(/\s/g, '')}">📞 ${esc(nr)}</a> <small>${esc(hvad)}</small>`).join('<br>');
+
 export function beredskabFor(h) {
   const t = `${h.titel || ''}\n${h.tekst || ''}`;
   const b = (/Beredskab:\s*([^\n·]+)/i.exec(t) || [])[1] || '';
@@ -695,11 +733,116 @@ export function indsigtHtml(h, d, { kontor = false } = {}) {
     ${her.length ? `<p><b>Plejer at køre${d.sted ? ` (${esc(d.sted)})` : ''}:</b> ${her.map(e => enhedNavn(e.enhed)).join(', ')}</p>` : ''}
     ${(niv => `<p><b>Niveau:</b> ${niv.navn} <small>(${niv.tekst})</small>${minimumsbemanding(h) ? `<br><small>Minimumsbemanding: ${minimumsbemanding(h)}</small>` : ''}</p>`)(beredskabsNiveau(h))}
     ${udrykningsprofil(h) ? `<p><b>Typisk udrykning:</b> ${esc(udrykningsprofil(h))} <small>(udrykningsprofil efter Beredskab Østs plan – lokale picklister kan afvige)</small></p>` : ''}
-    ${(b => b ? `<p class="lille">🚒 <b>${esc(b.navn)}</b> · ${esc(b.region)}${b.tekst ? ` (${esc(b.kilde)}): ${esc(b.tekst)}` : ''} · <a href="${esc(b.web)}" target="_blank" rel="noopener">hjemmeside</a></p>` : '')(beredskabFor(h))}
+    ${(b => b ? `<p class="lille">🚒 <b>${esc(b.navn)}</b> · ${esc(b.region)}${b.tekst ? ` (${esc(b.kilde)}): ${esc(b.tekst)}` : ''} · <a href="${esc(b.web)}" target="_blank" rel="noopener">hjemmeside</a>${b.tlf.length ? `<br>${tlfLinks(b.tlf)}` : ''}</p>` : '')(beredskabFor(h))}
     ${d.n_med_enheder ? `<p class="lille">Ekstra enheder/assistance tilkaldt senere ved ${pct(d.andel_ekstra)} af de lignende${(d.ekstra_nu || []).length ? ` · <b>her: ${d.ekstra_nu.map(enhedNavn).join(', ')}</b>` : ''}</p>` : ''}
     <p><b>Forslag:</b> <span class="prio-tekst p${p}">${PRIO[p]?.navn || 'Normal'} prioritet</span> · alvor ${esc(d.alvor)}
       <br><small>${(d.grund || []).map(esc).join(' · ')}</small></p>
     <p class="lille">Fotograf kørte på ${pct(d.andel_foto)} af de lignende${d.varighed_min != null ? ` · de varer typisk ${varighedTekst(d.varighed_min)}` : ''}</p>
     ${kontor && aktiv(h) && p && p !== nu ? `<button class="secondary lille-knap" data-prio="${h.id}" data-p="${p}">Brug forslaget: ${PRIO[p].navn}</button>` : ''}
   </div>`;
+}
+
+// ---------------------------------------------------------------------------------
+// Stationer på kortet: brand-, politi- og ambulancestationer (OpenStreetMap, tabellen stationer i databasen).
+// Filter-knapper øverst til højre på kortet. Tryk på en station for adresse, telefon og "Navigér".
+const STATIONSTYPER = {
+  brand: { ikon: '🚒', navn: 'Brandstationer', ental: 'Brandstation', farve: '#dc2626' },
+  politi: { ikon: '👮', navn: 'Politistationer', ental: 'Politistation', farve: '#1d4ed8' },
+  ambulance: { ikon: '🚑', navn: 'Ambulancestationer', ental: 'Ambulancestation', farve: '#059669' },
+};
+let stationsData = null;
+const hentStationer = () => stationsData ||= store.hentStationer().catch(() => { stationsData = null; return []; });
+const læsFilter = () => { try { return JSON.parse(localStorage.getItem('fotovagt-stationer')) || {}; } catch { return {}; } };
+const gemFilter = f => { try { localStorage.setItem('fotovagt-stationer', JSON.stringify(f)); } catch { /* privat vindue */ } };
+
+function stationsTlf(st) {
+  const tekst = `${st.op || ''} ${st.n || ''}`;
+  if (st.t === 'politi') {
+    const k = POLITI.find(p => p.match.test(tekst));
+    return k ? `<b>${esc(k.navn)}</b><br>${tlfLinks(k.tlf)}` : '<small>Politiet: 114 (døgnet rundt)</small>';
+  }
+  if (st.t === 'brand') {
+    const b = BEREDSKABER.find(x => x.match.test(tekst));
+    return b ? `<b>${esc(b.navn)}</b>${b.tlf.length ? `<br>${tlfLinks(b.tlf)}` : ''}` : '';
+  }
+  return '<small>Ambulancerne styres af regionens AMK-vagtcentral (intet offentligt nummer)</small>';
+}
+// Adresse slås op, når stationen åbnes (OpenStreetMap har sjældent adressen): DAWA, ellers OpenStreetMap
+async function slåAdresseOp(st) {
+  if (st.a || st._adr) return;
+  st._adr = true;
+  try {
+    const r = await fetch(`https://api.dataforsyningen.dk/adgangsadresser/reverse?x=${st.lon}&y=${st.lat}&struktur=mini`);
+    if (r.ok) { const d = await r.json(); if (d.betegnelse) { st.a = d.betegnelse; return; } }
+  } catch { /* prøv næste */ }
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=${st.lat}&lon=${st.lon}`);
+    const a = (await r.json()).address || {};
+    const linje = [[a.road, a.house_number].filter(Boolean).join(' '), [a.postcode, a.town || a.city || a.village].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    if (linje) st.a = linje;
+  } catch { /* ingen adresse */ }
+}
+function stationsPopup(st) {
+  const T = STATIONSTYPER[st.t], nav = navigationsLink({ lat: st.lat, lon: st.lon });
+  return `<div class="st-popup"><b>${T.ikon} ${esc(st.n || T.ental)}</b>
+    ${st.a ? `<br>${esc(st.a)}` : '<br><small>Finder adresse …</small>'}
+    ${(t => t ? `<div class="st-tlf">${t}</div>` : (st.op ? `<br><small>${esc(st.op)}</small>` : ''))(stationsTlf(st))}
+    <a class="knap st-nav" href="${nav}" target="_blank" rel="noopener">🧭 Navigér hertil</a></div>`;
+}
+export function stationsKontrol(kort) {
+  const lag = Object.fromEntries(Object.keys(STATIONSTYPER).map(t => [t, L.layerGroup()]));
+  let filter = læsFilter(), fyldt = false;
+  async function fyld() {
+    if (fyldt) return; fyldt = true;
+    for (const st of await hentStationer()) {
+      const T = STATIONSTYPER[st.t]; if (!T || !lag[st.t]) continue;
+      L.marker([st.lat, st.lon], {
+        icon: L.divIcon({ className: 'st-ikon', html: `<span style="--c:${T.farve}">${T.ikon}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
+        title: st.n || T.ental, keyboard: false,
+      }).bindPopup(() => stationsPopup(st), { maxWidth: 260 })
+        .on('popupopen', async e => { if (st.a) return; await slåAdresseOp(st); if (st.a) e.popup.setContent(stationsPopup(st)); })
+        .addTo(lag[st.t]);
+    }
+  }
+  async function opdater() {
+    if (Object.values(filter).some(Boolean)) await fyld();
+    for (const [t, l] of Object.entries(lag)) { if (filter[t]) l.addTo(kort); else l.remove(); }
+    boks.querySelectorAll('[data-st]').forEach(b => b.setAttribute('aria-pressed', String(!!filter[b.dataset.st])));
+  }
+  const Kontrol = L.Control.extend({
+    onAdd() {
+      const d = L.DomUtil.create('div', 'st-kontrol leaflet-bar');
+      d.innerHTML = Object.entries(STATIONSTYPER).map(([t, T]) => `<button type="button" data-st="${t}" title="Vis ${T.navn.toLowerCase()}" aria-pressed="false">${T.ikon}</button>`).join('')
+        + '<button type="button" data-tlfliste title="Telefonliste: vagtcentraler og politikredse">☎</button>';
+      L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+      d.addEventListener('click', e => {
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.tlfliste != null) return åbnTelefonliste();
+        filter = { ...filter, [b.dataset.st]: !filter[b.dataset.st] }; gemFilter(filter); opdater();
+      });
+      return d;
+    },
+  });
+  const boks = new Kontrol({ position: 'topright' }).addTo(kort).getContainer();
+  opdater();
+}
+
+// Telefonliste: politikredse og beredskaber med lokale numre (ikke 112)
+export function åbnTelefonliste() {
+  let dlg = $('#dlg-tlfliste');
+  if (!dlg) {
+    dlg = document.createElement('dialog'); dlg.id = 'dlg-tlfliste'; dlg.className = 'ark';
+    const sekt = (titel, liste) => `<h3>${titel}</h3><div class="tlf-liste">${liste.map(x => `<div class="tlf-række"><b>${esc(x.navn)}</b><div>${tlfLinks(x.tlf)}</div></div>`).join('')}</div>`;
+    dlg.innerHTML = `<div class="ark-indhold">
+      <div class="ark-top"><h2>☎ Telefonliste</h2><button class="luk" data-luk-tlf aria-label="Luk">✕</button></div>
+      <p class="hint">Lokale numre – ikke 112. Ved akut fare: ring 112. Politiets døgnnummer er 114. Numrene er fra politi.dk og beredskabernes egne kontaktsider.</p>
+      ${sekt('👮 Politikredse', POLITI)}
+      ${sekt('🚒 Beredskaber', BEREDSKABER.filter(b => b.tlf.length))}
+      <p class="hint">Beredskaber uden offentligt vagtcentralnummer: ${BEREDSKABER.filter(b => !b.tlf.length).map(b => esc(b.navn)).join(', ')}.
+        Ambulancer styres af regionernes AMK-vagtcentraler, som ikke har offentlige numre.</p>
+    </div>`;
+    document.body.append(dlg);
+    dlg.addEventListener('click', e => { if (e.target === dlg || e.target.closest('[data-luk-tlf]')) dlg.close(); });
+  }
+  dlg.showModal();
 }

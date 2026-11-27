@@ -697,3 +697,18 @@ body.marken #app { overflow: hidden; }
 .ai-boks small { color: var(--dæmpet); }
 .prio-tekst.p1 { color: #dc2626; font-weight: 700; }
 .prio-tekst.p3 { color: var(--dæmpet); font-weight: 700; }
+
+/* Stationer på kortet */
+.st-kontrol { display: flex; flex-direction: column; background: var(--flade); }
+.st-kontrol button { width: 36px; height: 36px; border: 0; border-bottom: 1px solid var(--kant); background: var(--flade); font-size: 18px; padding: 0; cursor: pointer; border-radius: 0; min-height: 0; color: inherit; }
+.st-kontrol button:last-child { border-bottom: 0; }
+.st-kontrol button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent, #2f80ff) 22%, var(--flade)); box-shadow: inset 3px 0 0 var(--accent, #2f80ff); }
+.st-ikon span { --c: #555; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 2px solid var(--c); font-size: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.st-popup { font-size: .9rem; line-height: 1.4; }
+.st-tlf { margin: 6px 0; }
+.st-tlf a, .tlf-række a { white-space: nowrap; font-weight: 600; }
+.st-nav { display: inline-block; margin-top: 6px; padding: 6px 10px; font-size: .85rem; text-decoration: none; }
+.tlf-liste { display: grid; gap: 6px; margin-bottom: 12px; }
+.tlf-række { padding: 8px 10px; background: var(--flade2); border-radius: var(--radius-s); font-size: .9rem; }
+.tlf-række small { color: var(--dæmpet); }
+.leaflet-popup-content a.st-nav { color: #fff; background: var(--tekst, #111); border-radius: 10px; }
