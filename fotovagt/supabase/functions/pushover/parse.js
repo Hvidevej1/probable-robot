@@ -376,13 +376,29 @@ export function findMatch(ny, aktive, nu = Date.now()) {
 const FÆRDIG = /færdige (?:med [a-zæøå ]+ )?på (?:uhelds|ulykkes|gerningsstedet|stedet)|færdige med undersøgelserne|trafikken er (?:åbnet|genåbnet)|åbnet op igen|vejen er (?:åbnet|genåbnet)|slukket|under kontrol/i;
 const klokkenDK = () => new Intl.DateTimeFormat('da-DK', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Copenhagen' }).format(new Date());
 
+// Er beskeden allerede lagt ind? Samme tekst sendes ofte flere gange (fx af en backup-kilde hvert 20. sekund),
+// med andre skilletegn, linjeskift, "for 3 minutter siden" eller et nyt klokkeslæt. Vi sammenligner kun ordene.
+const kerne = s => renEmoji(s).toLowerCase()
+  .replace(/https?:\/\/\S+/g, ' ')
+  .replace(/\bfor\s+\d+\s+(?:sekunder|sekund|minutter|minut|timer|time)\s+siden\b/g, ' ')
+  .replace(/\b\d{1,2}[-./]\d{1,2}[-./]\d{2,4}\b/g, ' ').replace(/\b(?:kl\.?\s*)?\d{1,2}[:.]\d{2}(?::\d{2})?\b/g, ' ')
+  .replace(/\s—\s.*?:/g, ' ').replace(/[^a-zæøå0-9]+/g, ' ').trim();
+export function alleredeKendt(gammel, ny) {
+  const n = kerne(ny), g = kerne(gammel);
+  if (!n) return true;
+  if (g.includes(n.slice(0, 160))) return true;
+  // Næsten alle ord findes allerede (fx samme melding fra en anden kilde med lidt andre ord)
+  const ord = [...new Set(n.split(' ').filter(o => o.length > 2))];
+  const kendte = new Set(g.split(' '));
+  return ord.length >= 6 && ord.filter(o => kendte.has(o)).length / ord.length >= 0.9;
+}
+
 export function flet(h, ny, app) {
   const kort = String(ny.tekst || '').split('\n').map(l => renEmoji(l).replace(NYHEDSKILDE, ''))
     .filter(l => l && !/^læs mere|^https?:\/\//i.test(l)).join(' · ');
   const indhold = kort.startsWith(ny.titel) ? kort : [ny.titel, kort].filter(Boolean).join(' · ');
-  const linje = `— kl. ${klokkenDK()} ${app || 'Ekstra besked'}: ${FÆRDIG.test(ny.tekst || '') ? '✅ ' : ''}${indhold}`;
-  const kendt = String(ny.tekst || '').replace(/\s+/g, ' ').slice(0, 80);
-  const felter = { tekst: kendt && String(h.tekst || '').replace(/\s+/g, ' ').includes(kendt) ? h.tekst : [h.tekst, linje].filter(Boolean).join('\n') };
+  const linje = `— kl. ${klokkenDK()} ${String(app || 'Ekstra besked').trim()}: ${FÆRDIG.test(ny.tekst || '') ? '✅ ' : ''}${indhold}`;
+  const felter = { tekst: alleredeKendt(h.tekst, ny.tekst) ? h.tekst : [h.tekst, linje].filter(Boolean).join('\n') };
   // Efterlyst person fundet: politiet beder om at slette navn og foto, så den første tekst fjernes
   if (/er fundet|slette (?:foto|billede|navn)/i.test(ny.tekst || '') && /efterlys/i.test(`${h.titel} ${h.tekst}`)) {
     felter.titel = 'Efterlysning afsluttet – personen er fundet';

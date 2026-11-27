@@ -136,5 +136,12 @@ const sindal = parseBesked({ app: 'PF-Upload', title: '⚡ Strømafbrydelse – 
 console.log('  planlagt:', sindal.titel, '|', sindal.adresse, '|', sindal.kategori);
 tjek('Planlagt strømafbrydelse kommer med (Sindal)', !sindal.ignorer && sindal.kategori === 'Forsyning' && /planlagt/.test(sindal.titel) && /12\.00–15\.00/.test(sindal.titel));
 tjek('Planlagt strømafbrydelse placeres i byen (9870 Sindal)', /9870 Sindal/.test(sindal.adresse));
+const skiveFørst = { titel: 'Uheld – Rute 26', tekst: 'Uheld\nRute 26 fra Skive mod Viborg mellem Skive SV og Skive S\nUheld, Vejen er spærret', status: 'ny', oprettet: new Date().toISOString() };
+const skiveNyhed = parseBesked({ app: 'Pf-upload 3 backup ', title: 'TV MidtVest', message: 'Vej spærret ved Skive\nfor 3 minutter siden En lastbil har påkørt en personbil bagfra. Det fortæller vagtchef Rasmus Poulsen hos Midt- og Vestjyllands Politi. Uheldet er sket på rute 26 fra Skive mod Viborg på Ringvej Syd.' });
+const efter1 = flet(skiveFørst, skiveNyhed, 'Pf-upload 3 backup ');
+const igen = parseBesked({ app: 'Pf-upload 3 backup ', title: 'TV MidtVest', message: 'Vej spærret ved Skive\nfor 4 minutter siden En lastbil har påkørt en personbil bagfra. Det fortæller vagtchef Rasmus Poulsen hos Midt- og Vestjyllands Politi. Uheldet er sket på rute 26 fra Skive mod Viborg på Ringvej Syd.' });
+const efter2 = flet({ ...skiveFørst, tekst: efter1.tekst }, igen, 'Pf-upload 3 backup ');
+tjek('Samme nyhed sendt igen ("for 4 minutter siden") tilføjes ikke en gang til', efter2.tekst === efter1.tekst && (efter1.tekst.match(/lastbil/g) || []).length === 1);
+tjek('Kildens navn uden mellemrum før kolon', /Pf-upload 3 backup: /.test(efter1.tekst));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

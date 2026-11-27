@@ -377,7 +377,8 @@ export function tidslinjePunkter(h, kommentarer = kommentarerTil(h.id)) {
     punkter.push({ type: 'opdatering', tid, kilde: m ? m[3] : 'Opdatering', tekst: m ? m[4] : l.slice(2) });
   }
   for (const k of kommentarer) punkter.push({ type: 'kommentar', tid: new Date(k.oprettet), k });
-  return punkter.sort((a, b) => a.tid - b.tid);
+  const orden = { melding: 0, opdatering: 1, kommentar: 2 };
+  return punkter.sort((a, b) => (a.tid - b.tid) || (orden[a.type] - orden[b.type]));   // første melding først ved samme minut
 }
 
 // Seneste nye ting på hændelsen (til kortene i listerne)
