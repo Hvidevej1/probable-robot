@@ -579,42 +579,94 @@ const ENHEDSNAVN = { ISL: 'indsatsleder', OC: 'operationschef', M: 'autosprøjte
 // Andre forkortelser vises som de står.
 const STATIONER = { CI: 'Aarhus City', NO: 'Aarhus Nord', SY: 'Aarhus Syd', OD: 'Odder', SK: 'Skanderborg' };
 
-// Viden fra beredskabernes egne planer for risikobaseret dimensionering
-const BEREDSKABER = {
-  ostjylland: {
-    navn: 'Østjyllands Brandvæsen', kilde: 'plan 2026–2030',
+// Viden fra beredskabernes egne planer for risikobaseret dimensionering. Alle 29 kommunale redningsberedskaber
+// (liste fra RBIS) er med med region og hjemmeside; dem, hvis plan er læst, har også fakta og minimumsbemanding.
+const B = (navn, region, web, match, ekstra = {}) => ({ navn, region, web, match, ...ekstra });
+const BEREDSKABER = [
+  // Hovedstaden
+  B('Hovedstadens Beredskab', 'Hovedstaden', 'https://www.hbr.dk', /hovedstadens beredskab/i),
+  B('Beredskab Øst', 'Hovedstaden', 'https://beros.dk', /beredskab øst/i, { kilde: 'plan 2025',
+    tekst: 'Ballerup, Gentofte, Gladsaxe og Lyngby. Fire stationer med døgnhold på 1+5 (afgang ca. 1 min) og deltid 1+5 som 2. udrykning. To indsatsledere på vagt, den ene på døgnvagt i Gladsaxe.' }),
+  B('Beredskab 4K', 'Hovedstaden', 'https://beredskab4k.dk/', /beredskab 4k/i),
+  B('Frederiksborg Brand & Redning', 'Hovedstaden', 'http://www.fbbr.dk', /frederiksborg brand/i, { kilde: 'RBD25',
+    tekst: 'Basisberedskab på alle stationer: tanksprøjte + vandtankvogn (typisk 1+5, enkelte 1+3). Båd og hurtig slukningsenhed på udvalgte stationer. Altid to indsatsledere på vagt – nærmeste tilkaldes.' }),
+  B('Nordsjællands Brandvæsen', 'Hovedstaden', 'http://www.nsbv.dk/', /nordsjællands brandvæsen/i),
+  B('Helsingør Kommunes Beredskab', 'Hovedstaden', 'https://beredskab.helsingor.dk/', /helsingør/i, { kilde: 'plan for RBD',
+    tekst: 'Fire stationer: Helsingør, Espergærde, Tikøb og Hornbæk. Bygget på taktiske enheder på 1+3; nærmeste auto-/tanksprøjte sendes, evt. med køretøjer fra næstnærmeste station. Udrykningen er fastlagt pr. meldingskode i 112-picklisten.',
+    minimum: () => '1+3 pr. taktisk enhed' }),
+  B('Gribskov Beredskab', 'Hovedstaden', 'https://www.gribskov.dk/erhverv/gribskov-beredskab/', /gribskov/i),
+  B('Tårnby Brandvæsen', 'Hovedstaden', 'http://tb.taarnby.dk', /tårnby/i, { tekst: 'M1–M3 er autosprøjter, S1 en 32 m stigevogn og V1 en tankvogn med knap 8.000 liter vand.', kilde: 'køretøjsliste' }),
+  B('Bornholms Brandvæsen', 'Hovedstaden', 'https://www.brk.dk/Borger/beredskab/Sider/Brand-og-beredskab.aspx', /bornholm/i),
+  // Sjælland
+  B('Roskilde Brandvæsen', 'Sjælland', 'https://brandvaesen.roskilde.dk/', /roskilde brandvæsen/i),
+  B('Vestsjællands Brandvæsen', 'Sjælland', 'https://vsbv.dk/', /vestsjællands brandvæsen/i),
+  B('Slagelse Brand og Redning', 'Sjælland', 'https://beredskab.slagelse.dk/', /slagelse brand/i),
+  B('Midt- og Sydsjællands Brand & Redning', 'Sjælland', 'http://www.msbr.dk/', /midt- og sydsjællands/i),
+  B('Lolland-Falster Brandvæsen', 'Sjælland', 'https://www.lfbv.dk', /lolland-falster/i),
+  B('Brand & Redning Køge', 'Sjælland', 'https://www.koege.dk', /redning køge/i),
+  B('Brand & Redning Stevns', 'Sjælland', 'https://www.stevns.dk', /redning stevns/i),
+  B('Lejre Brandvæsen', 'Sjælland', 'https://www.lejre.dk', /lejre brandvæsen/i),
+  // Syddanmark
+  B('Beredskab Fyn', 'Syddanmark', 'https://beredskabfyn.dk/', /beredskab fyn/i),
+  B('TrekantBrand', 'Syddanmark', 'http://www.trekantbrand.dk/', /trekantbrand/i),
+  B('Vejle Brandvæsen', 'Syddanmark', 'https://www.vejlebrandvaesen.dk/', /vejle brandvæsen/i),
+  B('Sydvestjysk Brandvæsen', 'Syddanmark', 'http://svjb.dk/', /sydvestjysk brandvæsen/i),
+  B('Brand & Redning Sønderjylland', 'Syddanmark', 'https://www.brsj.dk/', /redning sønderjylland/i),
+  B('Beredskab Sønderborg', 'Syddanmark', 'https://sonderborgkommune.dk/', /beredskab sønderborg/i),
+  // Midtjylland
+  B('Østjyllands Brandvæsen', 'Midtjylland', 'https://www.ostbv.dk/', /østjyllands brandvæsen/i, { kilde: 'plan 2026–2030',
     tekst: 'Døgnstationer: Aarhus Nord, City og Syd; deltid bl.a. Odder, Hørning, Skanderborg, Ry. Indsatsleder Nord og Syd. Nærmeste relevante enhed sendes altid.',
     minimum: t => /højhus/.test(t) && /bygn|brand/.test(t) ? '3+4+20+2 ved bekræftet brand i højhus'
       : /\baba\d*\b|automatisk brandalarm/.test(t) ? '1+5 (nogle ABA-objekter: indsatsleder med, 1+1+5, eller 1+2+10)'
       : /bygn\.?\s?brand|bygningsbrand|campingvogn|kolonihave|sommerhus|parcelhus|villa|lejlighed|etage/.test(t) ? '1+1+5 – indsatsleder, holdleder og 5 brandfolk'
-      : /knallert|skraldespand|container|affald|i det fri/.test(t) ? '1+3 – holdleder og 3 brandfolk' : null,
-  },
-  midtjysk: {
-    navn: 'Midtjysk Brand & Redning', kilde: 'plan 2026–2029',
+      : /knallert|skraldespand|container|affald|i det fri/.test(t) ? '1+3 – holdleder og 3 brandfolk' : null }),
+  B('Beredskab & Sikkerhed', 'Midtjylland', 'http://www.bsik.dk/', /beredskab & sikkerhed|beredskab og sikkerhed/i),
+  B('Midtjysk Brand & Redning', 'Midtjylland', 'http://mjbr.dk/', /midtjysk/i, { kilde: 'plan 2026–2029',
     tekst: 'Viborg og Silkeborg kommuner, 10 stationer. Alle har sprøjte og tankvogn – det er førsteudrykningen. Drejestige, redningsvogn og specialer kommer fra Viborg eller Silkeborg (CBRNE kun Viborg). Indsatsleder Nord (Viborg) og Syd (Silkeborg). Gennemsnitlig responstid 6,8 min.',
-    minimum: t => /drejestige|højde|etage|lejlighed/.test(t) ? '1+3 på autosprøjten, +2 pr. specialkøretøj (fx drejestige)' : '1+3 på første autosprøjte',
-  },
-};
+    minimum: t => /drejestige|højde|etage|lejlighed/.test(t) ? '1+3 på autosprøjten, +2 pr. specialkøretøj (fx drejestige)' : '1+3 på første autosprøjte' }),
+  B('Brand & Redning MidtVest', 'Midtjylland', 'http://brmv.dk/', /midtvest/i),
+  B('Nordvestjyllands Brandvæsen', 'Midtjylland', 'https://www.nvjbrand.dk/', /nordvestjyllands brandvæsen/i),
+  B('Sydøstjyllands Brandvæsen', 'Midtjylland', 'https://sojbv.dk/', /sydøstjyllands brandvæsen/i),
+  // Nordjylland
+  B('Nordjyllands Beredskab', 'Nordjylland', 'https://www.nordjyllandsberedskab.dk/', /nordjyllands beredskab/i),
+];
 export function beredskabFor(h) {
   const t = `${h.titel || ''}\n${h.tekst || ''}`;
   const b = (/Beredskab:\s*([^\n·]+)/i.exec(t) || [])[1] || '';
-  if (/østjylland/i.test(b) || (!b && /\b(CI|NO|SY|OD|SK)[\s-]?(?:MR|[MVSRBTKH])[\s-]?\d/.test(t))) return BEREDSKABER.ostjylland;
-  if (/midtjysk/i.test(b)) return BEREDSKABER.midtjysk;
+  if (b) return BEREDSKABER.find(x => x.match.test(b)) || null;
+  // Uden "Beredskab:"-linje: Østjyllands enhedskoder (fx fra 1-1-2 Århus)
+  if (/\b(CI|NO|SY|OD|SK)[\s-]?(?:MR|[MVSRBTKH])[\s-]?\d/.test(t)) return BEREDSKABER.find(x => x.navn === 'Østjyllands Brandvæsen');
   return null;
 }
-const enhedNavn = k => { const m = /^([A-ZÆØÅ]{2,3})-/.exec(k) || /^ISL (NO|SY)$/.exec(k); return m && STATIONER[m[1]] ? `${esc(k)} <small>${k.startsWith('ISL') ? 'indsatsleder ' + STATIONER[m[1]].split(' ')[1] : STATIONER[m[1]]}</small>` : esc(k); };
-// Hændelsesniveau og minimumsbemanding efter Østjyllands Brandvæsens plan for risikobaseret dimensionering 2026-2030
-// (holdleder + brandfolk; "1+1+5" = indsatsleder + holdleder + 5 brandfolk)
-export function beredskabsNiveau(h) {
-  const t = `${h.titel || ''}\n${h.tekst || ''}`;
-  const isl = new Set((t.match(/\bISL\s+[A-ZÆØÅ]{2,3}\b/g) || []).map(x => x.replace(/\s+/g, ' '))).size;
-  if (/\bOC\b/.test(t) || (h.antal_ass || 0) >= 3) return { navn: 'Ekstraordinær hændelse', tekst: 'operationschefen rekvirerer assistance' };
-  if (h.eskaleret || isl >= 2 || (h.antal_enheder || 0) >= 5) return { navn: 'Større hændelse', tekst: 'minimum 1+2+10' };
-  return { navn: 'Hverdagshændelse', tekst: 'nærmeste relevante enhed' };
+
+// Typiske udrykningsprofiler pr. melding – principperne fra Beredskab Østs plan 2025 (tabel 17). De svarer til den
+// gængse danske opbygning; det enkelte beredskabs pickliste kan afvige. M = sprøjte (1+3), S = drejestige (2),
+// V = vandtankvogn (2), ISL = indsatsleder. "(x)" = afhænger af objekt og melding.
+const PROFILER = [
+  [/\baba\d*\b|automatisk brandalarm/, 'Sprøjte + drejestige + indsatsleder (ved udvalgte ABA-anlæg kun sprøjte)'],
+  [/etage|højhus|institution|plejehjem|hospital|tagbrand|brand i tag/, 'Sprøjte + drejestige + 2. sprøjte + vandtankvogn, ved komplekse bygninger en 3. udrykningsenhed + indsatsleder og 2. indsatsleder'],
+  [/bygn\.?\s?brand|bygningsbrand|villa|rækkehus|kædehus|lejlighed|industri|p-hus|kælder/, 'Sprøjte + drejestige + 2. sprøjte + vandtankvogn + indsatsleder'],
+  [/el-?bil|elbil|hybrid/, 'Sprøjte + 2. sprøjte + vandtankvogn + specialkøretøj + indsatsleder'],
+  [/\btog\b|\bfly\b|skib/, 'Sprøjte + drejestige + 2. sprøjte + vandtankvogn (+ specialkøretøj) + indsatsleder'],
+  [/skur|carport|transformator|skorst|eftersyn/, 'Sprøjte + drejestige + indsatsleder'],
+  [/gasudslip|gaslæk|gasledning/, 'Sprøjte + vandtankvogn + indsatsleder'],
+  [/brand-bil|bilbrand|bil i det fri|bus|lastvogn|lastbil|landbrug|traktor|mejetærsker/, 'Sprøjte + vandtankvogn + indsatsleder'],
+  [/mark|skov|halm|naturbrand/, 'Sprøjte + vandtankvogn + indsatsleder (mindre naturbrand: kun sprøjte)'],
+  [/container|bål|knallert|affald|skraldespand|i det fri/, 'Sprøjte – holdleder kan opgradere med vandtankvogn og indsatsleder'],
+  [/fastklemt.*(bus|lastbil|tog)|silo|jordskred|sandskred/, 'Sprøjte + 2. sprøjte + vandtankvogn + specialkøretøj + indsatsleder'],
+  [/færdselsuheld|trafikuheld|fuh|fastklemt|frigørelse/, 'Sprøjte + vandtankvogn + indsatsleder'],
+  [/drukn|vandredning|person i vand|redning på vand/, 'Sprøjte + vandtankvogn (+ båd) + indsatsleder – altid overfladereddere'],
+  [/redn\.|redning|mast|skrænt/, 'Sprøjte (+ drejestige/vandtankvogn) + indsatsleder'],
+  [/kemikalie/, 'Sprøjte + drejestige + 2. sprøjte + vandtankvogn + specialkøretøjer + indsatsleder og 2. indsatsleder'],
+  [/miljø|udslip|olie|spild/, 'Mindre spild: sprøjte. Større udslip: sprøjte + vandtankvogn + indsatsleder'],
+];
+export function udrykningsprofil(h) {
+  const t = (h.titel || '').toLowerCase();
+  return (PROFILER.find(([re]) => re.test(t)) || [])[1] || null;
 }
 export function minimumsbemanding(h) {
   const b = beredskabFor(h);
-  return b ? b.minimum((h.titel || '').toLowerCase()) : null;
+  return b?.minimum ? b.minimum((h.titel || '').toLowerCase()) : null;
 }
 const pct = x => `${Math.round((x || 0) * 100)} %`;
 const varighedTekst = m => m == null ? '' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} t ${m % 60 ? `${m % 60} min` : ''}`.trim();
@@ -630,7 +682,8 @@ export function indsigtHtml(h, d, { kontor = false } = {}) {
       : '<p class="lille">Ingen enheder i de lignende beskeder endnu.</p>'}
     ${her.length ? `<p><b>Plejer at køre${d.sted ? ` (${esc(d.sted)})` : ''}:</b> ${her.map(e => enhedNavn(e.enhed)).join(', ')}</p>` : ''}
     ${(niv => `<p><b>Niveau:</b> ${niv.navn} <small>(${niv.tekst})</small>${minimumsbemanding(h) ? `<br><small>Minimumsbemanding: ${minimumsbemanding(h)}</small>` : ''}</p>`)(beredskabsNiveau(h))}
-    ${(b => b ? `<p class="lille">🚒 <b>${esc(b.navn)}</b> (${esc(b.kilde)}): ${esc(b.tekst)}</p>` : '')(beredskabFor(h))}
+    ${udrykningsprofil(h) ? `<p><b>Typisk udrykning:</b> ${esc(udrykningsprofil(h))} <small>(udrykningsprofil efter Beredskab Østs plan – lokale picklister kan afvige)</small></p>` : ''}
+    ${(b => b ? `<p class="lille">🚒 <b>${esc(b.navn)}</b> · ${esc(b.region)}${b.tekst ? ` (${esc(b.kilde)}): ${esc(b.tekst)}` : ''} · <a href="${esc(b.web)}" target="_blank" rel="noopener">hjemmeside</a></p>` : '')(beredskabFor(h))}
     ${d.n_med_enheder ? `<p class="lille">Ekstra enheder/assistance tilkaldt senere ved ${pct(d.andel_ekstra)} af de lignende${(d.ekstra_nu || []).length ? ` · <b>her: ${d.ekstra_nu.map(enhedNavn).join(', ')}</b>` : ''}</p>` : ''}
     <p><b>Forslag:</b> <span class="prio-tekst p${p}">${PRIO[p]?.navn || 'Normal'} prioritet</span> · alvor ${esc(d.alvor)}
       <br><small>${(d.grund || []).map(esc).join(' · ')}</small></p>

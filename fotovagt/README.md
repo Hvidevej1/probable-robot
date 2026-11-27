@@ -238,5 +238,13 @@ Fra Midtjysk Brand & Rednings *Plan for risikobaseret dimensionering 2026-2029* 
 * Alle stationer har sprøjte og tankvogn = førsteudrykningen. Drejestige, redningsvogn og specialer kommer fra Viborg
   eller Silkeborg (CBRNE kun Viborg). Indsatsleder Nord (Viborg) og Syd (Silkeborg).
 * Minimum 1+3 på første autosprøjte, +2 pr. specialkøretøj. Gennemsnitlig responstid 6,8 min (2021-2024).
+**Alle 29 kommunale redningsberedskaber** (liste fra RBIS) + Brand & Redning Stevns er registreret med region og hjemmeside
+(`BEREDSKABER` i `faelles.js`). Planer læst indtil videre: Østjyllands Brandvæsen, Midtjysk Brand & Redning, Beredskab Øst,
+Frederiksborg Brand & Redning, Helsingør Kommunes Beredskab (+ Tårnbys køretøjsliste). Flere tilføjes samme sted.
+
+**Typisk udrykning pr. melding** bygger på udrykningsprofilerne i Beredskab Østs plan 2025 (tabel 17), som følger den
+gængse danske opbygning – fx villa/lejlighed: sprøjte + drejestige + 2. sprøjte + vandtankvogn + indsatsleder; ABA:
+sprøjte + drejestige + indsatsleder; container/bål/knallert: sprøjte. Lokale picklister kan afvige.
+
 Assistenten genkender beredskabet på linjen "Beredskab:" i beskeden (eller Østjyllands enhedskoder) og viser den viden,
 der passer – andre beredskaber får kun det, assistenten har lært af historikken.
