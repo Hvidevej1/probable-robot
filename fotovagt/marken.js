@@ -5,6 +5,7 @@ import {
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
+  PRIO, prioAf, efterPrio,
 } from './faelles.js';
 
 const pref = {
@@ -64,10 +65,10 @@ function kort_(h) {
   const tagbar = h.status === 'ny' && !mig.haendelse_id;
   const min = h.taget_af === mig.id;
   return `
-    <article class="h-kort h-${h.status}${min ? ' min' : ''}" data-id="${h.id}">
+    <article class="h-kort h-${h.status} prio-${prioAf(h)}${min ? ' min' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
-        <h3>${h.eskaleret ? '<span class="stor-mærke">⬆️ Stor hændelse</span> ' : ''}${esc(h.titel)}</h3>
+        <h3>${prioAf(h) === 1 && aktiv(h) ? '<span class="prio-mærke">🔴 Høj prioritet</span> ' : ''}${h.eskaleret ? '<span class="stor-mærke">⬆️ Stor hændelse</span> ' : ''}${esc(h.titel)}</h3>
         <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
         <p class="lille">${siden(h.oprettet)} siden${d != null ? ` · ${kmTekst(d)}` : ''} ·
           ${kommentarerTil(h.id).length ? `<span class="k-antal" title="Kommentarer">💬 ${kommentarerTil(h.id).length}</span> · ` : ''}<span class="h-status">${h.auto_lukket && !aktiv(h) ? 'Lukket automatisk (ingen opdateringer)' : h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
@@ -78,7 +79,7 @@ function kort_(h) {
 
 function tegnListe() {
   const alle = store.state.haendelser;
-  const aktive = alle.filter(aktiv).sort((a, b) => (b.status === 'ny') - (a.status === 'ny') || b.oprettet.localeCompare(a.oprettet));
+  const aktive = alle.filter(aktiv).sort(efterPrio);   // kontorets prioritet først
   const afsluttede = alle.filter(h => !aktiv(h)).slice(0, 15);
   const nye = aktive.filter(h => h.status === 'ny').length;
   const t = $('#antal-nye'); t.hidden = !nye; t.textContent = nye;
@@ -220,6 +221,7 @@ function visHaendelse(id, åbn = true) {
     <div class="ark-top"><span class="kat stor">${ikonFor(h)}</span>
       <button class="luk" data-luk aria-label="Luk">✕</button></div>
     ${h.eskaleret ? '<p class="stor-banner">⬆️ Stor hændelse – opgraderet af kontoret</p>' : ''}
+    ${aktiv(h) && prioAf(h) !== 2 ? `<p class="prio-banner p${prioAf(h)}">${prioAf(h) === 1 ? '🔴 Kontoret har givet hændelsen høj prioritet' : '⚪ Lav prioritet fra kontoret'}</p>` : ''}
     <h2>${esc(h.titel)}</h2>
     <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${d != null ? ` · ${kmTekst(d)} væk` : ''}</p>
     ${h.antal_enheder ? `<p class="lille">🚒 ${h.antal_ass || 0} assistance${h.antal_ass === 1 ? '' : 'r'} · ${h.antal_enheder} enheder</p>` : ''}
@@ -316,6 +318,7 @@ async function start() {
 
   // Live opdateringer: hvis teksten på min opgave (eller en ledig hændelse) bliver længere, får jeg besked
   const kendtTekst = new Map(store.state.haendelser.map(h => [h.id, h.tekst || '']));
+  const kendtPrio = new Map(store.state.haendelser.map(h => [h.id, prioAf(h)]));
   store.lyt(s => {
     tegn();
     for (const h of s.haendelser) {
@@ -326,6 +329,17 @@ async function start() {
       if (min || h.status === 'ny') {
         if (min && pref.get('lyd', true)) bip();
         toast(`${min ? 'Opdatering på din opgave' : 'Opdatering'}: ${senesteOpdatering(h).replace(/^kl\. \d\d[.:]\d\d [^:]+: /, '').slice(0, 120)}`, min ? 'ny' : '');
+      }
+    }
+    // Kontoret ændrer prioritet: besked, når en hændelse bliver høj (eller min opgave ændres)
+    for (const h of s.haendelser) {
+      const før = kendtPrio.get(h.id), nu = prioAf(h);
+      kendtPrio.set(h.id, nu);
+      if (før == null || før === nu || !aktiv(h)) continue;
+      const min = h.id === s.mig?.haendelse_id;
+      if (nu === 1 || min) {
+        if (nu === 1 && pref.get('lyd', true)) bip();
+        toast(`${nu === 1 ? '🔴 Høj prioritet' : `Prioritet: ${PRIO[nu].navn}`}${min ? ' på din opgave' : ''}: ${h.titel}`, nu === 1 ? 'ny' : '');
       }
     }
     const k = s.nyKommentar;

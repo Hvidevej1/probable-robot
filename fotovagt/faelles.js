@@ -216,11 +216,22 @@ export function lavKort(el) {
   return kort;
 }
 
+// Kontorets prioritet: 1 = Høj, 2 = Normal, 3 = Lav
+export const PRIO = { 1: { navn: 'Høj', kort: '🔴 Høj' }, 2: { navn: 'Normal', kort: 'Normal' }, 3: { navn: 'Lav', kort: '⚪ Lav' } };
+export const prioAf = h => h?.prio || 2;
+// Sortering: høj prioritet først, så nye før tagne, så nyeste først
+export const efterPrio = (a, b) => (prioAf(a) - prioAf(b)) || ((b.status === 'ny') - (a.status === 'ny')) || b.oprettet.localeCompare(a.oprettet);
+// Andre aktive hændelser i nærheden (til at prioritere, når der er mange i samme område)
+export function iNærheden(h, alle, radiusKm = 10) {
+  if (h.lat == null) return [];
+  return alle.filter(x => x.id !== h.id && aktiv(x) && x.lat != null && km(h, x) <= radiusKm);
+}
+
 export function haendelsesIkon(h, valgt = false) {
   const ikon = ikonFor(h);
   return L.divIcon({
     className: '',
-    html: `<div class="pin pin-${h.status}${valgt ? ' valgt' : ''}${h.status === 'ny' ? ' puls' : ''}${h.cirka ? ' cirka' : ''}"><span>${ikon}</span></div>`,
+    html: `<div class="pin pin-${h.status}${valgt ? ' valgt' : ''}${h.status === 'ny' ? ' puls' : ''}${h.cirka ? ' cirka' : ''} prio-${prioAf(h)}"><span>${ikon}</span>${prioAf(h) === 1 ? '<b class="pin-prio">!</b>' : ''}</div>`,
     iconSize: [36, 36], iconAnchor: [18, 34], popupAnchor: [0, -30],
   });
 }

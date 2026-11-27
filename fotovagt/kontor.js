@@ -7,6 +7,7 @@ import {
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm, nedtælling,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
+  PRIO, prioAf, efterPrio, iNærheden,
 } from './faelles.js';
 
 let sLag;
@@ -110,13 +111,21 @@ const forslag = h => h.eskalering_forslag && !h.eskaleret && !h.eskalering_afvis
 function haendelseKort(h) {
   const taget = h.taget_af ? P(h.taget_af) : null;
   return `
-    <article class="h-kort h-${h.status}${valgtId === h.id ? ' valgt' : ''}${nyeKommentarer(h) ? ' har-ny-kommentar' : ''}${forslag(h) ? ' eskalering' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
+    <article class="h-kort h-${h.status} prio-${prioAf(h)}${valgtId === h.id ? ' valgt' : ''}${nyeKommentarer(h) ? ' har-ny-kommentar' : ''}${forslag(h) ? ' eskalering' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}</p>
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)}${h.taget_tid ? ` · taget kl. ${klokken(h.taget_tid)}` : ''}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
+        ${aktiv(h) ? (() => {
+          const nær = iNærheden(h, S().haendelser);
+          return `<div class="prio-række" role="group" aria-label="Prioritet">
+            <span class="prio-navn">Prioritet</span>
+            ${[1, 2, 3].map(p => `<button class="prio-knap p${p}${prioAf(h) === p ? ' valgt' : ''}" data-prio="${h.id}" data-p="${p}" aria-pressed="${prioAf(h) === p}">${PRIO[p].kort}</button>`).join('')}
+            ${nær.length ? `<span class="nær" title="${esc(nær.map(x => x.titel).join(', '))}">📍 ${nær.length} andre inden for 10 km</span>` : ''}
+          </div>`;
+        })() : ''}
         ${h.antal_enheder || h.antal_ass ? `<p class="lille enheder-linje">🚒 ${h.antal_ass || 0} assistance${h.antal_ass === 1 ? '' : 'r'} · ${h.antal_enheder || 0} enheder${h.eskaleret ? ' · <b class="stor-mærke">⬆️ Stor hændelse</b>' : ''}</p>` : (h.eskaleret ? '<p class="lille"><b class="stor-mærke">⬆️ Stor hændelse</b></p>' : '')}
         ${forslag(h) ? `<div class="eskalering-boks"><p>⚠️ <b>Stor hændelse?</b> Der er kaldt ${h.antal_ass} assistancer og ${h.antal_enheder} enheder. Skal den opgraderes på fotografernes skærm?</p>
           <div class="knap-række"><button data-eskaler="${h.id}" data-ja="1">⬆️ Opgradér for fotograferne</button><button class="secondary" data-eskaler="${h.id}" data-ja="0">Afvis</button></div></div>` : ''}
@@ -140,7 +149,7 @@ function haendelseKort(h) {
 
 function tegnHaendelser() {
   const liste = S().haendelser.filter(h => filter === 'alle' || aktiv(h))
-    .sort((a, b) => (b.status === 'ny') - (a.status === 'ny') || b.oprettet.localeCompare(a.oprettet));
+    .sort((a, b) => aktiv(a) && aktiv(b) ? efterPrio(a, b) : b.oprettet.localeCompare(a.oprettet));
   $('#haendelser').innerHTML = liste.length ? liste.map(haendelseKort).join('') : '<p class="tom">Ingen hændelser.</p>';
 }
 
@@ -550,9 +559,14 @@ async function start() {
 
   // Klik overalt på siden (lister, kort-popups)
   document.body.addEventListener('click', e => {
-    const t = e.target.closest('[data-eskaler],[data-giv],[data-tildel],[data-luk],[data-ret],[data-kommentarer],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
+    const t = e.target.closest('[data-prio],[data-eskaler],[data-giv],[data-tildel],[data-luk],[data-ret],[data-kommentarer],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
     if (!t || t.closest('dialog')) return;
     const d = t.dataset;
+    if (d.prio) {
+      const p = +d.p, h = H(d.prio);
+      if (prioAf(h) === p) return;
+      return prøv(() => store.ret(d.prio, { prio: p }), `Prioritet: ${PRIO[p].navn}.`);
+    }
     if (d.eskaler) {
       const ja = d.ja === '1';
       return prøv(() => store.eskaler(d.eskaler, ja), ja ? 'Opgraderet. Fotograferne får besked.' : 'Forslaget er afvist.');
