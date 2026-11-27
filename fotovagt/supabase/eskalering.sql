@@ -1,4 +1,5 @@
--- Stor hændelse: kaldes der assistance mere end 3 gange OG er der mere end 4 enheder på hændelsen,
+-- Stor hændelse: kaldes der assistance mere end 3 gange, ELLER er der mere end 4 enheder på hændelsen
+-- (fx ISL NO + SY-M1 + SY-V1 + SY S1 + OC = 5), eller nævnes et kritisk ord (elbil, færge, skib …),
 -- foreslås en opgradering til kontoret (push + ⚠️ på hændelsen). Kontoret afgør, om den skal
 -- opgraderes på fotografernes skærm (manuel opgradering). Grænserne står i indstillinger.
 -- Enheder tælles ud fra beredskabets koder i alle meldinger: SY-M1, SY V1, OD S1, VB V-1, KO MR-1,
@@ -7,7 +8,9 @@
 
 alter table indstillinger add column if not exists eskaler_ass int not null default 3;        -- flere end 3 assistancer
 alter table indstillinger add column if not exists eskaler_enheder int not null default 4;    -- flere end 4 enheder
-alter table indstillinger add column if not exists eskaler_begge boolean not null default true; -- true: begge skal opfyldes
+alter table indstillinger add column if not exists eskaler_begge boolean not null default false; -- false: én af dem er nok
+alter table indstillinger add column if not exists eskaler_ord text not null default 'elbil\w*|el-bil\w*|færge\w*|skibet|skibe|skibsbrand|batteri\w*|lithium\w*|tunnel\w*|ammoniak';
+update indstillinger set eskaler_begge = false where id = 1;
 
 alter table haendelser add column if not exists antal_ass int not null default 0;
 alter table haendelser add column if not exists antal_enheder int not null default 0;
@@ -27,9 +30,11 @@ language sql immutable set search_path = public as $$
   select count(*)::int from unnest(string_to_array(coalesce(t, ''), E'\n')) l where l ~* '(\mass\.|assistance)';
 $$;
 
+alter table haendelser add column if not exists eskalering_grund text;   -- fx "5 enheder" eller 'nævner "elbil"'
+
 create or replace function eskalering_tjek() returns trigger
 language plpgsql security definer set search_path = public as $$
-declare ind indstillinger; ok_ass boolean; ok_enh boolean;
+declare ind indstillinger; ok_ass boolean; ok_enh boolean; ok_ord boolean; aba boolean; ord text;
 begin
   new.antal_ass := tael_ass(new.tekst);
   new.antal_enheder := tael_enheder(new.tekst);
@@ -37,9 +42,18 @@ begin
      and new.status in ('ny', 'taget', 'ankommet') then
     select * into ind from indstillinger where id = 1;
     ok_ass := new.antal_ass > coalesce(ind.eskaler_ass, 3);
-    ok_enh := new.antal_enheder > coalesce(ind.eskaler_enheder, 4);
-    if (coalesce(ind.eskaler_begge, true) and ok_ass and ok_enh) or (not coalesce(ind.eskaler_begge, true) and (ok_ass or ok_enh)) then
+    -- Automatiske brandalarmer (ABA) sendes ofte med mange enheder og er som regel falske: tæller ikke på enheder alene
+    aba := coalesce(new.titel, '') ~* '(\maba\d*\M|automatisk brandalarm)';
+    ok_enh := new.antal_enheder > coalesce(ind.eskaler_enheder, 4) and not aba;
+    ord := case when coalesce(ind.eskaler_ord, '') <> ''
+                then (regexp_match(lower(coalesce(new.titel, '') || ' ' || coalesce(new.tekst, '')), '\m(' || lower(ind.eskaler_ord) || ')\M'))[1] end;
+    ok_ord := ord is not null;
+    if ok_ord or (coalesce(ind.eskaler_begge, false) and ok_ass and ok_enh) or (not coalesce(ind.eskaler_begge, false) and (ok_ass or ok_enh)) then
       new.eskalering_forslag := now();
+      new.eskalering_grund := concat_ws(' · ',
+        case when ok_ord then 'nævner "' || ord || '"' end,
+        case when ok_enh then new.antal_enheder || ' enheder' end,
+        case when ok_ass then new.antal_ass || ' assistancer' end);
     end if;
   end if;
   return new;
@@ -68,7 +82,7 @@ language plpgsql security definer set search_path = public as $$
 begin
   if not er_kontor() then raise exception 'Kun kontoret kan opgradere hændelser.'; end if;
   if ja then
-    update haendelser set eskaleret = true, eskalering_afvist = false, opgraderet = now(),
+    update haendelser set eskaleret = true, eskalering_afvist = false, opgraderet = now(), prio = 1,
            eskalering_forslag = coalesce(eskalering_forslag, now()) where id = h;
     perform skriv_log(h, 'opgraderede hændelsen til stor hændelse');
   else

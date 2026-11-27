@@ -127,7 +127,7 @@ function haendelseKort(h) {
           </div>`;
         })() : ''}
         ${h.antal_enheder || h.antal_ass ? `<p class="lille enheder-linje">🚒 ${h.antal_ass || 0} assistance${h.antal_ass === 1 ? '' : 'r'} · ${h.antal_enheder || 0} enheder${h.eskaleret ? ' · <b class="stor-mærke">⬆️ Stor hændelse</b>' : ''}</p>` : (h.eskaleret ? '<p class="lille"><b class="stor-mærke">⬆️ Stor hændelse</b></p>' : '')}
-        ${forslag(h) ? `<div class="eskalering-boks"><p>⚠️ <b>Stor hændelse?</b> Der er kaldt ${h.antal_ass} assistancer og ${h.antal_enheder} enheder. Skal den opgraderes på fotografernes skærm?</p>
+        ${forslag(h) ? `<div class="eskalering-boks"><p>⚠️ <b>Stor hændelse?</b> ${esc(h.eskalering_grund || `${h.antal_ass} assistancer · ${h.antal_enheder} enheder`)}. Skal den opgraderes på fotografernes skærm? <small>(giver også høj prioritet)</small></p>
           <div class="knap-række"><button data-eskaler="${h.id}" data-ja="1">⬆️ Opgradér for fotograferne</button><button class="secondary" data-eskaler="${h.id}" data-ja="0">Afvis</button></div></div>` : ''}
         ${tilbudLinjer(h)}
         ${(n => n ? `<p class="opdatering"><span>${n.ikon} ${esc(n.tekst)}</span></p>` : '')(senesteNyt(h))}
@@ -533,7 +533,7 @@ async function start() {
     if (nyeF.length && kendteForslag.size >= 0 && forslagKlar) {
       bip(); setTimeout(bip, 600);
       const h = H(nyeF[0]);
-      toast(`⚠️ Stor hændelse? ${h.titel} – ${h.antal_ass} assistancer, ${h.antal_enheder} enheder`, 'fejl');
+      toast(`⚠️ Stor hændelse? ${h.titel} – ${h.eskalering_grund || `${h.antal_ass} assistancer, ${h.antal_enheder} enheder`}`, 'fejl');
     }
     kendteForslag = new Set(nuForslag);
     if (s.nyKommentar) {

@@ -94,7 +94,7 @@ async function håndtér(id: string, slags: string) {
     const { data: kontor } = await db.from("profiles").select("id").eq("rolle", "kontor");
     return { sendt: await send((kontor ?? []).map((p) => p.id), {
       title: `⚠️ Stor hændelse? ${ikon} ${h.titel}`,
-      body: `${h.antal_ass} assistancer · ${h.antal_enheder} enheder · ${sted}. Tag stilling til opgradering.`,
+      body: `${h.eskalering_grund || `${h.antal_ass} assistancer · ${h.antal_enheder} enheder`} · ${sted}. Tag stilling til opgradering.`,
       tag: `${h.id}-esk`, url: `./kontor.html?h=${h.id}`, sos: true,
     }) };
   }

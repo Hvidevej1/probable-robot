@@ -513,7 +513,7 @@ function demoBackend() {
     },
     eskaler: kør((id, ja) => {
       kontor(); const h = H(id);
-      if (ja) Object.assign(h, { eskaleret: true, eskalering_afvist: false, opgraderet: nu(), eskalering_forslag: h.eskalering_forslag || nu() });
+      if (ja) Object.assign(h, { eskaleret: true, eskalering_afvist: false, opgraderet: nu(), prio: 1, eskalering_forslag: h.eskalering_forslag || nu() });
       else h.eskalering_afvist = true;
       log(id, ja ? 'opgraderede hændelsen til stor hændelse' : 'afviste opgradering');
     }),
