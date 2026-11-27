@@ -143,6 +143,12 @@ begin
   if n_enh >= 3 and coalesce(hh.antal_enheder, 0) > median_enh + 1 then
     forslag := least(forslag, 1); grund := grund || format('flere enheder end normalt (%s mod typisk %s)', hh.antal_enheder, round(median_enh));
   end if;
+  -- Operationschefen rekvirerer assistance ved større og ekstraordinære hændelser (Østjyllands Brandvæsens plan 2026-2030)
+  if 'OC' = any(e_nu) then
+    forslag := 1; grund := grund || 'operationschef (OC) er tilkaldt – større/ekstraordinær hændelse'::text;
+  elsif (select count(*) from unnest(e_nu) u where u like 'ISL%') >= 2 then
+    forslag := 1; grund := grund || 'to indsatsledere – tyder på større hændelse'::text;
+  end if;
   alvor := case when forslag = 1 then 'stor' when forslag = 3 then 'lille' else 'normal' end;
 
   return jsonb_build_object(

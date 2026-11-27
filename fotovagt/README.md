@@ -224,3 +224,10 @@ Begreberne følger Beredskabsstyrelsens *Vejledning om risikobaseret dimensioner
 enhederne på selve alarmen (første besked), mens enheder i senere opdateringer tæller som tilkaldt senere (assistance/
 supplerende). Tilkaldes der flere ekstra enheder, end der plejer for typen, foreslår assistenten høj prioritet.
 Køretøjsnavne: M = automobilsprøjte, V = vandtankvogn, S = drejestige/lift, ISL = indsatsleder, OC = operationschef.
+Fra Østjyllands Brandvæsens *Plan for risikobaseret dimensionering 2026-2030* (ostbv.dk):
+* **Niveau:** hverdagshændelse, større hændelse (min. 1+2+10; fx to indsatsledere eller ≥5 enheder) eller ekstraordinær
+  hændelse (operationschefen rekvirerer assistance; fx OC tilkaldt eller ≥3 assistancer). OC eller to indsatsledere
+  giver forslag om høj prioritet.
+* **Minimumsbemanding** pr. type: småbrande (knallert, skraldespand) 1+3 · brand i campingvogn/kolonihave/sommerhus/
+  parcelhus og opefter 1+1+5 (med indsatsleder) · ABA 1+5 · bekræftet brand i højhus 3+4+20+2.
+* **Stationer:** CI = Aarhus City, NO = Aarhus Nord (Lisbjerg), SY = Aarhus Syd (Højbjerg); ISL NO/SY = indsatsleder Nord/Syd.

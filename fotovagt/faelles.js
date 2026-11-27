@@ -574,6 +574,27 @@ export function indsigt(h, nårKlar) {
 }
 // Køretøjsnavne som i Beredskabsstyrelsens vejledning (automobilsprøjte, vandtankvogn, drejestige)
 const ENHEDSNAVN = { ISL: 'indsatsleder', OC: 'operationschef', M: 'autosprøjte', V: 'vandtankvogn', S: 'drejestige/lift' };
+// Stationer i Østjyllands Brandvæsen (plan 2026-2030): døgnstationerne Nord (Lisbjerg), City og Syd (Højbjerg),
+// og indsatslederne Nord og Syd. Andre forkortelser vises som de står.
+const STATIONER = { CI: 'Aarhus City', NO: 'Aarhus Nord', SY: 'Aarhus Syd' };
+const enhedNavn = k => { const m = /^([A-ZÆØÅ]{2,3})-/.exec(k) || /^ISL (NO|SY)$/.exec(k); return m && STATIONER[m[1]] ? `${esc(k)} <small>${k.startsWith('ISL') ? 'indsatsleder ' + STATIONER[m[1]].split(' ')[1] : STATIONER[m[1]]}</small>` : esc(k); };
+// Hændelsesniveau og minimumsbemanding efter Østjyllands Brandvæsens plan for risikobaseret dimensionering 2026-2030
+// (holdleder + brandfolk; "1+1+5" = indsatsleder + holdleder + 5 brandfolk)
+export function beredskabsNiveau(h) {
+  const t = `${h.titel || ''}\n${h.tekst || ''}`;
+  const isl = new Set((t.match(/\bISL\s+[A-ZÆØÅ]{2,3}\b/g) || []).map(x => x.replace(/\s+/g, ' '))).size;
+  if (/\bOC\b/.test(t) || (h.antal_ass || 0) >= 3) return { navn: 'Ekstraordinær hændelse', tekst: 'operationschefen rekvirerer assistance' };
+  if (h.eskaleret || isl >= 2 || (h.antal_enheder || 0) >= 5) return { navn: 'Større hændelse', tekst: 'minimum 1+2+10' };
+  return { navn: 'Hverdagshændelse', tekst: 'nærmeste relevante enhed' };
+}
+export function minimumsbemanding(h) {
+  const t = (h.titel || '').toLowerCase();
+  if (/højhus/.test(t) && /bygn|brand/.test(t)) return '3+4+20+2 ved bekræftet brand i højhus';
+  if (/\baba\d*\b|automatisk brandalarm/.test(t)) return '1+5 (nogle ABA-objekter: indsatsleder med, 1+1+5, eller 1+2+10)';
+  if (/bygn\.?\s?brand|bygningsbrand|campingvogn|kolonihave|sommerhus|parcelhus|villa|lejlighed|etage/.test(t)) return '1+1+5 – indsatsleder, holdleder og 5 brandfolk';
+  if (/knallert|skraldespand|container|affald|i det fri/.test(t)) return '1+3 – holdleder og 3 brandfolk';
+  return null;
+}
 const pct = x => `${Math.round((x || 0) * 100)} %`;
 const varighedTekst = m => m == null ? '' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} t ${m % 60 ? `${m % 60} min` : ''}`.trim();
 export function indsigtHtml(h, d, { kontor = false } = {}) {
@@ -586,8 +607,9 @@ export function indsigtHtml(h, d, { kontor = false } = {}) {
     <p class="ai-top">🤖 Assistent <small>lærer af ${d.n} lignende (${esc(d.niveau)})</small></p>
     ${typer.length ? `<p><b>Normal førsteudrykning:</b> ${typer.map(t => `${esc(t.type)}${ENHEDSNAVN[t.type] ? ` <small>${ENHEDSNAVN[t.type]}</small>` : ''} ${pct(t.andel)}`).join(' · ')}${d.typisk_foerste ? ` · typisk ${d.typisk_foerste} enheder` : ''}</p>`
       : '<p class="lille">Ingen enheder i de lignende beskeder endnu.</p>'}
-    ${her.length ? `<p><b>Plejer at køre${d.sted ? ` (${esc(d.sted)})` : ''}:</b> ${her.map(e => esc(e.enhed)).join(', ')}</p>` : ''}
-    ${d.n_med_enheder ? `<p class="lille">Ekstra enheder/assistance tilkaldt senere ved ${pct(d.andel_ekstra)} af de lignende${(d.ekstra_nu || []).length ? ` · <b>her: ${d.ekstra_nu.map(esc).join(', ')}</b>` : ''}</p>` : ''}
+    ${her.length ? `<p><b>Plejer at køre${d.sted ? ` (${esc(d.sted)})` : ''}:</b> ${her.map(e => enhedNavn(e.enhed)).join(', ')}</p>` : ''}
+    ${(niv => `<p><b>Niveau:</b> ${niv.navn} <small>(${niv.tekst})</small>${minimumsbemanding(h) ? `<br><small>Minimumsbemanding for typen: ${minimumsbemanding(h)} (Østjyllands Brandvæsen)</small>` : ''}</p>`)(beredskabsNiveau(h))}
+    ${d.n_med_enheder ? `<p class="lille">Ekstra enheder/assistance tilkaldt senere ved ${pct(d.andel_ekstra)} af de lignende${(d.ekstra_nu || []).length ? ` · <b>her: ${d.ekstra_nu.map(enhedNavn).join(', ')}</b>` : ''}</p>` : ''}
     <p><b>Forslag:</b> <span class="prio-tekst p${p}">${PRIO[p]?.navn || 'Normal'} prioritet</span> · alvor ${esc(d.alvor)}
       <br><small>${(d.grund || []).map(esc).join(' · ')}</small></p>
     <p class="lille">Fotograf kørte på ${pct(d.andel_foto)} af de lignende${d.varighed_min != null ? ` · de varer typisk ${varighedTekst(d.varighed_min)}` : ''}</p>
