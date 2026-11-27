@@ -574,9 +574,34 @@ export function indsigt(h, nårKlar) {
 }
 // Køretøjsnavne som i Beredskabsstyrelsens vejledning (automobilsprøjte, vandtankvogn, drejestige)
 const ENHEDSNAVN = { ISL: 'indsatsleder', OC: 'operationschef', M: 'autosprøjte', V: 'vandtankvogn', S: 'drejestige/lift' };
-// Stationer i Østjyllands Brandvæsen (plan 2026-2030): døgnstationerne Nord (Lisbjerg), City og Syd (Højbjerg),
-// og indsatslederne Nord og Syd. Andre forkortelser vises som de står.
-const STATIONER = { CI: 'Aarhus City', NO: 'Aarhus Nord', SY: 'Aarhus Syd' };
+// Stationer i Østjyllands Brandvæsen (plan 2026-2030 og Station-feltet i jeres egne beskeder): døgnstationerne
+// Nord (Lisbjerg), City og Syd (Højbjerg), deltidsstationerne Odder og Skanderborg, og indsatslederne Nord og Syd.
+// Andre forkortelser vises som de står.
+const STATIONER = { CI: 'Aarhus City', NO: 'Aarhus Nord', SY: 'Aarhus Syd', OD: 'Odder', SK: 'Skanderborg' };
+
+// Viden fra beredskabernes egne planer for risikobaseret dimensionering
+const BEREDSKABER = {
+  ostjylland: {
+    navn: 'Østjyllands Brandvæsen', kilde: 'plan 2026–2030',
+    tekst: 'Døgnstationer: Aarhus Nord, City og Syd; deltid bl.a. Odder, Hørning, Skanderborg, Ry. Indsatsleder Nord og Syd. Nærmeste relevante enhed sendes altid.',
+    minimum: t => /højhus/.test(t) && /bygn|brand/.test(t) ? '3+4+20+2 ved bekræftet brand i højhus'
+      : /\baba\d*\b|automatisk brandalarm/.test(t) ? '1+5 (nogle ABA-objekter: indsatsleder med, 1+1+5, eller 1+2+10)'
+      : /bygn\.?\s?brand|bygningsbrand|campingvogn|kolonihave|sommerhus|parcelhus|villa|lejlighed|etage/.test(t) ? '1+1+5 – indsatsleder, holdleder og 5 brandfolk'
+      : /knallert|skraldespand|container|affald|i det fri/.test(t) ? '1+3 – holdleder og 3 brandfolk' : null,
+  },
+  midtjysk: {
+    navn: 'Midtjysk Brand & Redning', kilde: 'plan 2026–2029',
+    tekst: 'Viborg og Silkeborg kommuner, 10 stationer. Alle har sprøjte og tankvogn – det er førsteudrykningen. Drejestige, redningsvogn og specialer kommer fra Viborg eller Silkeborg (CBRNE kun Viborg). Indsatsleder Nord (Viborg) og Syd (Silkeborg). Gennemsnitlig responstid 6,8 min.',
+    minimum: t => /drejestige|højde|etage|lejlighed/.test(t) ? '1+3 på autosprøjten, +2 pr. specialkøretøj (fx drejestige)' : '1+3 på første autosprøjte',
+  },
+};
+export function beredskabFor(h) {
+  const t = `${h.titel || ''}\n${h.tekst || ''}`;
+  const b = (/Beredskab:\s*([^\n·]+)/i.exec(t) || [])[1] || '';
+  if (/østjylland/i.test(b) || (!b && /\b(CI|NO|SY|OD|SK)[\s-]?(?:MR|[MVSRBTKH])[\s-]?\d/.test(t))) return BEREDSKABER.ostjylland;
+  if (/midtjysk/i.test(b)) return BEREDSKABER.midtjysk;
+  return null;
+}
 const enhedNavn = k => { const m = /^([A-ZÆØÅ]{2,3})-/.exec(k) || /^ISL (NO|SY)$/.exec(k); return m && STATIONER[m[1]] ? `${esc(k)} <small>${k.startsWith('ISL') ? 'indsatsleder ' + STATIONER[m[1]].split(' ')[1] : STATIONER[m[1]]}</small>` : esc(k); };
 // Hændelsesniveau og minimumsbemanding efter Østjyllands Brandvæsens plan for risikobaseret dimensionering 2026-2030
 // (holdleder + brandfolk; "1+1+5" = indsatsleder + holdleder + 5 brandfolk)
@@ -588,12 +613,8 @@ export function beredskabsNiveau(h) {
   return { navn: 'Hverdagshændelse', tekst: 'nærmeste relevante enhed' };
 }
 export function minimumsbemanding(h) {
-  const t = (h.titel || '').toLowerCase();
-  if (/højhus/.test(t) && /bygn|brand/.test(t)) return '3+4+20+2 ved bekræftet brand i højhus';
-  if (/\baba\d*\b|automatisk brandalarm/.test(t)) return '1+5 (nogle ABA-objekter: indsatsleder med, 1+1+5, eller 1+2+10)';
-  if (/bygn\.?\s?brand|bygningsbrand|campingvogn|kolonihave|sommerhus|parcelhus|villa|lejlighed|etage/.test(t)) return '1+1+5 – indsatsleder, holdleder og 5 brandfolk';
-  if (/knallert|skraldespand|container|affald|i det fri/.test(t)) return '1+3 – holdleder og 3 brandfolk';
-  return null;
+  const b = beredskabFor(h);
+  return b ? b.minimum((h.titel || '').toLowerCase()) : null;
 }
 const pct = x => `${Math.round((x || 0) * 100)} %`;
 const varighedTekst = m => m == null ? '' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} t ${m % 60 ? `${m % 60} min` : ''}`.trim();
@@ -608,7 +629,8 @@ export function indsigtHtml(h, d, { kontor = false } = {}) {
     ${typer.length ? `<p><b>Normal førsteudrykning:</b> ${typer.map(t => `${esc(t.type)}${ENHEDSNAVN[t.type] ? ` <small>${ENHEDSNAVN[t.type]}</small>` : ''} ${pct(t.andel)}`).join(' · ')}${d.typisk_foerste ? ` · typisk ${d.typisk_foerste} enheder` : ''}</p>`
       : '<p class="lille">Ingen enheder i de lignende beskeder endnu.</p>'}
     ${her.length ? `<p><b>Plejer at køre${d.sted ? ` (${esc(d.sted)})` : ''}:</b> ${her.map(e => enhedNavn(e.enhed)).join(', ')}</p>` : ''}
-    ${(niv => `<p><b>Niveau:</b> ${niv.navn} <small>(${niv.tekst})</small>${minimumsbemanding(h) ? `<br><small>Minimumsbemanding for typen: ${minimumsbemanding(h)} (Østjyllands Brandvæsen)</small>` : ''}</p>`)(beredskabsNiveau(h))}
+    ${(niv => `<p><b>Niveau:</b> ${niv.navn} <small>(${niv.tekst})</small>${minimumsbemanding(h) ? `<br><small>Minimumsbemanding: ${minimumsbemanding(h)}</small>` : ''}</p>`)(beredskabsNiveau(h))}
+    ${(b => b ? `<p class="lille">🚒 <b>${esc(b.navn)}</b> (${esc(b.kilde)}): ${esc(b.tekst)}</p>` : '')(beredskabFor(h))}
     ${d.n_med_enheder ? `<p class="lille">Ekstra enheder/assistance tilkaldt senere ved ${pct(d.andel_ekstra)} af de lignende${(d.ekstra_nu || []).length ? ` · <b>her: ${d.ekstra_nu.map(enhedNavn).join(', ')}</b>` : ''}</p>` : ''}
     <p><b>Forslag:</b> <span class="prio-tekst p${p}">${PRIO[p]?.navn || 'Normal'} prioritet</span> · alvor ${esc(d.alvor)}
       <br><small>${(d.grund || []).map(esc).join(' · ')}</small></p>

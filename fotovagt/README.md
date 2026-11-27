@@ -230,4 +230,13 @@ Fra Østjyllands Brandvæsens *Plan for risikobaseret dimensionering 2026-2030* 
   giver forslag om høj prioritet.
 * **Minimumsbemanding** pr. type: småbrande (knallert, skraldespand) 1+3 · brand i campingvogn/kolonihave/sommerhus/
   parcelhus og opefter 1+1+5 (med indsatsleder) · ABA 1+5 · bekræftet brand i højhus 3+4+20+2.
-* **Stationer:** CI = Aarhus City, NO = Aarhus Nord (Lisbjerg), SY = Aarhus Syd (Højbjerg); ISL NO/SY = indsatsleder Nord/Syd.
+* **Stationer:** CI = Aarhus City, NO = Aarhus Nord (Lisbjerg), SY = Aarhus Syd (Højbjerg), OD = Odder, SK = Skanderborg;
+  ISL NO/SY = indsatsleder Nord/Syd (bekræftet af Station-feltet i jeres egne beskeder).
+
+Fra Midtjysk Brand & Rednings *Plan for risikobaseret dimensionering 2026-2029* (mjbr.dk):
+* Viborg og Silkeborg kommuner, 10 stationer (centerstationer Viborg og Silkeborg + 8 deltidsstationer).
+* Alle stationer har sprøjte og tankvogn = førsteudrykningen. Drejestige, redningsvogn og specialer kommer fra Viborg
+  eller Silkeborg (CBRNE kun Viborg). Indsatsleder Nord (Viborg) og Syd (Silkeborg).
+* Minimum 1+3 på første autosprøjte, +2 pr. specialkøretøj. Gennemsnitlig responstid 6,8 min (2021-2024).
+Assistenten genkender beredskabet på linjen "Beredskab:" i beskeden (eller Østjyllands enhedskoder) og viser den viden,
+der passer – andre beredskaber får kun det, assistenten har lært af historikken.
