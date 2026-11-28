@@ -16,7 +16,23 @@ export const KATEGORI_IKON = {
 };
 // Ikonet for en hændelse: kategorien, men lægehelikopter får en helikopter og indsatsleder-opgaver (ISL) en brandmand
 export const ikonFor = h => /helikopter/i.test(h?.titel || '') ? '🚁'
+  : erTog(h) ? '🚆'
   : /^\s*(?:ISL\b|indsatsleder)/i.test(h?.titel || '') ? '🧑‍🚒' : (KATEGORI_IKON[h?.kategori] || '📍');
+// Togmeldinger (DSB, Banedanmark, Arriva, letbane …) – samme regel som er_tog() i databasen
+export const erTog = h => /^tog:/i.test(h?.titel || '') || /\b(?:dsb|banedanmark|arriva|letbane|s-tog|regionaltog|lyntog|intercity)\b|\(tog\)/i.test(`${h?.titel || ''} ${h?.tekst || ''}`);
+const TOG_ALVORLIG = /påkør|personulykke|ulykke|afspor|brand|røgudvikling|\brøg\b|evakuer|sammenstød|kollision|eksplosion|bombe|politi/i;
+// "Hvad sker der" for en togmelding: forsinkelse/aflysning/stop, årsag og vurdering
+export function togForklaring(h) {
+  const t = String(h?.tekst || '').replace(/\n— kl\.[^:]*:/g, ' ');
+  const min = (/ca\.?\s*(\d+)\s*min/i.exec(t) || [])[1];
+  const hvad = /aflys/i.test(t) ? 'Tog aflyst' : /holder stille|kører ikke|ingen tog|spærret/i.test(t) ? 'Togene holder stille' : /forsink|senere end planlagt/i.test(t) ? `Forsinkelse${min ? ` ca. ${min} min` : ''}` : 'Togmelding';
+  const årsag = ((/(?:skyldes|på grund af|pga\.?)\s+(?:at\s+)?([^.]{3,90})/i.exec(t) || [])[1] || '').trim();
+  const alvorlig = TOG_ALVORLIG.test(t);
+  const vurdering = alvorlig ? 'Kan være en ulykke eller politiaktion på banen – normal prioritet'
+    : /ambulance/i.test(årsag) ? 'Formentlig en syg passager – ikke en ulykke, lav prioritet'
+    : 'Driftsforstyrrelse – ikke en ulykke, lav prioritet';
+  return { hvad, årsag, vurdering, alvorlig };
+}
 // Seneste live opdatering, der er lagt ind i hændelsen ("— kl. 19:42 PF-Upload: …")
 export function senesteOpdatering(h) {
   const l = String(h?.tekst || '').split('\n').filter(x => x.startsWith('— ')).pop();
@@ -721,7 +737,7 @@ const PROFILER = [
   [/etage|højhus|institution|plejehjem|hospital|tagbrand|brand i tag/, 'Sprøjte + drejestige + 2. sprøjte + vandtankvogn, ved komplekse bygninger en 3. udrykningsenhed + indsatsleder og 2. indsatsleder'],
   [/bygn\.?\s?brand|bygningsbrand|villa|rækkehus|kædehus|lejlighed|industri|p-hus|kælder/, 'Sprøjte + drejestige + 2. sprøjte + vandtankvogn + indsatsleder'],
   [/el-?bil|elbil|hybrid/, 'Sprøjte + 2. sprøjte + vandtankvogn + specialkøretøj + indsatsleder'],
-  [/\btog\b|\bfly\b|skib/, 'Sprøjte + drejestige + 2. sprøjte + vandtankvogn (+ specialkøretøj) + indsatsleder'],
+  [/(?:brand|ild|røg).*(?:\btog\b|\bfly\b|skib)|(?:\btog\b|\bfly\b|skib).*(?:brand|ild|røg)/, 'Sprøjte + drejestige + 2. sprøjte + vandtankvogn (+ specialkøretøj) + indsatsleder'],
   [/skur|carport|transformator|skorst|eftersyn/, 'Sprøjte + drejestige + indsatsleder'],
   [/gasudslip|gaslæk|gasledning/, 'Sprøjte + vandtankvogn + indsatsleder'],
   [/brand-bil|bilbrand|bil i det fri|bus|lastvogn|lastbil|landbrug|traktor|mejetærsker/, 'Sprøjte + vandtankvogn + indsatsleder'],
@@ -735,6 +751,7 @@ const PROFILER = [
   [/miljø|udslip|olie|spild/, 'Mindre spild: sprøjte. Større udslip: sprøjte + vandtankvogn + indsatsleder'],
 ];
 export function udrykningsprofil(h) {
+  if (erTog(h) && !TOG_ALVORLIG.test(h.tekst || '')) return null;   // togmelding uden ulykke: beredskabet er ikke kaldt
   const t = (h.titel || '').toLowerCase();
   return (PROFILER.find(([re]) => re.test(t)) || [])[1] || null;
 }
@@ -754,6 +771,18 @@ const pct = x => `${Math.round((x || 0) * 100)} %`;
 const varighedTekst = m => m == null ? '' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} t ${m % 60 ? `${m % 60} min` : ''}`.trim();
 export function indsigtHtml(h, d, { kontor = false } = {}) {
   if (d === undefined) return '<div class="ai-boks"><p class="ai-top">🤖 Assistent</p><p class="lille">Tænker …</p></div>';
+  // Togmelding: forklar hvad der sker – ingen brand-udrykning, medmindre det er en ulykke/brand
+  if (erTog(h)) {
+    const tg = togForklaring(h), forslag = tg.alvorlig ? 2 : 3, prof = udrykningsprofil(h);
+    return `<div class="ai-boks"><p class="ai-top">🤖 Assistent <small>togmelding${d?.n ? ` · lærer af ${d.n} tidligere` : ''}</small></p>
+      <p><b>Hvad sker der:</b> ${esc(tg.hvad)}${tg.årsag ? ` – årsag: ${esc(tg.årsag)}` : ''}</p>
+      <p><b>Vurdering:</b> ${esc(tg.vurdering)}</p>
+      ${prof ? `<p><b>Typisk udrykning:</b> ${esc(prof)}</p>` : ''}
+      <p class="lille">${tg.alvorlig ? 'Fotograferne får tilbud som normalt.' : 'Fotograferne får ikke tilbud, og kontoret får ikke blink, før meldingen udvikler sig (fx påkørsel, ulykke, afsporing, brand, evakuering eller politiets arbejde på banen).'}
+        ${d?.n ? ` Fotograf kørte på ${pct(d.andel_foto)} af de tidligere togmeldinger.` : ''}</p>
+      ${kontor && aktiv(h) && forslag !== prioAf(h) ? `<button class="secondary lille-knap" data-prio="${h.id}" data-p="${forslag}">Brug forslaget: ${PRIO[forslag].navn}</button>` : ''}
+    </div>`;
+  }
   // Uden historik: vis stadig de forventede ressourcer (typisk udrykning, niveau, minimumsbemanding, beredskab)
   if (!d || !d.n) {
     const niv = beredskabsNiveau(h), b = beredskabFor(h);

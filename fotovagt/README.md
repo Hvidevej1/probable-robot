@@ -318,3 +318,11 @@ SQL: `supabase/profilfoto.sql`.
 * **Push-funktionen** afviser kald uden den interne hemmelighed (databasen sender den med); prøvebeskeden kræver login.
 * Interne databasefunktioner kan ikke kaldes udefra; hjælpefunktioner har fast `search_path`. SQL: `supabase/sikkerhed.sql`.
 * **Husk i Supabase**: Authentication → Sign In / Providers → Email → slå **"Leaked password protection"** til.
+
+## Togmeldinger
+Meldinger fra DSB, Banedanmark, Arriva, letbanen m.fl. får en læsbar overskrift ("Tog: Forventet forsinkelse på IC 5757 –
+Tinglev St. → Flensburg") og ikonet 🚆. De starter som **lav** og hviler (ingen tilbud, intet blink), medmindre teksten tyder
+på noget alvorligt: påkørsel, ulykke, afsporing, brand, røg, evakuering, sammenstød, eksplosion, bombe eller politiets arbejde.
+Kommer det senere, hæves de til normal, og det normale forløb starter. Assistenten viser **Hvad sker der** (forsinkelse,
+aflysning, stop + årsag) og en vurdering – fx "venter på en ambulance → formentlig en syg passager, ikke en ulykke".
+SQL: `supabase/togmeldinger.sql`.
