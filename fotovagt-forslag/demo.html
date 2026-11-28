@@ -1,0 +1,728 @@
+<title>Fotovagt demo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap">
+<style>
+/* Layout: demo-bjælke øverst, derunder enten Marken (telefonramme + guide) eller Kontoret (to paneler).
+   Farver = designforslagets tokens: status som fyld + tonet baggrund + tekst; rød flade kun til SOS. */
+:root {
+  --bg: #eef1f5; --flade: #fff; --flade2: #f6f8fb; --flade3: #eaeef4;
+  --tekst: #121722; --daempet: #556070; --kant: #dfe4ec; --kant2: #cfd6e1;
+  --top: #1c1c21; --top2: #26262d; --top-tekst: #f4f4f6; --top-daempet: #a3a3ad; --top-flade: #2d2d35;
+  --fokus: #2f80ff;
+  --ledig: #1f9f4c;    --ledig-bg: #e3f5ea;    --ledig-tekst: #146c34;
+  --optaget: #c2410c;  --optaget-bg: #fdebe1;  --optaget-tekst: #9a3412;
+  --pause: #ffc21a;    --pause-bg: #fff4cf;    --pause-tekst: #7a5600;
+  --ankommet: #2f80ff; --ankommet-bg: #e4eeff; --ankommet-tekst: #1d5fd1;
+  --offline: #8c8c96;  --offline-bg: #eceef2;  --offline-tekst: #4f5562;
+  --ny: #ff7a1a;       --ny-bg: #fff0e3;       --ny-tekst: #a64400;
+  --taget: #8b5cf6;    --taget-bg: #f0ebff;    --taget-tekst: #6233c9;
+  --sos: #d4001a; --sos-moerk: #a80014; --fare: #b42318;
+  --primaer: #1c1c21; --primaer-tekst: #fff;
+  --radar-bg: #e6ebf1; --radar-ring: #c9d2de;
+  --skygge-s: 0 1px 2px rgba(16,20,28,.06);
+  --skygge: 0 1px 2px rgba(16,20,28,.05), 0 6px 20px rgba(16,20,28,.08);
+  --skygge-l: 0 18px 50px rgba(16,20,28,.22);
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --r: 16px; --r-s: 11px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0e14; --flade: #151a23; --flade2: #1b212c; --flade3: #232a36;
+    --tekst: #eef1f6; --daempet: #a3adbd; --kant: #262d3a; --kant2: #313a4a;
+    --top: #121216; --top2: #1c1c21; --top-flade: #26262d;
+    --ledig-bg: #12301f; --ledig-tekst: #7fe0a3; --optaget-bg: #3a1d10; --optaget-tekst: #ffb08a;
+    --pause-bg: #3a2f0c; --pause-tekst: #ffd766; --ankommet-bg: #142a4d; --ankommet-tekst: #9cc2ff;
+    --offline-bg: #22262e; --offline-tekst: #b7bcc6; --ny-bg: #3a2210; --ny-tekst: #ffb27a;
+    --taget-bg: #261d45; --taget-tekst: #c7b3ff; --fare: #ff8a80;
+    --primaer: #eef1f6; --primaer-tekst: #121722; --radar-bg: #121821; --radar-ring: #2a3342;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0e14; --flade: #151a23; --flade2: #1b212c; --flade3: #232a36;
+  --tekst: #eef1f6; --daempet: #a3adbd; --kant: #262d3a; --kant2: #313a4a;
+  --top: #121216; --top2: #1c1c21; --top-flade: #26262d;
+  --ledig-bg: #12301f; --ledig-tekst: #7fe0a3; --optaget-bg: #3a1d10; --optaget-tekst: #ffb08a;
+  --pause-bg: #3a2f0c; --pause-tekst: #ffd766; --ankommet-bg: #142a4d; --ankommet-tekst: #9cc2ff;
+  --offline-bg: #22262e; --offline-tekst: #b7bcc6; --ny-bg: #3a2210; --ny-tekst: #ffb27a;
+  --taget-bg: #261d45; --taget-tekst: #c7b3ff; --fare: #ff8a80;
+  --primaer: #eef1f6; --primaer-tekst: #121722; --radar-bg: #121821; --radar-ring: #2a3342;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--tekst); font: 15px/1.45 var(--font); -webkit-font-smoothing: antialiased; margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 40px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--fokus) 70%, transparent); outline-offset: 2px; }
+.tal-tab { font-variant-numeric: tabular-nums; }
+
+/* ---------- demo-bjælke ---------- */
+.demo-bar { max-width: 1180px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.demo-bar h1 { font-size: 1.25rem; margin: 0; letter-spacing: -.02em; white-space: nowrap; }
+.demo-bar h1 small { font-weight: 600; font-size: .75rem; background: var(--pause-bg); color: var(--pause-tekst); padding: 2px 8px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; }
+.vaelger { display: inline-flex; background: var(--flade3); border-radius: 12px; padding: 3px; gap: 2px; }
+.vaelger button { border: 0; background: none; padding: 7px 14px; border-radius: 9px; font-weight: 600; color: var(--daempet); min-height: 36px; }
+.vaelger button[aria-pressed="true"] { background: var(--flade); color: var(--tekst); box-shadow: var(--skygge-s); }
+.demo-bar .hoejre { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.lille-knap { border: 1px solid var(--kant2); background: var(--flade); border-radius: 10px; padding: 6px 12px; font-weight: 600; min-height: 36px; font-size: .88rem; }
+.lille-knap[aria-pressed="true"] { background: var(--pause-bg); color: var(--pause-tekst); border-color: var(--pause); }
+
+.visning { max-width: 1180px; margin: 0 auto; }
+.marken-visning { display: flex; gap: 36px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.guide { flex: 1 1 280px; max-width: 400px; min-width: 0; }
+.guide h2 { font-size: 1.05rem; margin: 6px 0 8px; }
+.guide ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.guide li { display: flex; gap: 10px; align-items: flex-start; font-size: .92rem; }
+.guide li i { flex: none; width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--kant2); display: grid; place-items: center; font-style: normal; font-size: 12px; margin-top: 1px; }
+.guide li.ok i { background: var(--ledig); border-color: var(--ledig); color: #fff; }
+.guide li.ok span { color: var(--daempet); text-decoration: line-through; }
+.guide p { color: var(--daempet); font-size: .88rem; }
+
+/* ---------- telefon ---------- */
+.telefon { position: relative; width: 390px; max-width: 100%; height: 800px; border-radius: 46px; border: 11px solid #0d0d10; background: var(--bg);
+  overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--skygge-l); flex: none; }
+@media (max-width: 520px) { .telefon { width: 100%; height: 740px; border-width: 0; border-radius: 18px; box-shadow: var(--skygge); } .guide { order: 2; } }
+.m-top { background: var(--top); color: var(--top-tekst); padding: 14px 12px 12px; display: grid; gap: 10px; flex: none; }
+.m-raekke { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.logo { width: 32px; height: 32px; border-radius: 9px; background: var(--top-flade); display: grid; place-items: center; flex: none; }
+.logo i { width: 16px; height: 16px; border-radius: 50%; border: 3px solid; border-color: #2f80ff #22b455 #ffc21a #ff3b3b; }
+.mig { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.mig b { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sos-knap { background: var(--sos); color: #fff; font-weight: 900; letter-spacing: .08em; border: 0; border-radius: 99px; min-height: 48px; padding: 0 22px;
+  font-size: 1.05rem; box-shadow: 0 0 0 3px rgba(212,0,26,.35); flex: none; }
+.sos-knap.aktiv { background: #fff; color: var(--sos); }
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 4px; padding: 4px; background: var(--top-flade); border-radius: 14px; }
+.seg button { border: 0; background: none; color: var(--top-daempet); font-weight: 650; font-size: .84rem; min-height: 40px; border-radius: 10px; padding: 0 2px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+.seg button::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.seg button[aria-pressed="true"] { background: var(--b); color: var(--t); }
+.seg button:disabled { opacity: .35; cursor: not-allowed; }
+@media (max-width: 420px) { .seg button { font-size: .76rem; gap: 4px; } .seg button::before { width: 6px; height: 6px; } }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: var(--b); color: var(--t); white-space: nowrap; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.s-ledig    { --c: var(--ledig);    --b: var(--ledig-bg);    --t: var(--ledig-tekst); }
+.s-optaget  { --c: var(--optaget);  --b: var(--optaget-bg);  --t: var(--optaget-tekst); }
+.s-pause    { --c: var(--pause);    --b: var(--pause-bg);    --t: var(--pause-tekst); }
+.s-ankommet { --c: var(--ankommet); --b: var(--ankommet-bg); --t: var(--ankommet-tekst); }
+.s-offline  { --c: var(--offline);  --b: var(--offline-bg);  --t: var(--offline-tekst); }
+.h-ny       { --c: var(--ny);       --b: var(--ny-bg);       --t: var(--ny-tekst); }
+.h-taget    { --c: var(--taget);    --b: var(--taget-bg);    --t: var(--taget-tekst); }
+.h-ankommet { --c: var(--ankommet); --b: var(--ankommet-bg); --t: var(--ankommet-tekst); }
+.h-afsluttet{ --c: var(--offline);  --b: var(--offline-bg);  --t: var(--offline-tekst); }
+
+.bjaelke { font-size: .84rem; font-weight: 600; padding: 8px 14px; display: flex; gap: 8px; align-items: center; flex: none; }
+.bjaelke.offline { background: var(--pause-bg); color: var(--pause-tekst); }
+.bjaelke.sos { background: var(--sos); color: #fff; justify-content: space-between; }
+.bjaelke.sos button { background: #fff; color: var(--sos); border: 0; border-radius: 8px; font-weight: 800; padding: 6px 12px; min-height: 36px; }
+.ikon { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.opgave { background: var(--flade); border-bottom: 1px solid var(--kant); padding: 12px 14px 12px 18px; box-shadow: inset 5px 0 0 var(--ankommet); flex: none; }
+.opgave .lbl { font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ankommet-tekst); }
+.opgave h3 { margin: 2px 0 0; font-size: 1.02rem; }
+.opgave p { margin: 2px 0 0; font-size: .9rem; color: var(--daempet); }
+.knapper { display: flex; gap: 8px; margin-top: 10px; }
+.knapper > * { flex: 1; }
+.knap { border: 1px solid var(--kant2); background: var(--flade); border-radius: var(--r-s); min-height: 46px; padding: 0 14px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; color: var(--tekst); white-space: nowrap; }
+.knap.primaer { background: var(--primaer); color: var(--primaer-tekst); border-color: var(--primaer); }
+.knap.ok { background: var(--ledig-tekst); color: var(--ledig-bg); border-color: var(--ledig-tekst); }
+.knap:active { transform: scale(.98); }
+
+.faner { display: flex; gap: 4px; padding: 6px; background: var(--flade); border-bottom: 1px solid var(--kant); flex: none; }
+.faner button { flex: 1; border: 0; background: none; font-weight: 650; color: var(--daempet); min-height: 40px; border-radius: 10px; }
+.faner button[aria-selected="true"] { background: var(--flade3); color: var(--tekst); }
+.taeller { background: var(--ny-bg); color: var(--ny-tekst); border-radius: 99px; font-size: .72rem; padding: 1px 7px; margin-left: 4px; }
+.indhold { flex: 1; min-height: 0; position: relative; }
+.liste { position: absolute; inset: 0; overflow-y: auto; padding: 4px 12px 20px; }
+.sorter { display: flex; align-items: center; justify-content: space-between; padding: 8px 2px 6px; font-size: .84rem; color: var(--daempet); }
+.sorter .vaelger button { padding: 4px 10px; min-height: 30px; font-size: .82rem; }
+
+.hk { position: relative; background: var(--flade); border: 1px solid var(--kant); border-radius: var(--r); padding: 12px 12px 12px 16px; margin-bottom: 10px;
+  box-shadow: var(--skygge-s); display: grid; grid-template-columns: 40px minmax(0,1fr); gap: 4px 12px; overflow: hidden; cursor: pointer; text-align: left; width: 100%; }
+.hk::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--c); }
+.hk.ny-ind { animation: ind .5s ease both; }
+@keyframes ind { from { opacity: 0; transform: translateY(-8px); } }
+.kat { width: 40px; height: 40px; border-radius: 12px; background: var(--flade2); display: grid; place-items: center; font-size: 1.3rem; grid-row: span 2; }
+.hk .hoved { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.hk h3 { margin: 0; font-size: 1rem; line-height: 1.25; }
+.hk .adr { margin: 2px 0 0; font-size: .9rem; overflow-wrap: anywhere; }
+.hk .bund { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.afstand { display: inline-flex; flex-direction: column; line-height: 1.1; white-space: nowrap; }
+.afstand b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.afstand small { color: var(--daempet); font-size: .74rem; }
+.tid { color: var(--daempet); font-size: .84rem; white-space: nowrap; }
+.hk .knap { margin-left: auto; }
+.hvem { margin-left: auto; font-size: .84rem; font-weight: 600; color: var(--t); text-align: right; }
+.prio-hoej { border-color: color-mix(in srgb, var(--sos) 45%, var(--kant)); }
+.prio-ikon { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--sos); color: #fff; font-size: 11px; font-weight: 900; margin-right: 5px; vertical-align: 1px; }
+.hk.dim { opacity: .72; }
+.tom { text-align: center; color: var(--daempet); padding: 30px 10px; }
+
+/* radar i stedet for kort (demoen kan ikke hente kortfliser) */
+.radar-boks { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--radar-bg); }
+.radar-boks svg { flex: 1; min-height: 0; width: 100%; }
+.radar-note { font-size: .78rem; color: var(--daempet); padding: 8px 12px; background: var(--flade); border-top: 1px solid var(--kant); }
+.r-ring { fill: none; stroke: var(--radar-ring); stroke-width: 1.5; }
+.r-tekst { fill: var(--daempet); font-size: 11px; font-weight: 600; }
+.r-pin { cursor: pointer; }
+.r-pin text { font-size: 15px; }
+.r-pin .ring { fill: var(--flade); stroke: var(--c); stroke-width: 3.5; }
+.r-foto circle { stroke: var(--flade); stroke-width: 2.5; }
+.r-foto text { fill: #fff; font-size: 10px; font-weight: 800; }
+.r-mig { fill: var(--ankommet); stroke: var(--flade); stroke-width: 3; }
+
+/* ark (bundark) */
+.slør { position: absolute; inset: 0; background: rgba(8,10,15,.5); z-index: 20; display: flex; align-items: flex-end; }
+.ark { background: var(--flade); width: 100%; max-height: 88%; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 10px 18px 22px; animation: op .25s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes op { from { transform: translateY(100%); } }
+.ark::before { content: ""; display: block; width: 40px; height: 5px; border-radius: 3px; background: var(--kant2); margin: 0 auto 12px; }
+.ark-top { display: flex; gap: 12px; align-items: flex-start; }
+.ark-top h2 { margin: 0; font-size: 1.15rem; }
+.ark-top p { margin: 2px 0 0; color: var(--daempet); font-size: .9rem; }
+.luk { margin-left: auto; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--flade2); flex: none; font-size: 1rem; }
+.fakta { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 14px 0; font-size: .9rem; }
+.fakta dt { color: var(--daempet); }
+.fakta dd { margin: 0; font-weight: 600; }
+.tl { list-style: none; margin: 8px 0 0; padding: 0 0 0 16px; position: relative; }
+.tl::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: var(--kant); }
+.tl li { position: relative; margin: 0 0 8px; padding: 8px 10px; background: var(--flade2); border-radius: 10px; font-size: .88rem; }
+.tl li::before { content: ""; position: absolute; left: -16px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--flade); border: 2px solid var(--c, var(--daempet)); }
+.tl time { color: var(--daempet); font-variant-numeric: tabular-nums; margin-right: 6px; }
+.ark label { display: block; font-weight: 600; font-size: .9rem; margin: 12px 0; }
+.ark textarea { width: 100%; margin-top: 6px; border: 1px solid var(--kant2); border-radius: var(--r-s); padding: 10px 12px; background: var(--flade); font-size: 16px; min-height: 80px; resize: vertical; }
+
+/* SOS-nedtælling */
+.sos-skaerm { position: absolute; inset: 0; z-index: 30; background: var(--sos); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 14px; }
+.sos-skaerm h2 { margin: 0; font-size: 1.5rem; }
+.sos-skaerm .tal { font-size: 4rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.sos-skaerm button { width: min(320px, 100%); min-height: 58px; border-radius: 14px; font-weight: 800; font-size: 1.15rem; }
+.sos-skaerm .send { background: #fff; color: var(--sos-moerk); border: 0; }
+.sos-skaerm .fortryd { background: transparent; color: #fff; border: 2px solid #fff; }
+.sos-skaerm p { margin: 0; font-size: .9rem; opacity: .95; }
+
+.toast { position: absolute; left: 50%; bottom: 18px; transform: translate(-50%, 0); z-index: 40; background: var(--top); color: #fff; padding: 11px 16px; border-radius: 14px;
+  font-weight: 600; font-size: .9rem; box-shadow: var(--skygge-l); max-width: calc(100% - 28px); text-align: center; animation: ind .25s ease both; }
+.toast.ny { background: var(--ny-tekst); }
+
+/* ---------- Kontoret ---------- */
+.k-top { background: linear-gradient(180deg, var(--top2), var(--top)); color: var(--top-tekst); border-radius: var(--r); padding: 10px 14px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; }
+.k-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; white-space: nowrap; }
+.k-brand small { font-weight: 500; opacity: .6; }
+.k-tal { display: flex; gap: 6px; margin-left: auto; }
+.k-tal div { background: rgba(255,255,255,.07); border-radius: 10px; padding: 4px 12px; text-align: center; min-width: 62px; }
+.k-tal b { display: block; font-size: 1.2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.k-tal span { font-size: .68rem; color: var(--top-daempet); }
+.k-tal .n b { color: #ffa066; } .k-tal .g b { color: #c7b3ff; } .k-tal .l b { color: #7fe0a3; }
+.k-knap { border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.07); color: var(--top-tekst); font-weight: 650; border-radius: var(--r-s);
+  min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.k-knap.hvid { background: #fff; color: #1c1c21; border-color: #fff; }
+.prikker { display: inline-flex; gap: 3px; }
+.prikker i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.menu { position: absolute; right: 14px; top: calc(100% + 8px); z-index: 10; background: var(--top2); color: var(--top-tekst); border-radius: 14px; padding: 6px; width: 270px; max-width: calc(100% - 28px); box-shadow: var(--skygge-l); }
+.menu button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 9px; font-weight: 600; background: none; border: 0; color: inherit; min-height: 44px; text-align: left; }
+.menu button:hover { background: rgba(255,255,255,.08); }
+.menu small { margin-left: auto; font-weight: 600; font-size: .78rem; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,.08); color: var(--top-daempet); }
+.menu small.til { background: rgba(31,159,76,.25); color: #7fe0a3; }
+.menu hr { border: 0; border-top: 1px solid rgba(255,255,255,.1); margin: 4px 0; }
+.k-grid { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 14px; margin-top: 14px; align-items: start; }
+@media (max-width: 780px) { .k-grid { grid-template-columns: 1fr; } .k-tal { margin-left: 0; width: 100%; } .k-tal div { flex: 1; min-width: 0; } }
+.panel { background: var(--flade); border: 1px solid var(--kant); border-radius: var(--r); padding: 14px; box-shadow: var(--skygge-s); min-width: 0; }
+.panel-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.panel h2 { margin: 0; font-size: 1.05rem; }
+.region { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--daempet); display: flex; justify-content: space-between; margin: 12px 0 4px; }
+.tomme { font-size: .84rem; color: var(--daempet); background: var(--flade2); border-radius: 8px; padding: 8px 10px; }
+.foto { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--kant); }
+.foto:last-child { border-bottom: 0; }
+.av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--b); color: var(--t); box-shadow: 0 0 0 3px var(--c); flex: none; }
+.foto .info { flex: 1; min-width: 0; }
+.foto .info b { display: block; }
+.foto .info small { color: var(--daempet); }
+.foto .opg { display: block; font-size: .8rem; color: var(--daempet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-hk { background: var(--flade); border: 1px solid var(--kant); border-radius: var(--r); padding: 12px 14px 12px 18px; position: relative; overflow: hidden; margin-bottom: 10px; }
+.k-hk::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--c); }
+.k-hk .hoved { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.k-hk h3 { margin: 0; font-size: 1rem; }
+.k-hk p { margin: 2px 0; font-size: .9rem; }
+.k-hk .meta { color: var(--daempet); font-size: .82rem; }
+.naer { background: var(--ledig-bg); color: var(--ledig-tekst); border-radius: 8px; padding: 6px 6px 6px 10px; font-size: .86rem; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.naer button { border: 0; background: var(--ledig-tekst); color: var(--ledig-bg); font-weight: 700; border-radius: 8px; min-height: 36px; padding: 0 12px; }
+.k-handl { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.k-handl .knap { min-height: 44px; }
+.k-handl select { margin-left: auto; min-height: 44px; border-radius: var(--r-s); padding: 0 10px; border: 1px solid var(--kant2); background: var(--flade); font-weight: 650; }
+.filter-hk { margin-bottom: 10px; }
+.k-note { color: var(--daempet); font-size: .84rem; margin-top: 12px; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="demo-bar">
+  <h1>Fotovagt <small>Demo af forslaget</small></h1>
+  <div class="vaelger" role="group" aria-label="Vælg side">
+    <button id="v-marken" aria-pressed="true">Marken (telefon)</button>
+    <button id="v-kontor" aria-pressed="false">Kontoret</button>
+  </div>
+  <div class="hoejre">
+    <button class="lille-knap" id="t-offline" aria-pressed="false">Simulér ingen net</button>
+    <button class="lille-knap" id="t-ny">Send ny hændelse</button>
+    <button class="lille-knap" id="t-tema">Tema: system</button>
+    <button class="lille-knap" id="t-nulstil">Start forfra</button>
+  </div>
+</div>
+
+<main class="visning" id="visning"></main>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const MIG_POS = { lat: 56.1572, lon: 10.2107 };
+  const STATUS = { ledig: 'Ledig', optaget: 'Optaget', pause: 'Pause', ankommet: 'Ankommet', offline: 'Offline' };
+  const H_STATUS = { ny: 'Ny', taget: 'Taget', ankommet: 'På stedet', afsluttet: 'Afsluttet' };
+  const minSiden = n => new Date(Date.now() - n * 60e3);
+
+  function startData() {
+    return {
+      mig: 'mads',
+      fotografer: [
+        { id: 'mads', navn: 'Mads', status: 'ledig', lat: 56.1572, lon: 10.2107, sidst: 0 },
+        { id: 'anna', navn: 'Anna', status: 'ledig', lat: 56.19, lon: 10.17, sidst: 21 },
+        { id: 'ida', navn: 'Ida', status: 'ledig', lat: 57.05, lon: 9.92, sidst: 8 },
+        { id: 'jonas', navn: 'Jonas', status: 'optaget', lat: 55.71, lon: 9.54, sidst: 4 },
+        { id: 'peter', navn: 'Peter', status: 'ankommet', lat: 55.467, lon: 8.452, sidst: 37 },
+        { id: 'sofie', navn: 'Sofie', status: 'optaget', lat: 55.70, lon: 12.53, sidst: 2 },
+      ],
+      haendelser: [
+        { id: 1, ikon: '🔥', titel: 'Brand i etageejendom', adr: 'Frederiks Allé 40, 8000 Aarhus C', lat: 56.1497, lon: 10.2008, oprettet: minSiden(3), status: 'ny', prio: 1, kilde: 'pushover',
+          tl: [['Melding', 'Østjyllands Brandvæsen: Brand i lejlighed, 3. sal. Røgudvikling.']] },
+        { id: 2, ikon: '🚗', titel: 'Færdselsuheld E45', adr: 'E45 ved Vejle, retning syd', lat: 55.71, lon: 9.53, oprettet: minSiden(7), status: 'ny', prio: 2, kilde: 'pushover',
+          tl: [['Melding', 'Sydøstjyllands Politi: Trafikuheld, to biler involveret.']] },
+        { id: 3, ikon: '🛟', titel: 'Person i vandet', adr: 'Havnegade, 5000 Odense C', lat: 55.405, lon: 10.389, oprettet: minSiden(1), status: 'ny', prio: 2, kilde: 'pushover',
+          tl: [['Melding', 'Fyns Politi: Melding om person i vandet ved havnen.']] },
+        { id: 4, ikon: '🚓', titel: 'Større politiaktion', adr: 'Nørrebrogade 45, 2200 København N', lat: 55.69, lon: 12.55, oprettet: minSiden(18), status: 'taget', foto: 'sofie', prio: 2, kilde: 'kontoret',
+          tl: [['Melding', 'Københavns Politi: Større indsats på Nørrebrogade.'], ['Taget', 'Sofie tog opgaven.']] },
+        { id: 5, ikon: '🌧️', titel: 'Skybrud, oversvømmede kældre', adr: 'Kongensgade, 6700 Esbjerg', lat: 55.467, lon: 8.452, oprettet: minSiden(37), status: 'ankommet', foto: 'peter', prio: 3, kilde: 'kontoret',
+          tl: [['Melding', 'Sydvestjyllands Brandvæsen: Mange kældre under vand.'], ['Taget', 'Peter tog opgaven.'], ['På stedet', 'Peter er ankommet.']] },
+      ],
+      side: 'marken', fane: 'liste', sort: 'naer', offline: false, sos: null, ko: [],
+      vaerktoej: { auto: true, push: false, pushover: true }, menu: false, kontorFilter: 'aktive',
+      guide: {}, naesteNy: 0,
+    };
+  }
+  let S = startData();
+  let ark = null, sosTimer = null, toastTimer = null, nyTimer = null;
+
+  // ---------- hjælpere ----------
+  function km(a, b) {
+    const R = 6371, rad = x => x * Math.PI / 180;
+    const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  const kmTekst = d => d < 1 ? `${Math.round(d * 1000)} m` : d < 10 ? `${d.toFixed(1).replace('.', ',')} km` : `${Math.round(d)} km`;
+  function koersel(d) {
+    const m = Math.round(d / 75 * 60 + 3);
+    return m < 60 ? `ca. ${m} min` : `ca. ${Math.floor(m / 60)} t${m % 60 ? ' ' + (m % 60) + ' min' : ''}`;
+  }
+  const siden = t => { const m = Math.max(0, Math.round((Date.now() - t) / 60e3)); return m < 1 ? 'lige nu' : m < 60 ? `${m} min siden` : `${Math.floor(m / 60)} t siden`; };
+  const klokken = t => t.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+  const mig = () => S.fotografer.find(f => f.id === S.mig);
+  const foto = id => S.fotografer.find(f => f.id === id);
+  const minOpgave = () => S.haendelser.find(h => h.foto === S.mig && (h.status === 'taget' || h.status === 'ankommet'));
+  const aktiv = h => h.status !== 'afsluttet';
+  const hCls = h => 'h-' + h.status;
+  const hVar = h => ({ ny: 'var(--ny)', taget: 'var(--taget)', ankommet: 'var(--ankommet)', afsluttet: 'var(--offline)' })[h.status];
+  const log = (h, hvad, tekst) => h.tl.push([hvad, tekst, new Date()]);
+  function afkryds(k) { if (!S.guide[k]) { S.guide[k] = true; } }
+
+  function toast(t, slags = '') {
+    const ramme = S.side === 'marken' ? $('.telefon') : null;
+    document.querySelectorAll('.toast').forEach(x => x.remove());
+    const el = document.createElement('div');
+    el.className = 'toast ' + slags; el.setAttribute('role', 'status'); el.textContent = t;
+    if (ramme) ramme.appendChild(el); else { el.style.position = 'fixed'; el.style.bottom = 'calc(18px + env(safe-area-inset-bottom, 0px))'; document.body.appendChild(el); }
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), 3200);
+  }
+
+  // Ændring af status: kommer i kø, når der ikke er net
+  function meldStatus(st) {
+    const m = mig();
+    m.status = st; m.sidst = 0;
+    if (S.offline) { S.ko.push(st); toast(`${STATUS[st]} gemt. Sendes, når der er net.`); }
+    else toast(`Du er meldt ${STATUS[st].toLowerCase()}`);
+    afkryds('status');
+  }
+
+  // ---------- Marken ----------
+  const SVG = {
+    offline: '<svg class="ikon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 5.2-2.7M19 12.9a10 10 0 0 0-1.9-1.5M2 8.8a15 15 0 0 1 4.2-2.7M22 8.8A15 15 0 0 0 11 5"/></svg>',
+    nav: '<svg class="ikon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"/></svg>',
+  };
+
+  function kortHtml(h) {
+    const d = km(MIG_POS, h);
+    const andres = h.foto && h.foto !== S.mig;
+    const min = h.foto === S.mig;
+    let hoejre;
+    if (h.status === 'ny') hoejre = `<button class="knap primaer" data-tag="${h.id}">Tag opgaven</button>`;
+    else if (andres) hoejre = `<span class="hvem">${esc(foto(h.foto).navn)} ${h.status === 'ankommet' ? 'er på stedet' : 'er på vej'}</span>`;
+    else if (min) hoejre = `<span class="hvem">Din opgave</span>`;
+    else hoejre = '';
+    return `<article class="hk ${hCls(h)} ${h.prio === 1 && h.status === 'ny' ? 'prio-hoej' : ''} ${andres || h.status === 'afsluttet' ? 'dim' : ''} ${h.nyInd ? 'ny-ind' : ''}" style="--c:${hVar(h)}" data-vis="${h.id}" tabindex="0">
+      <span class="kat" aria-hidden="true">${h.ikon}</span>
+      <div class="hoved"><h3>${h.prio === 1 ? '<span class="prio-ikon" title="Høj prioritet">!</span>' : ''}${esc(h.titel)}</h3><span class="chip ${hCls(h)}">${H_STATUS[h.status]}</span></div>
+      <p class="adr">${esc(h.adr)}</p>
+      <div class="bund">
+        <span class="afstand"><b>${kmTekst(d)}</b><small>${koersel(d)}</small></span>
+        <span class="tid">· ${siden(h.oprettet)}</span>
+        ${hoejre}
+      </div>
+    </article>`;
+  }
+
+  function sorteret() {
+    const liste = S.haendelser.filter(aktiv);
+    const gruppe = h => h.status === 'ny' ? 0 : h.foto === S.mig ? -1 : 1;
+    return liste.sort((a, b) => gruppe(a) - gruppe(b) || (S.sort === 'naer' ? km(MIG_POS, a) - km(MIG_POS, b) : b.oprettet - a.oprettet));
+  }
+
+  function radarHtml() {
+    const W = 360, H = 420, cx = W / 2, cy = H / 2, R = 165;
+    const skala = d => R * Math.log(1 + d) / Math.log(1 + 220);
+    const pos = p => {
+      const d = km(MIG_POS, p);
+      const y = (p.lat - MIG_POS.lat), x = (p.lon - MIG_POS.lon) * Math.cos(MIG_POS.lat * Math.PI / 180);
+      const v = Math.atan2(y, x), r = skala(d);
+      return [cx + r * Math.cos(v), cy - r * Math.sin(v)];
+    };
+    const ringe = [5, 25, 100, 200].map(d => `<circle class="r-ring" cx="${cx}" cy="${cy}" r="${skala(d)}"/><text class="r-tekst" x="${cx + 4}" y="${cy - skala(d) - 4}">${d} km</text>`).join('');
+    const fotos = S.fotografer.filter(f => f.id !== S.mig).map(f => {
+      const [x, y] = pos(f);
+      return `<g class="r-foto"><circle cx="${x}" cy="${y}" r="11" fill="var(--${f.status})"/><text x="${x}" y="${y + 3.5}" text-anchor="middle">${f.navn[0]}</text></g>`;
+    }).join('');
+    const hs = S.haendelser.filter(aktiv).map(h => {
+      const [x, y] = pos(h);
+      return `<g class="r-pin" data-vis="${h.id}" style="--c:${hVar(h)}" role="button" tabindex="0" aria-label="${esc(h.titel)}">
+        <circle class="ring" cx="${x}" cy="${y}" r="17"/>${h.prio === 1 ? `<circle cx="${x + 13}" cy="${y - 13}" r="7" fill="var(--sos)"/><text x="${x + 13}" y="${y - 9.5}" text-anchor="middle" style="font-size:10px;fill:#fff;font-weight:900">!</text>` : ''}
+        <text x="${x}" y="${y + 5.5}" text-anchor="middle">${h.ikon}</text></g>`;
+    }).join('');
+    return `<div class="radar-boks">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Hændelser omkring dig">
+        ${ringe}${fotos}${hs}
+        <circle class="r-mig" cx="${cx}" cy="${cy}" r="9"/><text class="r-tekst" x="${cx}" y="${cy + 26}" text-anchor="middle">Dig</text>
+      </svg>
+      <div class="radar-note">I demoen vises hændelserne omkring dig i stedet for et rigtigt kort. Hændelser ligger altid over fotografer, så de kan trykkes på.</div>
+    </div>`;
+  }
+
+  function tegnMarken(v) {
+    const m = mig(), opg = minOpgave();
+    const nye = S.haendelser.filter(h => h.status === 'ny').length;
+    const statusKnap = st => `<button class="s-${st}" data-status="${st}" aria-pressed="${m.status === st}" ${st === 'ankommet' && !opg ? 'disabled title="Kræver en opgave"' : ''}>${STATUS[st]}</button>`;
+    v.innerHTML = `<div class="marken-visning">
+      <div class="telefon" id="telefon">
+        <div class="m-top">
+          <div class="m-raekke">
+            <span class="logo" aria-hidden="true"><i></i></span>
+            <div class="mig"><b>${esc(m.navn)}</b><span class="chip s-${m.status}">${STATUS[m.status]}</span></div>
+            <button class="sos-knap ${S.sos ? 'aktiv' : ''}" id="btn-sos" aria-label="SOS – tilkald hjælp">SOS</button>
+          </div>
+          <div class="seg" role="group" aria-label="Meld status">${['ledig', 'optaget', 'pause', 'ankommet'].map(statusKnap).join('')}</div>
+        </div>
+        ${S.sos ? `<div class="bjaelke sos" role="alert"><span>SOS sendt kl. ${klokken(S.sos)}. Anna og Jonas er på vej.</span><button id="btn-sos-stop">Stop SOS</button></div>` : ''}
+        ${S.offline ? `<div class="bjaelke offline">${SVG.offline}<span>Ingen net. ${S.ko.length ? `${S.ko.length} ændring${S.ko.length > 1 ? 'er' : ''} venter og sendes` : 'Ændringer sendes'}, når der er forbindelse.</span></div>` : ''}
+        ${opg ? `<section class="opgave" aria-live="polite">
+          <div class="lbl">Din opgave · ${H_STATUS[opg.status]}</div>
+          <h3>${opg.ikon} ${esc(opg.titel)}</h3>
+          <p>${esc(opg.adr)} · ${kmTekst(km(MIG_POS, opg))}</p>
+          <div class="knapper">
+            <a class="knap" href="https://www.google.com/maps/dir/?api=1&destination=${opg.lat},${opg.lon}" target="_blank" rel="noopener">${SVG.nav}Navigér</a>
+            ${opg.status === 'taget' ? `<button class="knap primaer" id="btn-ankommet">Jeg er fremme</button>` : `<button class="knap ok" id="btn-afslut">Afslut opgave</button>`}
+          </div>
+        </section>` : ''}
+        <div class="faner" role="tablist">
+          <button role="tab" aria-selected="${S.fane === 'kort'}" data-fane="kort">Kort</button>
+          <button role="tab" aria-selected="${S.fane === 'liste'}" data-fane="liste">Hændelser${nye ? `<span class="taeller">${nye} ny${nye > 1 ? 'e' : ''}</span>` : ''}</button>
+        </div>
+        <div class="indhold">
+          ${S.fane === 'liste' ? `<div class="liste" role="tabpanel">
+            <div class="sorter"><span>${nye} ledig${nye === 1 ? '' : 'e'} · ${S.haendelser.filter(h => h.status === 'taget' || h.status === 'ankommet').length} i gang</span>
+              <span class="vaelger" role="group" aria-label="Sortér"><button data-sort="naer" aria-pressed="${S.sort === 'naer'}">Nærmest</button><button data-sort="nyeste" aria-pressed="${S.sort === 'nyeste'}">Nyeste</button></span></div>
+            ${sorteret().map(kortHtml).join('') || '<p class="tom">Ingen aktive hændelser lige nu.</p>'}
+          </div>` : radarHtml()}
+        </div>
+      </div>
+      <aside class="guide">
+        <h2>Prøv det her</h2>
+        <ul>
+          ${[['status', 'Skift status i toppen (Ledig, Optaget, Pause)'],
+             ['sort', 'Sortér hændelserne efter Nærmest eller Nyeste'],
+             ['vis', 'Tryk på en hændelse for at se detaljer og tidslinje'],
+             ['tag', 'Tag en opgave, tryk "Jeg er fremme" og afslut den'],
+             ['kort', 'Se fanen Kort'],
+             ['sos', 'Tryk SOS (du kan fortryde i 5 sekunder)'],
+             ['offline', 'Tryk "Simulér ingen net" og skift status'],
+             ['ny', 'Tryk "Send ny hændelse" og se den dukke op'],
+             ['kontor', 'Skift til Kontoret og giv en opgave til Mads']]
+            .map(([k, t]) => `<li class="${S.guide[k] ? 'ok' : ''}"><i>${S.guide[k] ? '✓' : ''}</i><span>${t}</span></li>`).join('')}
+        </ul>
+        <p>Alt er opdigtede data, og intet sendes nogen steder hen. Marken og Kontoret deler data, så det du gør det ene sted, kan ses det andet.</p>
+      </aside>
+    </div>`;
+    tegnArk();
+  }
+
+  // ---------- bundark og SOS i telefonen ----------
+  function tegnArk() {
+    const tlf = $('#telefon');
+    if (!tlf) return;
+    tlf.querySelectorAll('.slør, .sos-skaerm').forEach(e => e.remove());
+    if (sosTimer) {
+      const el = document.createElement('div');
+      el.className = 'sos-skaerm'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-label', 'SOS');
+      el.innerHTML = `<div class="tal" id="sos-tal">${sosTimer.n}</div><h2>Sender SOS om ${sosTimer.n} sekunder</h2>
+        <p>Kontoret og fotografer inden for 20 km får besked med din placering.</p>
+        <button class="send" id="sos-send">Send nu</button><button class="fortryd" id="sos-fortryd">Fortryd</button>
+        <p>Er der fare for liv, så ring 112.</p>`;
+      tlf.appendChild(el);
+      $('#sos-fortryd').focus();
+      return;
+    }
+    if (!ark) return;
+    const slør = document.createElement('div');
+    slør.className = 'slør'; slør.dataset.lukArk = '1';
+    if (ark.type === 'haendelse') {
+      const h = S.haendelser.find(x => x.id === ark.id);
+      if (!h) { ark = null; return; }
+      const d = km(MIG_POS, h);
+      slør.innerHTML = `<div class="ark" role="dialog" aria-label="${esc(h.titel)}">
+        <div class="ark-top"><span class="kat" aria-hidden="true">${h.ikon}</span><div><h2>${esc(h.titel)}</h2><p>${esc(h.adr)}</p></div><button class="luk" data-luk-ark="1" aria-label="Luk">✕</button></div>
+        <dl class="fakta">
+          <dt>Status</dt><dd><span class="chip ${hCls(h)}">${H_STATUS[h.status]}</span>${h.foto ? ` ${esc(foto(h.foto).navn)}` : ''}</dd>
+          <dt>Afstand</dt><dd>${kmTekst(d)} · ${koersel(d)}</dd>
+          <dt>Prioritet</dt><dd>${['', 'Høj', 'Normal', 'Lav'][h.prio]}</dd>
+          <dt>Oprettet</dt><dd>kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} · ${esc(h.kilde)}</dd>
+        </dl>
+        <div class="knapper">
+          <a class="knap" href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lon}" target="_blank" rel="noopener">${SVG.nav}Navigér</a>
+          ${h.status === 'ny' ? `<button class="knap primaer" data-tag="${h.id}">Tag opgaven</button>` : ''}
+        </div>
+        <h3 style="margin:18px 0 0;font-size:1rem">Tidslinje</h3>
+        <ol class="tl">${h.tl.map(([hvad, t, tid]) => `<li style="--c:${hvad === 'Melding' ? 'var(--ny)' : hvad === 'Afsluttet' ? 'var(--ledig)' : 'var(--ankommet)'}"><time>${klokken(tid || h.oprettet)}</time><b>${esc(hvad)}</b><br>${esc(t)}</li>`).join('')}</ol>
+      </div>`;
+    } else if (ark.type === 'afslut') {
+      slør.innerHTML = `<form class="ark" role="dialog" aria-label="Afslut opgave" id="form-afslut">
+        <div class="ark-top"><div><h2>Afslut opgave</h2><p>Du bliver meldt ledig bagefter.</p></div><button type="button" class="luk" data-luk-ark="1" aria-label="Luk">✕</button></div>
+        <label for="afslut-note">Note til kontoret (valgfri)<textarea id="afslut-note" placeholder="Fx 24 billeder, sendt til redaktionen kl. 10.40"></textarea></label>
+        <div class="knapper"><button type="button" class="knap" data-luk-ark="1">Fortryd</button><button class="knap ok" type="submit">Afslut og meld ledig</button></div>
+      </form>`;
+    }
+    tlf.appendChild(slør);
+  }
+
+  // ---------- Kontoret ----------
+  function tegnKontor(v) {
+    const nye = S.haendelser.filter(h => h.status === 'ny').length;
+    const igang = S.haendelser.filter(h => h.status === 'taget' || h.status === 'ankommet').length;
+    const ledige = S.fotografer.filter(f => f.status === 'ledig').length;
+    const w = S.vaerktoej;
+    const liste = S.haendelser.filter(h => S.kontorFilter === 'aktive' ? aktiv(h) : true)
+      .sort((a, b) => a.prio - b.prio || (b.status === 'ny') - (a.status === 'ny') || b.oprettet - a.oprettet);
+    const naermeste = h => S.fotografer.filter(f => f.status === 'ledig').map(f => ({ f, d: km(f, h) })).sort((a, b) => a.d - b.d)[0];
+    v.innerHTML = `
+      <header class="k-top">
+        <span class="k-brand"><span class="logo" aria-hidden="true"><i></i></span>Fotovagt <small>kontoret</small></span>
+        <div class="k-tal"><div class="n"><b>${nye}</b><span>Nye</span></div><div class="g"><b>${igang}</b><span>I gang</span></div><div class="l"><b>${ledige}</b><span>Ledige</span></div><div><b>${S.fotografer.length}</b><span>Aktive</span></div></div>
+        <button class="k-knap hvid" id="k-ny"><svg class="ikon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Ny hændelse</button>
+        <button class="k-knap" id="k-menu" aria-expanded="${S.menu}">Værktøjer <span class="prikker" aria-label="Status: Auto ${w.auto ? 'til' : 'fra'}, Push ${w.push ? 'til' : 'fra'}, Pushover ${w.pushover ? 'forbundet' : 'afbrudt'}">
+          <i style="--c:${w.auto ? 'var(--ledig)' : 'var(--offline)'}"></i><i style="--c:${w.push ? 'var(--ledig)' : 'var(--offline)'}"></i><i style="--c:${w.pushover ? 'var(--ledig)' : 'var(--offline)'}"></i></span></button>
+        ${S.menu ? `<div class="menu" role="menu">
+          <button role="menuitemcheckbox" aria-checked="${w.auto}" data-v="auto">Auto-tilbud til nærmeste<small class="${w.auto ? 'til' : ''}">${w.auto ? 'til' : 'fra'}</small></button>
+          <button role="menuitemcheckbox" aria-checked="${w.push}" data-v="push">Push på denne computer<small class="${w.push ? 'til' : ''}">${w.push ? 'til' : 'fra'}</small></button>
+          <button role="menuitemcheckbox" aria-checked="${w.pushover}" data-v="pushover">Pushover<small class="${w.pushover ? 'til' : ''}">${w.pushover ? 'forbundet' : 'afbrudt'}</small></button>
+          <hr>
+          <button role="menuitem" data-v="info">Stedviden</button>
+          <button role="menuitem" data-v="info">Indsatsrapport</button>
+          <hr>
+          <button role="menuitem" data-v="info">Skift adgangskode</button>
+          <button role="menuitem" data-v="info">Log ud</button>
+        </div>` : ''}
+      </header>
+      ${S.sos ? `<div class="bjaelke sos" style="border-radius:12px;margin-top:12px" role="alert"><span>SOS fra Mads kl. ${klokken(S.sos)} · Frederiks Allé, Aarhus · Anna og Jonas er på vej</span></div>` : ''}
+      <div class="k-grid">
+        <section class="panel" aria-label="Fotografer">
+          <div class="panel-top"><h2>Fotografer</h2></div>
+          <div class="tomme">Ingen fotografer i Hovedstaden, Sjælland og Syddanmark.</div>
+          ${[['Midtjylland', ['mads', 'anna', 'jonas']], ['Nordjylland', ['ida']], ['Uden område', ['peter', 'sofie']]].map(([navn, ids]) => {
+            const fs = ids.map(foto);
+            return `<div class="region"><span>${navn}</span><span>${fs.filter(f => f.status === 'ledig').length} ledig${fs.filter(f => f.status === 'ledig').length === 1 ? '' : 'e'} af ${fs.length}</span></div>` +
+              fs.map(f => {
+                const o = S.haendelser.find(h => h.foto === f.id && aktiv(h));
+                return `<div class="foto s-${f.status}"><span class="av">${f.navn[0]}</span><div class="info"><b>${esc(f.navn)}${f.id === S.mig ? ' <small>(dig i demoen)</small>' : ''}</b><span class="chip s-${f.status}">${STATUS[f.status]}</span> <small>${f.sidst ? f.sidst + ' min' : 'nu'}</small>${o ? `<span class="opg">${o.ikon} ${esc(o.titel)}</span>` : ''}</div></div>`;
+              }).join('');
+          }).join('')}
+        </section>
+        <section class="panel" aria-label="Hændelser">
+          <div class="panel-top"><h2>Hændelser</h2>
+            <span class="vaelger" role="group" aria-label="Filter"><button data-kf="aktive" aria-pressed="${S.kontorFilter === 'aktive'}">Aktive</button><button data-kf="alle" aria-pressed="${S.kontorFilter === 'alle'}">Seneste døgn</button></span></div>
+          ${liste.map(h => {
+            const n = h.status === 'ny' ? naermeste(h) : null;
+            return `<article class="k-hk" style="--c:${hVar(h)}">
+              <div class="hoved"><h3>${h.prio === 1 ? '<span class="prio-ikon">!</span>' : ''}${h.ikon} ${esc(h.titel)}</h3><span class="chip ${hCls(h)}">${H_STATUS[h.status]}${h.foto ? ' · ' + esc(foto(h.foto).navn) : ''}</span></div>
+              <p>${esc(h.adr)}</p>
+              <p class="meta">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} · ${esc(h.kilde)}</p>
+              ${n ? `<div class="naer"><span>Nærmeste ledige: <b>${esc(n.f.navn)}</b>, ${kmTekst(n.d)}</span><button data-giv="${h.id}" data-til="${n.f.id}">Giv til ${esc(n.f.navn)}</button></div>` : ''}
+              ${h.tl.length > 1 ? `<p class="meta">Seneste: ${esc(h.tl[h.tl.length - 1][1])}</p>` : ''}
+              ${aktiv(h) ? `<div class="k-handl">
+                <select aria-label="Prioritet for ${esc(h.titel)}" data-prio="${h.id}">${[1, 2, 3].map(p => `<option value="${p}" ${h.prio === p ? 'selected' : ''}>Prioritet: ${['', 'Høj', 'Normal', 'Lav'][p]}</option>`).join('')}</select>
+                <button class="knap" data-kafslut="${h.id}">Afslut</button>
+              </div>` : ''}
+            </article>`;
+          }).join('')}
+          <p class="k-note">Prioritet vælges i én liste i stedet for tre knapper. Kortet er udeladt i demoen, fordi siden ikke må hente kortfliser.</p>
+        </section>
+      </div>`;
+  }
+
+  // ---------- tegn alt ----------
+  function tegn() {
+    const v = $('#visning');
+    const rul = v.querySelector('.liste')?.scrollTop || 0;
+    $('#v-marken').setAttribute('aria-pressed', S.side === 'marken');
+    $('#v-kontor').setAttribute('aria-pressed', S.side === 'kontor');
+    $('#t-offline').setAttribute('aria-pressed', S.offline);
+    if (S.side === 'marken') tegnMarken(v); else tegnKontor(v);
+    const l = v.querySelector('.liste'); if (l) l.scrollTop = rul;
+    S.haendelser.forEach(h => { h.nyInd = false; });
+  }
+
+  // ---------- handlinger ----------
+  function tag(id) {
+    const h = S.haendelser.find(x => x.id === id);
+    if (!h || h.status !== 'ny') return;
+    if (minOpgave()) { toast('Du har allerede en opgave. Afslut den først.'); return; }
+    h.status = 'taget'; h.foto = S.mig; log(h, 'Taget', 'Mads tog opgaven.');
+    mig().status = 'optaget';
+    ark = null; afkryds('tag');
+    toast(`Du har taget: ${h.titel}. Du er meldt optaget.`);
+  }
+
+  function nyHaendelse() {
+    const lager = [
+      { ikon: '🚑', titel: 'Trafikuheld med motorcykel', adr: 'Randersvej ved Lystrup, 8520', lat: 56.235, lon: 10.23, tekst: 'Østjyllands Politi: Motorcyklist kørt ned.' },
+      { ikon: '🔥', titel: 'Brand i landbrugsbygning', adr: 'Skovvej 12, 8660 Skanderborg', lat: 56.04, lon: 9.93, tekst: 'Brand i lade, ingen personer i fare.' },
+      { ikon: '🚁', titel: 'Redningshelikopter indsat', adr: 'Mols Bjerge, 8420 Knebel', lat: 56.22, lon: 10.55, tekst: 'Helikopter indsat ved person faldet i terrænet.' },
+    ];
+    const n = lager[S.naesteNy % lager.length]; S.naesteNy++;
+    const h = { id: Date.now(), ikon: n.ikon, titel: n.titel, adr: n.adr, lat: n.lat, lon: n.lon, oprettet: new Date(), status: 'ny', prio: 2, kilde: 'pushover', tl: [['Melding', n.tekst, new Date()]], nyInd: true };
+    S.haendelser.push(h);
+    afkryds('ny');
+    toast(`Ny hændelse ${kmTekst(km(MIG_POS, h))} fra dig: ${h.titel}`, 'ny');
+  }
+
+  function sosStart() {
+    if (S.sos) return;
+    sosTimer = { n: 5, id: setInterval(() => {
+      sosTimer.n--;
+      if (sosTimer.n <= 0) return sosSend();
+      const t = $('#sos-tal'); if (t) { t.textContent = sosTimer.n; t.nextElementSibling.textContent = `Sender SOS om ${sosTimer.n} sekunder`; }
+    }, 1000) };
+    afkryds('sos');
+    tegn();
+  }
+  function sosStop() { if (sosTimer) clearInterval(sosTimer.id); sosTimer = null; }
+  function sosSend() { sosStop(); S.sos = new Date(); tegn(); toast('SOS er sendt til kontoret og fotografer i nærheden.'); }
+
+  document.addEventListener('click', e => {
+    const t = e.target.closest('button, [data-vis], [data-luk-ark], a');
+    if (!t) { if (S.menu && !e.target.closest('.menu')) { S.menu = false; tegn(); } return; }
+    if (t.tagName === 'A') return;
+    if (t.id === 'v-marken' || t.id === 'v-kontor') { S.side = t.id === 'v-marken' ? 'marken' : 'kontor'; S.menu = false; ark = null; if (S.side === 'kontor') afkryds('kontorSe'); return tegn(); }
+    if (t.id === 't-offline') {
+      S.offline = !S.offline;
+      if (!S.offline && S.ko.length) { toast(`Forbindelsen er tilbage. ${S.ko.length} ændring${S.ko.length > 1 ? 'er' : ''} sendt.`); S.ko = []; }
+      if (S.offline) afkryds('offline');
+      return tegn();
+    }
+    if (t.id === 't-ny') { nyHaendelse(); return tegn(); }
+    if (t.id === 't-tema') {
+      const r = document.documentElement, nu = r.dataset.theme || 'system';
+      const naeste = { system: 'light', light: 'dark', dark: 'system' }[nu];
+      if (naeste === 'system') delete r.dataset.theme; else r.dataset.theme = naeste;
+      t.textContent = 'Tema: ' + { system: 'system', light: 'lys', dark: 'mørk' }[naeste];
+      return;
+    }
+    if (t.id === 't-nulstil') { sosStop(); ark = null; const side = S.side; S = startData(); S.side = side; toast('Demoen er nulstillet'); return tegn(); }
+
+    // Marken
+    if (t.dataset.status && !t.disabled) {
+      const st = t.dataset.status;
+      const opg = minOpgave();
+      if (st === 'ankommet' && opg) { opg.status = 'ankommet'; log(opg, 'På stedet', 'Mads er ankommet.'); }
+      meldStatus(st); return tegn();
+    }
+    if (t.dataset.tag) { e.stopPropagation(); tag(Number(t.dataset.tag)); return tegn(); }
+    if (t.dataset.sort) { S.sort = t.dataset.sort; afkryds('sort'); return tegn(); }
+    if (t.dataset.fane) { S.fane = t.dataset.fane; if (S.fane === 'kort') afkryds('kort'); return tegn(); }
+    if (t.id === 'btn-ankommet') { const o = minOpgave(); o.status = 'ankommet'; log(o, 'På stedet', 'Mads er ankommet.'); meldStatus('ankommet'); return tegn(); }
+    if (t.id === 'btn-afslut') { ark = { type: 'afslut' }; tegnArk(); setTimeout(() => $('#afslut-note')?.focus(), 50); return; }
+    if (t.id === 'btn-sos') { return S.sos ? toast('SOS er aktiv. Tryk "Stop SOS" for at stoppe den.') : sosStart(); }
+    if (t.id === 'sos-fortryd') { sosStop(); toast('SOS er fortrudt. Intet blev sendt.'); return tegn(); }
+    if (t.id === 'sos-send') { return sosSend(); }
+    if (t.id === 'btn-sos-stop') { S.sos = null; toast('SOS er stoppet'); return tegn(); }
+    if (t.dataset.lukArk && (e.target === t || t.tagName === 'BUTTON')) { ark = null; return tegnArk(); }
+    if (t.dataset.vis) { ark = { type: 'haendelse', id: Number(t.dataset.vis) }; afkryds('vis'); return tegn(); }
+
+    // Kontoret
+    if (t.id === 'k-menu') { S.menu = !S.menu; return tegn(); }
+    if (t.dataset.v) {
+      if (t.dataset.v === 'info') { S.menu = false; toast('Ikke med i demoen'); return tegn(); }
+      S.vaerktoej[t.dataset.v] = !S.vaerktoej[t.dataset.v]; return tegn();
+    }
+    if (t.id === 'k-ny') { nyHaendelse(); return tegn(); }
+    if (t.dataset.kf) { S.kontorFilter = t.dataset.kf; return tegn(); }
+    if (t.dataset.giv) {
+      const h = S.haendelser.find(x => x.id === Number(t.dataset.giv)), f = foto(t.dataset.til);
+      if (f.id === S.mig && minOpgave()) { toast('Mads har allerede en opgave.'); return; }
+      h.status = 'taget'; h.foto = f.id; f.status = 'optaget'; log(h, 'Taget', `Kontoret gav opgaven til ${f.navn}.`);
+      if (f.id === S.mig) afkryds('kontor');
+      toast(`${h.titel} er givet til ${f.navn}${f.id === S.mig ? '. Skift til Marken for at se den.' : ''}`);
+      return tegn();
+    }
+    if (t.dataset.kafslut) {
+      const h = S.haendelser.find(x => x.id === Number(t.dataset.kafslut));
+      if (h.foto) { const f = foto(h.foto); if (f) f.status = 'ledig'; }
+      h.status = 'afsluttet'; log(h, 'Afsluttet', 'Afsluttet af kontoret.'); toast('Hændelsen er afsluttet'); return tegn();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-vis]')) { e.preventDefault(); e.target.click(); }
+    if (e.key === 'Escape') { if (sosTimer) { sosStop(); tegn(); } else if (ark) { ark = null; tegnArk(); } else if (S.menu) { S.menu = false; tegn(); } }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.dataset.prio) {
+      const h = S.haendelser.find(x => x.id === Number(e.target.dataset.prio));
+      h.prio = Number(e.target.value); toast(`Prioritet: ${['', 'Høj', 'Normal', 'Lav'][h.prio]}`); tegn();
+    }
+  });
+  document.addEventListener('submit', e => {
+    if (e.target.id !== 'form-afslut') return;
+    e.preventDefault();
+    const o = minOpgave(), note = $('#afslut-note').value.trim();
+    if (o) { o.status = 'afsluttet'; log(o, 'Afsluttet', note ? `Mads: ${note}` : 'Mads afsluttede opgaven.'); }
+    ark = null; meldStatus('ledig'); toast('Opgaven er afsluttet. Du er meldt ledig.'); tegn();
+  });
+
+  // "x min siden" holdes opdateret, men kun mens siden er synlig
+  setInterval(() => { if (!document.hidden && !ark && !sosTimer && !S.menu) tegn(); }, 30e3);
+  // Første nye hændelse kommer af sig selv efter 20 sekunder
+  nyTimer = setTimeout(() => { if (S.naesteNy === 0) { nyHaendelse(); tegn(); } }, 20000);
+  tegn();
+})();
+</script>
