@@ -181,5 +181,14 @@ tjek('Eftersyn med kun station efter 10 timer lægges ikke ind', !findMatch({ ..
 // Lærte vejnavne
 const lært = parseBesked({ app: 'Pf-upload', title: 'Brand i carport', message: 'Brand i carport ved Uglehøjen lørdag aften.', url: 'https://fyens.dk/112/x', kendteVeje: [{ navn: 'Uglehøjen', by: 'Højby' }] });
 tjek('Lært vejnavn ("ved Uglehøjen") giver adresse', lært.adresse === 'Uglehøjen, Højby' && lært.gade === 'uglehøjen');
+// ISL-forespørgsel efterfulgt af assistance
+const islF = aktiv({ ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Tønder', message: '🔥 ISL-Forespørgsel\nBeredskab: Brand & Redning Sønderjylland\nStation: Tønder\n28-11-2026 10:17' }), id: 'isl', lat: 54.94, lon: 8.86 });
+islF.oprettet = new Date(Date.now() - 20 * 60e3).toISOString();
+const assSamme = parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Tønder', message: '🔥 Assistance TØ V-1\nBeredskab: Brand & Redning Sønderjylland\nStation: Tønder' });
+const assNabo = { ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Bredebro', message: '🔥 Assistance BR M-1\nBeredskab: Brand & Redning Sønderjylland\nStation: Bredebro' }), lat: 55.06, lon: 8.83 };
+const assAndet = { ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Esbjerg', message: '🔥 Assistance ES M-1\nBeredskab: Sydvestjysk Brandvæsen\nStation: Esbjerg' }), lat: 55.47, lon: 8.45 };
+tjek('Assistance fra samme station lægges ind i ISL-forespørgslen', findMatch(assSamme, [islF])?.id === 'isl');
+tjek('Assistance fra nabostation i samme beredskab (13 km) lægges ind', findMatch(assNabo, [islF])?.id === 'isl');
+tjek('Assistance fra et andet beredskab lægges ikke ind', !findMatch(assAndet, [islF]));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

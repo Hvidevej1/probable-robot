@@ -351,6 +351,10 @@ const OBJEKT = /lejlighed|etage|villa|rækkehus|parcelhus|enfamiliehus|sommerhus
 const objekter = h => new Set((`${h.titel || ''} ${h.tekst || ''}`.toLowerCase().match(OBJEKT) || []).map(o => o === 'bilbrand' ? 'bil' : o));
 function sammeObjekt(a, b) { const A = objekter(a); for (const o of objekter(b)) if (A.has(o)) return true; return false; }
 const EFTERSYN = /eftersyn|efterslukning|genantænd|blusset op igen|ulmebrand/i;
+// ISL-forespørgsel efterfulgt af assistance: assistancen kommer ofte fra en nabostation, så samme beredskab tæller også
+const ASSISTANCE = /^(?:ass\.|assistance)/i;
+const beredskabAf = h => (String(h.tekst || '').split('\n').map(renEmoji).find(l => /^beredskab:/i.test(l)) || '').replace(/^beredskab:\s*/i, '').trim().toLowerCase();
+const førsteLinje = h => renEmoji(String(h.tekst || '').split('\n')[0]);
 export function efterBrand(ny, alle, nu = Date.now()) {
   const na = adrNøgle(ny.adresse), ns = String(ny.station || '').trim().toLowerCase();
   for (const h of [...alle].sort((x, y) => String(y.oprettet).localeCompare(String(x.oprettet)))) {
@@ -396,6 +400,11 @@ export function findMatch(ny, aktive, nu = Date.now()) {
     // Nyhed om en alarm: medierne skriver typisk 20–90 min efter alarmen og nævner kun vej/by. Samme kategori,
     // samme slags sted (lejlighed, villa, bil …) og højst 15 km fra alarmens station (alarmen kendes kun ved stationen).
     if (ny.url && !ny.station && h.cirka && stationAf(h) && ny.kategori === h.kategori && afstand != null && afstand < 15 && sammeObjekt(ny, h)) return h;
+    // Assistance efter en ISL-forespørgsel (kun stationen kendes): samme station, eller samme beredskab højst 20 km væk, inden for 2 timer
+    if (ASSISTANCE.test(ny.titel) && /forespørgsel/i.test(`${førsteLinje(h)} ${h.titel}`) && alder < 2 * 3600e3) {
+      const ns = String(ny.station || '').trim().toLowerCase(), nb = beredskabAf(ny);
+      if ((ns && ns === stationAf(h)) || (nb && nb === beredskabAf(h) && afstand != null && afstand < 20)) return h;
+    }
     if (alder > 45 * 60e3) continue;
     if (na && na === adrNøgle(h.adresse)) return h;
     const a = nøgle(h.titel), kort = Math.min(a.length, n.length), fælles = fællesStart(a, n);

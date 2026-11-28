@@ -285,3 +285,10 @@ OpenStreetMap. Ved start lærte den 209 adresser, 65 vejnavne og 49 stationer af
 Et **eftersyn** (også "efterslukning", "genantændt", "blusset op igen") samme sted som en brand inden for det seneste døgn
 lægges ind i branden – også hvis branden er lukket. "Samme sted" = samme adresse, under 150 m, samme vej, eller (når kun
 stationen kendes) samme station inden for 6 timer. Logbogen skriver "eftersyn på den tidligere brand".
+
+## ISL-forespørgsel og assistance
+En **ISL-forespørgsel** starter som **lav prioritet**. Kaldes der **assistance** bagefter (samme station, eller samme
+beredskab højst 20 km væk, inden for 2 timer), lægges den ind i forespørgslen, og prioriteten hæves automatisk til
+**normal** (logbog: "assistance kaldt efter ISL-forespørgsel – prioritet hævet fra lav til normal"). Derefter gælder de
+øvrige regler: fx forslag om stor hændelse ved mere end 3 assistancer eller 4 enheder, opgradering ved bygningsbrand,
+og kontorets egne valg. Assistenten foreslår det samme. SQL: `supabase/isl-forespoergsel.sql`.
