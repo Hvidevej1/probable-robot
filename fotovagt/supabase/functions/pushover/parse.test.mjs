@@ -153,5 +153,18 @@ console.log('  opgraderet:', op.titel, '|', op.kategori);
 tjek('Eftersyn opgraderes til bygningsbrand (titel, kategori og markering)', /Bygn\.brand/.test(op.titel) && op.kategori === 'Brand' && op.opgraderet && /⬆️ Opgraderet/.test(op.tekst));
 tjek('Assistance opgraderer ikke et eftersyn', !flet(hE, ass, '1-1-2 Århus').opgraderet);
 tjek('En senere assistance nedgraderer ikke en bygningsbrand', !flet(aktiv({ ...bygnViby }), ass, '1-1-2 Århus').titel);
+// Nyhed fra fyens.dk om en alarm, der kun kendes ved stationen (Beredskab Fyn, Åsum - Odense)
+const katte = parseBesked({ app: 'Pf-upload 3 backup ', title: 'To katte døde efter brand i lejlighed', url: 'https://fyens.dk/112/to-katte-doede-efter-brand-i-lejlighed',
+  message: 'To katte døde efter brand i lejlighed\nTo katte har lørdag morgen mistet livet efter en brand i en lejlighed på Uglehøjen i Højby syd for Odense.' });
+tjek('Nyhed: "på Uglehøjen i Højby syd for Odense" giver adresse og vejnavn', katte.adresse === 'Uglehøjen, Højby, Odense' && katte.gade === 'uglehøjen');
+const åsum = aktiv({ ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Åsum - Odense', message: '🔥 Bygn.brand-Lejlighed\nBeredskab: Beredskab Fyn\nStation: Åsum - Odense\n28-11-2026 07:57' }), lat: 55.400, lon: 10.464 });
+åsum.oprettet = new Date(Date.now() - 33 * 60e3).toISOString();
+const aalborg = aktiv({ ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Aalborg', message: '🔥 Bygn.brand-Lejlighed\nBeredskab: Nordjyllands Beredskab\nStation: Aalborg' }), lat: 57.046, lon: 9.92 });
+const kattePos = { ...katte, lat: 55.35, lon: 10.37 };
+tjek('Nyheden lægges ind i alarmen ved Åsum (samme slags sted, 7 km), ikke i Aalborg', findMatch(kattePos, [aalborg, åsum]) === åsum);
+const bil = aktiv({ ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Åsum - Odense', message: '🔥 Brand-Bil i det fri\nBeredskab: Beredskab Fyn\nStation: Åsum - Odense' }), lat: 55.400, lon: 10.464 });
+tjek('Nyhed om lejlighedsbrand lægges ikke ind i en bilbrand i nærheden', !findMatch(kattePos, [bil]));
+const fk = flet(åsum, kattePos, 'Pf-upload 3 backup ');
+tjek('Nyhedens vejnavn erstatter stationen som adresse', fk.adresse === 'Uglehøjen, Højby, Odense' && fk.lat === 55.35);
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

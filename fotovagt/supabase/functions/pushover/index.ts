@@ -59,10 +59,10 @@ async function placér(h: Hændelse) {
   }
 }
 
-// Aktive hændelser fra de seneste 45 minutter (til at finde dubletter)
-// + hændelser fra det seneste døgn fra samme pressemeddelelse (opfølgning fra politiet)
+// Aktive hændelser fra de seneste 3 timer (til at finde dubletter – nyheder kommer ofte et stykke tid efter alarmen;
+// findMatch bruger selv 45 minutter for de fleste regler) + hændelser fra det seneste døgn fra samme pressemeddelelse
 async function nyligeAktive(h?: Hændelse) {
-  const siden = new Date(Date.now() - 45 * 60e3).toISOString();
+  const siden = new Date(Date.now() - 3 * 3600e3).toISOString();
   const { data } = await db.from("haendelser").select("*")
     .in("status", ["ny", "taget", "ankommet"]).gt("oprettet", siden);
   const pm = pressemeddelelseNr(h?.url);

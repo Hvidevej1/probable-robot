@@ -109,6 +109,8 @@ export function byFraLink(links) {
 
 // Giver { adresse, linje, start, cirka }: linje/start er hvor adressen står (bruges til at korte titlen af).
 // cirka = true, når det kun er en by/station/vejstrækning og ikke en præcis adresse.
+// Ord efter "på", der ikke er vejnavne (øer, landsdele, sociale medier, steder i almindelighed)
+const IKKE_VEJ = /^(?:Fyn|Sjælland|Jylland|Als|Mors|Bornholm|Lolland|Falster|Møn|Langeland|Ærø|Djursland|Samsø|Fanø|Rømø|Læsø|Anholt|Thurø|Tåsinge|Amager|Facebook|Twitter|Instagram|Tiktok|Youtube|Hospitalet|Sygehuset|Skolen|Stationen|Stedet|Vejen|Motorvejen|Banen|Havnen|Stranden|Torvet|Grund|Grundlag|Baggrund|Mandag|Tirsdag|Onsdag|Torsdag|Fredag|Lørdag|Søndag)$/;
 export function findAdresse(linjer, station, byHint = '') {
   const L = Array.isArray(linjer) ? linjer : String(linjer || '').split('\n');
   const ingen = { adresse: '', linje: -1, start: -1, cirka: false };
@@ -171,6 +173,12 @@ export function findAdresse(linjer, station, byHint = '') {
     const m = l.match(new RegExp(`${GADE}[^.\\n]{0,40}?\\s(?:i|ved|nær|(?:nord|syd|øst|vest|nordøst|nordvest|sydøst|sydvest)\\s+for)\\s+(${STEDNAVN})`));
     if (m && !/motorvej/i.test(m[1]) && !/motorvej/i.test(m[2])) return { adresse: `${m[1]}, ${m[2].replace(/\s[A-ZÆØÅ]{1,2}$/, '')}`, linje: -1, start: -1, cirka: true };
   }
+  // 4c) Nyheder: "en lejlighed på Uglehøjen i Højby syd for Odense" – vejnavne uden vej/gade (højen, toften, …).
+  //     Byen, der henvises til ("syd for Odense"), tages med, så den rigtige Højby findes.
+  for (const l of L) {
+    const m = l.match(new RegExp(`\\bpå\\s+([A-ZÆØÅ][a-zæøå]{3,}(?:\\s[A-ZÆØÅ][a-zæøå]+)?)\\s+i\\s+(${STEDNAVN})(?:\\s+(?:nord|syd|øst|vest|nordøst|nordvest|sydøst|sydvest)\\s+for\\s+(${STEDNAVN}))?`));
+    if (m && !IKKE_VEJ.test(m[1])) return { adresse: [m[1], m[2], m[3]].filter(Boolean).join(', '), linje: -1, start: -1, cirka: true, gade: m[1] };
+  }
   const gade = findGade(L);
   if (gade && byHint) return { adresse: `${gade}, ${byHint}`, linje: -1, start: -1, cirka: true };
   // 5) Motorvejsstrækning: "mellem <44> Hadsten og …", "mellem Horsens C og [57] Horsens S", "E45 fra Randers"
@@ -219,7 +227,7 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
   const station = stationLinje || (erStationsFormat ? rentitel : '') || '';
 
   const indhold = rene.filter(l => !METALINJE.test(l));
-  const { adresse, linje, start, cirka } = findAdresse(rene, station, byFraLink(links));
+  const { adresse, linje, start, cirka, gade: adrGade } = findAdresse(rene, station, byFraLink(links));
 
   let titel;
   if (/detekteret på google maps/i.test(rentitel)) {
@@ -290,7 +298,7 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
     opfoelgning: /politi$/i.test(rentitel) && /er fundet|slette (?:foto|billede|navn)/i.test(tekst),
     ignorer: IGNORER.test(`${title}\n${tekst}`) || (helikopter && HOSPITAL.test(adresse)),
     helikopter,
-    gade: findGade(rene).toLowerCase(),
+    gade: (adrGade || findGade(rene)).toLowerCase(),
   };
 }
 
@@ -326,6 +334,10 @@ const stationAf = h => (String(h.tekst || '').split('\n').filter(l => !l.startsW
 const gadeAf = h => findGade([h.adresse || '', ...String(h.tekst || '').split('\n').map(renEmoji)]).toLowerCase();
 const pressemeddelelse = u => (String(u || '').match(/pressemeddelelse\/(\d+)/) || [])[1] || '';
 
+// Hvilken slags sted handler det om? Bruges til at genkende en nyhed om samme alarm.
+const OBJEKT = /lejlighed|etage|villa|rækkehus|parcelhus|enfamiliehus|sommerhus|kolonihave|campingvogn|landbrug|stald|lade|gård|industri|fabrik|lager|butik|restaurant|skole|institution|plejehjem|kirke|skur|carport|garage|container|skraldespand|personbil|lastbil|bilbrand|\bbil\b|bus|traktor|mejetærsker|båd|skib|tog|mark|skov|halm|hede/gi;
+const objekter = h => new Set((`${h.titel || ''} ${h.tekst || ''}`.toLowerCase().match(OBJEKT) || []).map(o => o === 'bilbrand' ? 'bil' : o));
+function sammeObjekt(a, b) { const A = objekter(a); for (const o of objekter(b)) if (A.has(o)) return true; return false; }
 export function findMatch(ny, aktive, nu = Date.now()) {
   const n = nøgle(ny.titel), na = adrNøgle(ny.adresse);
   // Opfølgning på samme pressemeddelelse fra politiet (fx "personen er fundet")
@@ -347,6 +359,9 @@ export function findMatch(ny, aktive, nu = Date.now()) {
     // Samme gade og samme slags hændelse inden for 3 timer: politi, nyheder og 112 om samme ulykke
     //   (kun når mindst én mangler husnummer; præcise adresser bruger reglerne herunder)
     if (ny.gade && (!na || !adrNøgle(h.adresse)) && ny.kategori === h.kategori && ny.gade === gadeAf(h) && !(afstand > (præcis ? 2 : 25))) return h;
+    // Nyhed om en alarm: medierne skriver typisk 20–90 min efter alarmen og nævner kun vej/by. Samme kategori,
+    // samme slags sted (lejlighed, villa, bil …) og højst 15 km fra alarmens station (alarmen kendes kun ved stationen).
+    if (ny.url && !ny.station && h.cirka && stationAf(h) && ny.kategori === h.kategori && afstand != null && afstand < 15 && sammeObjekt(ny, h)) return h;
     if (alder > 45 * 60e3) continue;
     if (na && na === adrNøgle(h.adresse)) return h;
     const a = nøgle(h.titel), kort = Math.min(a.length, n.length), fælles = fællesStart(a, n);
@@ -422,10 +437,12 @@ export function flet(h, ny, app) {
     if (h.status === 'ny') { felter.status = 'afsluttet'; felter.afsluttet_tid = new Date().toISOString(); }
     return felter;
   }
-  const bedreAdresse = ny.adresse && (!h.adresse || (h.cirka && !ny.cirka && !ny.helikopter) || (h.lat == null && ny.lat != null && !ny.helikopter));
+  // En nyhed med vejnavn ("Uglehøjen, Højby") er bedre end en alarm, der kun kendes ved stationen ("Åsum - Odense")
+  const vejFremforStation = h.cirka && ny.cirka && ny.gade && !gadeAf(h) && ny.lat != null && !ny.helikopter;
+  const bedreAdresse = ny.adresse && (!h.adresse || (h.cirka && !ny.cirka && !ny.helikopter) || (h.lat == null && ny.lat != null && !ny.helikopter) || vejFremforStation);
   if (bedreAdresse) felter.adresse = ny.adresse;
   // (en lægehelikopter lander ved stedet, ikke præcis på det: placeringen forbliver cirka)
-  if (ny.lat != null && (h.lat == null || (h.cirka && !ny.cirka))) { felter.lat = ny.lat; felter.lon = ny.lon; felter.cirka = !!ny.cirka || !!ny.helikopter; }
+  if (ny.lat != null && (h.lat == null || (h.cirka && !ny.cirka) || vejFremforStation)) { felter.lat = ny.lat; felter.lon = ny.lon; felter.cirka = !!ny.cirka || !!ny.helikopter; }
   else if (bedreAdresse && h.cirka && !ny.cirka) { felter.lat = null; felter.lon = null; felter.cirka = false; } // slås op igen
   if (!felter.kategori && (!h.kategori || h.kategori === 'Andet') && ny.kategori !== 'Andet') felter.kategori = ny.kategori;
   if (!h.url && ny.url) felter.url = ny.url;
