@@ -267,3 +267,19 @@ telefonnumre og **🧭 Navigér hertil**. Adressen slås op i DAWA (ellers OpenS
 lokale numre (vagtcentral, hvor den er offentliggjort – ellers hovednummer) fra deres egne kontaktsider. Ikke 112.
 Ambulancerne styres af regionernes AMK-vagtcentraler, som ikke har offentlige numre.
 Data: OpenStreetMap (© OpenStreetMap-bidragydere) i tabellen `stationer` – se `supabase/stationer.sql` for genindlæsning.
+
+## Stedviden – Fotovagt lærer steder at kende
+Tabellen `stedviden` (`supabase/stedviden.sql`) bliver klogere for hver hændelse:
+* **Adresser**: hver adresse, der findes på kortet, huskes. **Kontorets rettelser** (flyt nålen / ret adressen under
+  "Ret") huskes for både den gamle og den nye tekst og vinder altid – næste gang samme tekst kommer, placeres den rigtigt.
+* **Vejnavne**: også navne uden vej/gade (fx "Uglehøjen" i Højby) læres, så en senere besked som "brand ved Uglehøjen"
+  får en adresse. (Almindelige navne som Skovvej/Vestergade bruges ikke alene, da de findes i mange byer.)
+* **Stationer**: "Station: Åsum - Odense" kobles til den rigtige brandstation fra OpenStreetMap (helst en med samme navn
+  inden for 12 km).
+Pushover-funktionen slår først op i stedviden (kontorets rettelser, tidligere fund, stationer) og først derefter hos
+OpenStreetMap. Ved start lærte den 209 adresser, 65 vejnavne og 49 stationer af historikken.
+
+## Eftersyn efter en brand
+Et **eftersyn** (også "efterslukning", "genantændt", "blusset op igen") samme sted som en brand inden for det seneste døgn
+lægges ind i branden – også hvis branden er lukket. "Samme sted" = samme adresse, under 150 m, samme vej, eller (når kun
+stationen kendes) samme station inden for 6 timer. Logbogen skriver "eftersyn på den tidligere brand".

@@ -111,7 +111,7 @@ export function byFraLink(links) {
 // cirka = true, når det kun er en by/station/vejstrækning og ikke en præcis adresse.
 // Ord efter "på", der ikke er vejnavne (øer, landsdele, sociale medier, steder i almindelighed)
 const IKKE_VEJ = /^(?:Fyn|Sjælland|Jylland|Als|Mors|Bornholm|Lolland|Falster|Møn|Langeland|Ærø|Djursland|Samsø|Fanø|Rømø|Læsø|Anholt|Thurø|Tåsinge|Amager|Facebook|Twitter|Instagram|Tiktok|Youtube|Hospitalet|Sygehuset|Skolen|Stationen|Stedet|Vejen|Motorvejen|Banen|Havnen|Stranden|Torvet|Grund|Grundlag|Baggrund|Mandag|Tirsdag|Onsdag|Torsdag|Fredag|Lørdag|Søndag)$/;
-export function findAdresse(linjer, station, byHint = '') {
+export function findAdresse(linjer, station, byHint = '', kendteVeje = []) {
   const L = Array.isArray(linjer) ? linjer : String(linjer || '').split('\n');
   const ingen = { adresse: '', linje: -1, start: -1, cirka: false };
   // 1) "Adresse: …", "Sted: …", "Lokation: …" (også midt i en linje efter et punktum)
@@ -179,6 +179,18 @@ export function findAdresse(linjer, station, byHint = '') {
     const m = l.match(new RegExp(`\\bpå\\s+([A-ZÆØÅ][a-zæøå]{3,}(?:\\s[A-ZÆØÅ][a-zæøå]+)?)\\s+i\\s+(${STEDNAVN})(?:\\s+(?:nord|syd|øst|vest|nordøst|nordvest|sydøst|sydvest)\\s+for\\s+(${STEDNAVN}))?`));
     if (m && !IKKE_VEJ.test(m[1])) return { adresse: [m[1], m[2], m[3]].filter(Boolean).join(', '), linje: -1, start: -1, cirka: true, gade: m[1] };
   }
+  // 4d) Lærte vejnavne (stedviden): veje, Fotovagt tidligere har fundet – også uden vej/gade ("ved Uglehøjen")
+  if (kendteVeje.length) {
+    const tekst = L.filter(l => !/^(?:station|beredskab):/i.test(l)).join('\n');
+    for (const k of kendteVeje) {
+      // (almindelige navne som Skovvej/Vestergade findes i mange byer og klares af reglerne ovenfor)
+      if (!k?.navn || k.navn.length < 4 || /(?:vej|gade|allé|alle|stræde|torv|plads|boulevard|vænget|parken|stien)$/i.test(k.navn) || !tekst.includes(k.navn)) continue;
+      if (new RegExp(`(?<![A-Za-zÆØÅæøåé])${k.navn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-zÆØÅæøåé])`).test(tekst)) {
+        const by = byHint || k.by;
+        return { adresse: by ? `${k.navn}, ${by}` : k.navn, linje: -1, start: -1, cirka: true, gade: k.navn };
+      }
+    }
+  }
   const gade = findGade(L);
   if (gade && byHint) return { adresse: `${gade}, ${byHint}`, linje: -1, start: -1, cirka: true };
   // 5) Motorvejsstrækning: "mellem <44> Hadsten og …", "mellem Horsens C og [57] Horsens S", "E45 fra Randers"
@@ -209,7 +221,7 @@ const NYHEDSKILDE = /^(?:breaking:?\s*)?[A-Za-z0-9æøå-]+\.dk:\s*/i;
 const VEJLINJE = /^(?:E\d{1,3}|Rute\s?\d+|M\d{1,2}\b)|motorvej/i;
 
 // Hele beskeden -> felter til tabellen "haendelser" (+ links, station og ignorer til serveren).
-export function parseBesked({ title, message, url, priority, app } = {}) {
+export function parseBesked({ title, message, url, priority, app, kendteVeje = [] } = {}) {
   let html = String(message || '');
   const links = [...html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)].map(m => afkod(m[1]));
   html = html.replace(/<br\s*\/?>|<\/p>|<\/div>/gi, '\n').replace(/<\/?[a-z][^>]*>/gi, ' ');
@@ -227,7 +239,7 @@ export function parseBesked({ title, message, url, priority, app } = {}) {
   const station = stationLinje || (erStationsFormat ? rentitel : '') || '';
 
   const indhold = rene.filter(l => !METALINJE.test(l));
-  const { adresse, linje, start, cirka, gade: adrGade } = findAdresse(rene, station, byFraLink(links));
+  const { adresse, linje, start, cirka, gade: adrGade } = findAdresse(rene, station, byFraLink(links), kendteVeje);
 
   let titel;
   if (/detekteret på google maps/i.test(rentitel)) {
@@ -338,6 +350,23 @@ const pressemeddelelse = u => (String(u || '').match(/pressemeddelelse\/(\d+)/) 
 const OBJEKT = /lejlighed|etage|villa|rækkehus|parcelhus|enfamiliehus|sommerhus|kolonihave|campingvogn|landbrug|stald|lade|gård|industri|fabrik|lager|butik|restaurant|skole|institution|plejehjem|kirke|skur|carport|garage|container|skraldespand|personbil|lastbil|bilbrand|\bbil\b|bus|traktor|mejetærsker|båd|skib|tog|mark|skov|halm|hede/gi;
 const objekter = h => new Set((`${h.titel || ''} ${h.tekst || ''}`.toLowerCase().match(OBJEKT) || []).map(o => o === 'bilbrand' ? 'bil' : o));
 function sammeObjekt(a, b) { const A = objekter(a); for (const o of objekter(b)) if (A.has(o)) return true; return false; }
+const EFTERSYN = /eftersyn|efterslukning|genantænd|blusset op igen|ulmebrand/i;
+export function efterBrand(ny, alle, nu = Date.now()) {
+  const na = adrNøgle(ny.adresse), ns = String(ny.station || '').trim().toLowerCase();
+  for (const h of [...alle].sort((x, y) => String(y.oprettet).localeCompare(String(x.oprettet)))) {
+    if (h.status === 'annulleret' || h.kategori !== 'Brand' || EFTERSYN.test(h.titel) || alvor(h.titel) < 2) continue;
+    if (nu - new Date(h.oprettet).getTime() > 24 * 3600e3) continue;
+    const begge = ny.lat != null && h.lat != null;
+    const afstand = begge ? Math.hypot((ny.lat - h.lat) * 111, (ny.lon - h.lon) * 111 * Math.cos(h.lat * Math.PI / 180)) : null;
+    const præcis = begge && !ny.cirka && !h.cirka;
+    if (na && na === adrNøgle(h.adresse)) return h;                                   // samme adresse
+    if (præcis && afstand < 0.15) return h;                                            // under 150 m
+    if (ny.gade && ny.gade === gadeAf(h) && !(afstand > 2)) return h;                  // samme vej
+    // Kun stationen kendes på begge: kun inden for 6 timer (ellers kan det være en anden brand i samme by)
+    if (ns && ns === stationAf(h) && !na && !adrNøgle(h.adresse) && !ny.gade && !gadeAf(h) && nu - new Date(h.oprettet).getTime() < 6 * 3600e3) return h;
+  }
+  return null;
+}
 export function findMatch(ny, aktive, nu = Date.now()) {
   const n = nøgle(ny.titel), na = adrNøgle(ny.adresse);
   // Opfølgning på samme pressemeddelelse fra politiet (fx "personen er fundet")
@@ -346,6 +375,11 @@ export function findMatch(ny, aktive, nu = Date.now()) {
     // (også afsluttede, så en efterlysning bliver ryddet op, selvom kontoret allerede har lukket den)
     const h = aktive.find(h => h.status !== 'annulleret' && pressemeddelelse(h.url) === pm
       && nu - new Date(h.oprettet).getTime() < 24 * 3600e3);
+    if (h) return h;
+  }
+  // Eftersyn efter en brand: samme sted som en brand inden for det seneste døgn (også lukkede) -> samme hændelse
+  if (EFTERSYN.test(ny.titel)) {
+    const h = efterBrand(ny, aktive, nu);
     if (h) return h;
   }
   // Nyeste først, så en besked uden adresse havner hos den seneste alarm med samme titel

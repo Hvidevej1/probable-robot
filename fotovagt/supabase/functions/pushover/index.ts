@@ -45,12 +45,22 @@ async function slåLinkOp(url: string) {
   } catch { return null; }
 }
 
-// Placér hændelsen: først links, så adresseopslag hos OpenStreetMap
+// Placér hændelsen: først links, så Fotovagts egen stedviden (kontorets rettelser, tidligere fund, stationer),
+// og til sidst adresseopslag hos OpenStreetMap
 async function placér(h: Hændelse) {
   if (h.lat != null && !h.cirka) return;
   for (const u of h.links.filter(skalSlåsOp)) {
     const pos = await slåLinkOp(u);
     if (pos) { h.lat = pos.lat; h.lon = pos.lon; h.cirka = false; return; }
+  }
+  if (h.lat == null && h.adresse) {
+    const { data } = await db.rpc("slaa_sted_op", { tekst: h.adresse, station: h.station });
+    const kendt = Array.isArray(data) ? data[0] : null;
+    if (kendt?.lat != null) {
+      h.lat = kendt.lat; h.lon = kendt.lon;
+      if (kendt.kilde === "kontor" && kendt.type === "adresse") h.cirka = false;   // kontoret har selv sat nålen
+      return;
+    }
   }
   if (h.lat == null && h.adresse) {
     const pos = await geokod(h.adresse, GEO);
@@ -63,8 +73,14 @@ async function placér(h: Hændelse) {
 // findMatch bruger selv 45 minutter for de fleste regler) + hændelser fra det seneste døgn fra samme pressemeddelelse
 async function nyligeAktive(h?: Hændelse) {
   const siden = new Date(Date.now() - 3 * 3600e3).toISOString();
-  const { data } = await db.from("haendelser").select("*")
+  let { data } = await db.from("haendelser").select("*")
     .in("status", ["ny", "taget", "ankommet"]).gt("oprettet", siden);
+  // Eftersyn: også brande fra det seneste døgn – også dem, der er lukket
+  if (h && /eftersyn|efterslukning|genantænd|blusset op igen|ulmebrand/i.test(h.titel)) {
+    const døgnet = new Date(Date.now() - 24 * 3600e3).toISOString();
+    const { data: brande } = await db.from("haendelser").select("*").eq("kategori", "Brand").neq("status", "annulleret").gt("oprettet", døgnet);
+    data = [...(data ?? []), ...(brande ?? []).filter((x) => !(data ?? []).some((y) => y.id === x.id))];
+  }
   const pm = pressemeddelelseNr(h?.url);
   if (!pm) return data ?? [];
   const døgn = new Date(Date.now() - 24 * 3600e3).toISOString();
@@ -74,8 +90,18 @@ async function nyligeAktive(h?: Hændelse) {
 
 // Én besked -> én hændelse. Er det samme alarm som en, der allerede er kommet fra en anden kilde,
 // lægges beskeden ind i den. Radioprøver og kontorets ignorér-liste (fx "(Bus)") springes over.
+// Lærte vejnavne (stedviden), hentes højst hvert 5. minut
+let kendteVeje: { navn: string; by: string | null }[] = [], vejeHentet = 0;
+async function hentKendteVeje() {
+  if (Date.now() - vejeHentet < 5 * 60e3) return kendteVeje;
+  const { data } = await db.from("stedviden").select("navn,by").eq("type", "vej").order("antal", { ascending: false }).limit(5000);
+  kendteVeje = (data ?? []).sort((a, b) => b.navn.length - a.navn.length);
+  vejeHentet = Date.now();
+  return kendteVeje;
+}
+
 async function indsaet(b: Indgang, kilde: string, eksternId: string | null, ignorer: string[] = []) {
-  const h = parseBesked(b);
+  const h = parseBesked({ ...b, kendteVeje: await hentKendteVeje() });
   if (skalIgnoreres(h, ignorer)) {
     // Gem, hvad der blev sprunget over, så kontoret kan se det (Pushover → Sprunget over)
     const egen = (ignorer || []).find((o) => o && `${h.titel}\n${h.tekst}`.toLowerCase().includes(String(o).toLowerCase().trim()));
@@ -97,7 +123,10 @@ async function indsaet(b: Indgang, kilde: string, eksternId: string | null, igno
       if (pos) { felter.lat = pos.lat; felter.lon = pos.lon; }
     }
     await db.from("haendelser").update(felter).eq("id", match.id);
-    await db.from("logbog").insert({ haendelse_id: match.id, handling: `ekstra besked fra ${b.app || kilde}` });
+    const eftersynPåLukket = !["ny", "taget", "ankommet"].includes(match.status);
+    await db.from("logbog").insert({ haendelse_id: match.id, handling: eftersynPåLukket
+      ? `eftersyn på den tidligere brand (fra ${b.app || kilde}) – lagt ind i den lukkede hændelse`
+      : `ekstra besked fra ${b.app || kilde}` });
     return { ...h, slaaet_sammen_med: match.id };
   }
   if (h.opfoelgning) return { ...h, ignoreret: true }; // fx "personen er fundet" uden efterlysning at høre til

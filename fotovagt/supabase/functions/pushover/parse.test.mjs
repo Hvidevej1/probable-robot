@@ -166,5 +166,20 @@ const bil = aktiv({ ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Å
 tjek('Nyhed om lejlighedsbrand lægges ikke ind i en bilbrand i nærheden', !findMatch(kattePos, [bil]));
 const fk = flet(åsum, kattePos, 'Pf-upload 3 backup ');
 tjek('Nyhedens vejnavn erstatter stationen som adresse', fk.adresse === 'Uglehøjen, Højby, Odense' && fk.lat === 55.35);
+// Eftersyn efter en brand (også når branden er lukket), inden for det seneste døgn
+const timerSiden = t => new Date(Date.now() - t * 3600e3).toISOString();
+const brandLukket = { ...parseBesked({ app: '1-1-2 Århus', title: '', message: 'Bygn.brand-Villa/Rækkehus OD-M1 + OD-V1 Byvej 63 8330 Beder' }), id: 'b1', status: 'afsluttet', oprettet: timerSiden(10), lat: 56.06, lon: 10.21 };
+const eftersynSamme = parseBesked({ app: '1-1-2 Århus', title: '', message: 'Eftersyn ISL SY Byvej 63 8330 Beder' });
+const eftersynAndet = parseBesked({ app: '1-1-2 Århus', title: '', message: 'Eftersyn ISL SY Skovvej 2 8330 Beder' });
+tjek('Eftersyn på samme adresse lægges ind i den lukkede brand fra i nat', findMatch(eftersynSamme, [brandLukket])?.id === 'b1');
+tjek('Eftersyn på en anden adresse lægges ikke ind', !findMatch(eftersynAndet, [brandLukket]));
+tjek('Eftersyn efter mere end et døgn lægges ikke ind', !findMatch(eftersynSamme, [{ ...brandLukket, oprettet: timerSiden(26) }]));
+const stEftersyn = parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Kolding', message: '🔥 Eftersyn\nBeredskab: TrekantBrand\nStation: Kolding' });
+const stBrand = { ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Kolding', message: '🔥 Bygn.brand-Villa/Rækkehus\nBeredskab: TrekantBrand\nStation: Kolding' }), id: 'b2', status: 'afsluttet', lat: 55.49, lon: 9.47 };
+tjek('Eftersyn med kun station: samme station inden for 6 timer lægges ind', findMatch({ ...stEftersyn, lat: 55.49, lon: 9.47 }, [{ ...stBrand, oprettet: timerSiden(2) }])?.id === 'b2');
+tjek('Eftersyn med kun station efter 10 timer lægges ikke ind', !findMatch({ ...stEftersyn, lat: 55.49, lon: 9.47 }, [{ ...stBrand, oprettet: timerSiden(10) }]));
+// Lærte vejnavne
+const lært = parseBesked({ app: 'Pf-upload', title: 'Brand i carport', message: 'Brand i carport ved Uglehøjen lørdag aften.', url: 'https://fyens.dk/112/x', kendteVeje: [{ navn: 'Uglehøjen', by: 'Højby' }] });
+tjek('Lært vejnavn ("ved Uglehøjen") giver adresse', lært.adresse === 'Uglehøjen, Højby' && lært.gade === 'uglehøjen');
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);
