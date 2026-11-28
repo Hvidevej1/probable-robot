@@ -372,11 +372,13 @@ export function efterBrand(ny, alle, nu = Date.now()) {
   return null;
 }
 // Brand i et køretøj (alarmkoder som BTBF/"Brand-Bil i det fri" og trafikmeldinger som "Bilbrand på E45")
-const BILBRAND = /bilbrand|brand[- ]bil\b|btbf|brand i (?:en )?(?:bil|personbil|lastbil|varevogn|bus|køretøj)|køretøjsbrand|(?:bil|lastbil|bus|varevogn) (?:i brand|brænder)/i;
+const BILBRAND = /bilbrand|brand[- ]bil\b|btbf|brand i (?:et |en )?(?:bil|personbil|lastbil|varevogn|bus|køretøj|vogntog|autocamper|campingvogn)|køretøjsbrand|(?:bil|personbil|lastbil|bus|varevogn|køretøj|vogntog|autocamper) (?:i brand|brænder|står i flammer|er brudt i brand)/i;
+// Meldingens egne linjer (ikke de tilføjede "— kl. …"-linjer fra andre kilder), højst de første 6
+const egneLinjer = h => renEmoji(String(h.tekst || '').split('\n').filter(l => !l.startsWith('— ')).slice(0, 6).join(' '));
 // Motorvej/rute i teksten (E45, E20, M50, rute 18, "Sønderjyske Motorvej" …) – til at se, om to meldinger er på samme vej
 const VEJKODE = /\b(E\d{2}|rute \d{1,3}|[a-zæøå]+(?:ske)? motorvej(?:en)?)\b/gi;
 const vejeI = t => new Set((String(t || '').match(VEJKODE) || []).map(v => v.toLowerCase().replace(/motorvejen$/, 'motorvej')));
-const vejAf = h => [...vejeI(`${h.titel} ${h.adresse} ${førsteLinje(h)}`)][0] || null;
+const vejAf = h => [...vejeI(`${h.titel} ${h.adresse} ${egneLinjer(h)}`)][0] || null;
 const sammeVej = (a, b) => { const x = vejeI(`${a.titel} ${a.adresse} ${a.tekst}`), y = vejeI(`${b.titel} ${b.adresse} ${b.tekst}`); return [...x].some(v => y.has(v)); };
 export function findMatch(ny, aktive, nu = Date.now()) {
   const n = nøgle(ny.titel), na = adrNøgle(ny.adresse);
@@ -407,8 +409,10 @@ export function findMatch(ny, aktive, nu = Date.now()) {
     // Bilbrand: alarmen "Brand-Bil i det fri" (kendt ved stationen), nabobrandvæsenets alarm om samme bil og
     //   trafikmeldingen "Bilbrand på E45 …" er samme hændelse, selvom kategorien (Brand/Trafik) og stationen er forskellige.
     //   Inden for 30 min og 30 km, og mindst én af dem kendes kun ved stationen / er en trafikmelding fra en vej.
-    if (BILBRAND.test(`${ny.titel} ${førsteLinje(ny)}`) && BILBRAND.test(`${h.titel} ${førsteLinje(h)}`) && alder < 30 * 60e3
-      && afstand != null && afstand < 30 && (h.cirka || ny.cirka) && (!vejAf(ny) || !vejAf(h) || sammeVej(ny, h))) return h;
+    //   (nyheder kommer ofte senere: op til 90 min; to præcise placeringer skal ligge inden for 3 km)
+    const nyhed = !!ny.url && !ny.station && !/112meldinger|google|goo\.gl/i.test(ny.url);
+    if (BILBRAND.test(`${ny.titel} ${egneLinjer(ny)}`) && BILBRAND.test(`${h.titel} ${egneLinjer(h)}`) && alder < (nyhed ? 90 : 30) * 60e3
+      && afstand != null && afstand < ((h.cirka || ny.cirka) ? 30 : 3) && (!vejAf(ny) || !vejAf(h) || sammeVej(ny, h))) return h;
     // Nyhed om en alarm: medierne skriver typisk 20–90 min efter alarmen og nævner kun vej/by. Samme kategori,
     // samme slags sted (lejlighed, villa, bil …) og højst 15 km fra alarmens station (alarmen kendes kun ved stationen).
     if (ny.url && !ny.station && h.cirka && stationAf(h) && ny.kategori === h.kategori && afstand != null && afstand < 15 && sammeObjekt(ny, h)) return h;
@@ -417,8 +421,10 @@ export function findMatch(ny, aktive, nu = Date.now()) {
       const ns = String(ny.station || '').trim().toLowerCase(), nb = beredskabAf(ny);
       if ((ns && ns === stationAf(h)) || (nb && nb === beredskabAf(h) && afstand != null && afstand < 20)) return h;
     }
-    if (alder > 45 * 60e3) continue;
+    // Samme præcise adresse (vej + husnummer) inden for 3 timer, mens den første stadig er aktiv: fx ABA kl. 6.26 og
+    //   assistance til samme adresse kl. 7.11, eller samme bygningsbrand meldt igen 45 min senere
     if (na && na === adrNøgle(h.adresse)) return h;
+    if (alder > 45 * 60e3) continue;
     const a = nøgle(h.titel), kort = Math.min(a.length, n.length), fælles = fællesStart(a, n);
     // (næsten ens kun for koder med tal, fx forvanskede "Assistance VB V-1 /-`Q" – ikke for "Færdselsuheld …")
     const sammeTitel = (kort >= 6 && fælles === kort) || (fælles >= 10 && fælles >= 0.8 * kort && /\d/.test(a.slice(0, fælles)));

@@ -116,7 +116,8 @@ tjek('Samme Breaking-tekst tilføjes ikke to gange', (() => { const f = flet(akt
 tjek('"Færdselsuheld på Randersvej" og "Færdselsuheld E45" ved Vejle holdes adskilt', !findMatch(P.politiRandersvej, [aktiv({ titel: 'Færdselsuheld E45', tekst: 'Trafikuheld E45 ved Vejle', adresse: 'E45 ved Vejle', kategori: 'Trafik', lat: 55.72, lon: 9.5 })]));
 tjek('Politiets "færdige på uheldsstedet" markeres med ✅ (opgaven lukkes ikke)', (() => { const f = flet(aktiv(P.politiRandersvej), P.politiDød, 'PF-Upload'); return /✅/.test(f.tekst) && !f.status; })());
 tjek('Breaking-overskriften gentages ikke i opdateringen', (() => { const f = flet(aktiv(P.politiRandersvej), P.breakingTv2, 'PF-Upload'); return (f.tekst.match(/alt er spærret/g) || []).length === 1; })());
-tjek('Gammel hændelse (over 45 min) bruges ikke', !findMatch(P.abaMast, [aktiv(P.aba112, 60)]));
+tjek('Samme ABA på samme adresse 60 min senere lægges ind (forsinket kilde)', findMatch(P.abaMast, [aktiv(P.aba112, 60)]));
+tjek('Gammel hændelse (over 3 timer) bruges ikke', !findMatch(P.abaMast, [aktiv(P.aba112, 200)]));
 const redn = parseBesked({ title: '🔥 Redn.-Silo/Brønd', message: '🔥 Redn.-Silo/Brønd\nBeredskab: Midtjysk Brand & Redning\nStation: Ørum\n24-11-2026 19:41', app: 'Mast' });
 tjek('"Redn.-Silo/Brønd" bliver Redning (ikke Brand)', redn.kategori === 'Redning');
 const bygn = parseBesked({ title: '🔥 Bygn.brand-Villa', message: '🔥 Bygn.brand-Villa\nBeredskab: Midtjysk Brand & Redning\nStation: Ørum', app: 'Mast' });
@@ -199,5 +200,15 @@ tjek('Vejle-alarm om bilbrand lægges ind i Koldings (26 km, 13 min)', findMatch
 tjek('Trafikmelding "Bilbrand på E45" lægges ind i alarmen', findMatch({ ...bbTrafik, lat: 55.5648, lon: 9.5571, cirka: false }, [aktiv(bbKolding, 13)])?.id === 'k');
 tjek('Bilbrand på E20 lægges ikke ind i bilbrand på E45', !findMatch({ ...bbTrafik, titel: 'Bilbrand på E20 Fynske Motorvej', tekst: 'Bilbrand på E20 Fynske Motorvej', lat: 55.5, lon: 9.6, cirka: false }, [aktiv(bbKolding, 10)]));
 tjek('Bilbrand en time senere er en ny hændelse', !findMatch({ ...bbVejle, lat: 55.7079, lon: 9.5329, cirka: true }, [aktiv(bbKolding, 60)]));
+// Samme bilbrand, 2. runde: "Uheld … Køretøj i brand" (PF-Upload) og TV Syds "Køretøj brænder på motorvejen"
+const bbUheld = parseBesked({ title: 'Trafikmelding', message: '🚙 Uheld\nE45 fra Skærup mod Kolding mellem Skærup og Kolding\nUheld, Køretøj i brand\nSønderjyske Motorvej, 6052 Herslev, Kolding Kommune\n28-11-2026 15:41:00\nSe placeringen her:\nhttps://112meldinger.dk/map.php?uid=m3TPaGr', app: 'Pf-upload 3 backup' });
+const bbTvSyd = parseBesked({ title: 'tvsyd.dk', message: 'Pas på: Køretøj brænder på motorvejen\nOpdateres... Der er udbrudt brand i et køretøj på Motorvej E45 mellem Skærup og Kolding i sydgående retning før sammenfletningen med E20. Redningsmandskab er på vej.', url: 'https://www.tvsyd.dk/kolding/pas-pa-koretoj-braender-pa-motorvejen-ce14c', app: 'Nyheder' });
+tjek('"Uheld – Køretøj i brand" lægges ind i bilbranden (cirka-alarm, 5 min)', findMatch({ ...bbUheld, lat: 55.5527, lon: 9.5428, cirka: false }, [aktiv(bbKolding, 5)])?.id === 'k');
+tjek('"Uheld – Køretøj i brand" lægges ind, når alarmen er præciseret (1,5 km)', findMatch({ ...bbUheld, lat: 55.5527, lon: 9.5428, cirka: false }, [aktiv({ ...bbKolding, cirka: false, lat: 55.5648, lon: 9.5571 }, 5)])?.id === 'k');
+tjek('TV Syd "Køretøj brænder på motorvejen" lægges ind (Skærup, 13 km, 17 min)', findMatch({ ...bbTvSyd, lat: 55.6825, lon: 9.5627, cirka: true }, [aktiv({ ...bbKolding, cirka: false, lat: 55.5648, lon: 9.5571 }, 17)])?.id === 'k');
+tjek('Nyhed om bilbrand 70 min senere lægges stadig ind', findMatch({ ...bbTvSyd, lat: 55.6825, lon: 9.5627, cirka: true }, [aktiv(bbKolding, 70)])?.id === 'k');
+tjek('To præcise bilbrande 8 km fra hinanden holdes adskilt', !findMatch({ ...bbUheld, lat: 55.62, lon: 9.62, cirka: false }, [aktiv({ ...bbKolding, cirka: false, lat: 55.5648, lon: 9.5571 }, 5)]));
+tjek('Assistance til samme adresse 45 min efter ABA lægges ind', findMatch(P.aba112b, [aktiv(P.ass112, 46)]));
+tjek('Samme adresse 4 timer senere er en ny hændelse', !findMatch(P.aba112b, [aktiv(P.ass112, 240)]));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);
