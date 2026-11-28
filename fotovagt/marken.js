@@ -6,7 +6,7 @@ import {
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
   PRIO, prioAf, efterPrio, indsigt, indsigtHtml,
-  stationsKontrol,
+  stationsKontrol, avatar, fotoFelt,
 } from './faelles.js';
 
 const pref = {
@@ -106,7 +106,7 @@ function kollegaListe() {
     const st = STATUS[p.status] || STATUS.offline, d = km(minPos || mig, p);
     const opg = store.state.haendelser.find(h => h.id === p.haendelse_id);
     return `<div class="kollega${p.status === 'offline' ? ' offline' : ''}">
-      <i class="dot" style="--c:${st.farve}"></i>
+      ${avatar(p, 38)}
       <div class="kollega-info"><b>${esc(p.navn)}</b>
         <span class="lille">${st.tekst}${d != null && p.status !== 'offline' ? ` · ${kmTekst(d)}` : ''}${set(p) || p.status === 'offline' ? '' : ' · ikke set for nylig'}${opg ? ` · ${esc(opg.titel)}` : ''}</span></div>
       ${p.lat != null && p.status !== 'offline' ? `<button class="ikon-knap" data-vis-kollega="${p.id}" aria-label="Vis ${esc(p.navn)} på kortet">📍</button>` : ''}
@@ -440,6 +440,7 @@ async function start() {
   $('#btn-mig').onclick = () => {
     const f = $('#form-profil');
     f.navn.value = mig.navn || ''; f.telefon.value = mig.telefon || '';
+    fotoFelt($('#mit-foto'), store.state.profiler.find(p => p.id === mig.id) || mig);
     const sel = $('#sel-omraade'), mitOmr = store.state.profiler.find(p => p.id === mig.id)?.omraade_id ?? mig.omraade_id;
     sel.innerHTML = '<option value="">– Intet område –</option>' + (store.state.omraader || [])
       .map(o => `<option value="${o.id}"${o.id === mitOmr ? ' selected' : ''}>${esc(o.navn)}</option>`).join('');

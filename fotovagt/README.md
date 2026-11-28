@@ -300,3 +300,10 @@ alarm på kontoret. Den **udvikler sig** og følger det normale forløb (priorit
 * der sker et **uheld/en ulykke inden for 1 km** (inden for 6 timer), eller
 * kontoret selv hæver prioriteten.
 Logbogen skriver hvorfor. SQL: `supabase/tabt-gods.sql`.
+
+## Profilbilleder
+Under **Min profil** i Marken kan fotografen tage/vælge et lille billede (📷 Vælg billede). Kontoret kan gøre det samme
+for en fotograf (✎ på fotografen). Billedet skæres til et kvadrat og gøres lille (160×160, ca. 10 KB) på telefonen, før det
+gemmes. Det vises i kontorets fotografliste, i tildelingslisten, i kollegalisten i Marken og som nål på kortet (ellers
+initialer). Kun brugere, der er logget ind, kan se billederne; kun personen selv og kontoret kan skifte/fjerne dem.
+SQL: `supabase/profilfoto.sql`.

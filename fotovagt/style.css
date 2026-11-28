@@ -731,3 +731,16 @@ dialog.ark.bred .ark-indhold { max-width: 760px; }
 .sv-faner button { min-height: 34px; padding: 6px 12px; font-size: .88rem; background: var(--flade2); color: var(--dæmpet); box-shadow: none; }
 .sv-faner button[aria-selected="true"] { background: var(--tekst, #111); color: var(--flade, #fff); }
 .app-version { align-self: center; font-size: .75rem; color: var(--dæmpet); white-space: nowrap; padding: 0 4px; }
+
+/* Profilbilleder */
+.avatar { --s: 36px; --c: var(--offline); width: var(--s); height: var(--s); min-width: var(--s); border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px var(--c); flex: none; display: inline-grid; place-items: center; }
+.avatar-tom { background: color-mix(in srgb, var(--c) 18%, var(--flade2)); color: var(--tekst, inherit); font-weight: 700; font-size: calc(var(--s) * .36); }
+.foto-række .avatar { margin: 2px 4px 0 2px; }
+.kollega .avatar { margin: 0 4px 0 2px; }
+.foto-pin.har-foto { padding: 0; overflow: hidden; }
+.foto-pin.har-foto img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.foto-felt { display: flex; align-items: center; gap: 14px; margin: 4px 0 12px; }
+.foto-felt .avatar { margin: 3px; }
+.foto-felt-knapper { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.foto-felt-knapper .hint { flex-basis: 100%; margin: 0; }
+.foto-pin.har-foto { box-shadow: 0 0 0 3px var(--c), 0 2px 8px rgba(0, 0, 0, .35); }

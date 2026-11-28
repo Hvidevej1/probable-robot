@@ -6,7 +6,7 @@ import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './s
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey) && !/[?&]demo\b/.test(location.search);
 const lyttere = new Set();
-const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], omraader: [], indst: {}, mig: null };
+const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], omraader: [], fotos: {}, indst: {}, mig: null };
 const fejlTekst = e => (e && (e.message || e.error_description)) || String(e);
 const ændret = () => lyttere.forEach(f => f(state));
 const kodeFejl = m => /different from the old/i.test(m) ? 'Den nye adgangskode skal være forskellig fra den gamle.'
@@ -53,7 +53,14 @@ function supabaseBackend() {
     state.tilbud = t.data || []; state.indst = ind.data || {}; state.kommentarer = k.data || [];
     state.mig = state.profiler.find(x => x.id === state.mig?.id) || state.mig;
     await hentOmraader(false);
+    await hentFotos(false);
     ændret();
+  }
+  // Profilbilleder (profilfoto.sql) – findes tabellen ikke endnu, er der bare ingen billeder
+  async function hentFotos(vis = true) {
+    const { data, error } = await sb.from('profilfoto').select('id,foto');
+    state.fotos = error ? {} : Object.fromEntries(data.map(x => [x.id, x.foto]));
+    if (vis) ændret();
   }
   // Områder findes først, når omraader.sql er kørt – uden den er listen bare tom
   async function hentOmraader(vis = true) {
@@ -88,6 +95,10 @@ function supabaseBackend() {
         ændret(); state.nytTilbud = null;
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'omraader' }, () => hentOmraader())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profilfoto' }, e => {
+        if (e.eventType === 'DELETE') delete state.fotos[e.old.id]; else state.fotos[e.new.id] = e.new.foto;
+        ændret();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'indstillinger' }, e => {
         if (e.new) state.indst = { ...state.indst, ...e.new }; ændret();
       })
@@ -156,6 +167,16 @@ function supabaseBackend() {
       return data;
     },
     get førsteLogin() { return førsteLogin; },
+    async gemFoto(id, foto) {
+      const { error } = await sb.from('profilfoto').upsert({ id, foto, opdateret: new Date().toISOString() });
+      if (error) throw new Error(/row-level|policy/i.test(error.message) ? 'Du kan kun skifte dit eget billede.' : error.message);
+      state.fotos[id] = foto; ændret();
+    },
+    async sletFoto(id) {
+      const { error } = await sb.from('profilfoto').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      delete state.fotos[id]; ændret();
+    },
     // Stedviden: det Fotovagt har lært om adresser, vejnavne og stationer
     async hentStedviden() {
       const ud = [];
@@ -366,6 +387,7 @@ function demoBackend() {
     state.tilbud = [...db.tilbud]; state.indst = db.indst;
     if (!db.omraader || db.omraader.some(o => o.navn === 'Østjylland')) db.omraader = DEMO_OMR();
     state.omraader = [...db.omraader].sort((a, b) => a.navn.localeCompare(b.navn));
+    state.fotos = { ...(db.fotos || {}) };
     state.nytTilbud = state.tilbud.find(x => !førTilbud.has(x.id) && x.fotograf === state.mig?.id && !x.svar) || null;
     db.sos ||= [];
     const førSos = new Set(state.sos.map(x => x.id));
@@ -580,6 +602,8 @@ function demoBackend() {
       return { ok: true, mail: false, link: 'https://vagt.hrc-fotos.dk/#demo-invitation', fejl: 'I demoen sendes der ikke mails.' };
     }),
     førsteLogin: false,
+    gemFoto: kør((id, foto) => { if (id !== mig().id) kontor(); db.fotos ||= {}; db.fotos[id] = foto; }),
+    sletFoto: kør(id => { if (id !== mig().id) kontor(); if (db.fotos) delete db.fotos[id]; }),
     async hentStedviden() {
       læs(); db.stedviden ||= [
         { noegle: 'vej:uglehøjenhøjby', type: 'vej', navn: 'Uglehøjen', by: 'Højby', lat: 55.335, lon: 10.444, kilde: 'nyhed', antal: 1, opdateret: nu() },

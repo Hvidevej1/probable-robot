@@ -235,11 +235,20 @@ export function haendelsesIkon(h, valgt = false) {
     iconSize: [36, 36], iconAnchor: [18, 34], popupAnchor: [0, -30],
   });
 }
+// Profilbilleder (tabellen profilfoto): lille rundt billede – ellers initialer
+export const fotoAf = id => store.state.fotos?.[id] || null;
+const initialerAf = p => (p?.navn || '?').split(/\s+/).map(s => s[0]).join('').slice(0, 2).toUpperCase();
+export function avatar(p, str = 36) {
+  const f = fotoAf(p?.id), c = STATUS[p?.status]?.farve || 'var(--offline)';
+  return f
+    ? `<img class="avatar" src="${f}" alt="" style="--s:${str}px;--c:${c}" loading="lazy">`
+    : `<span class="avatar avatar-tom" style="--s:${str}px;--c:${c}">${esc(initialerAf(p))}</span>`;
+}
 export function fotografIkon(p, migSelv = false) {
-  const initialer = (p.navn || '?').split(/\s+/).map(s => s[0]).join('').slice(0, 2).toUpperCase();
+  const f = fotoAf(p.id);
   return L.divIcon({
     className: '',
-    html: `<div class="foto-pin${migSelv ? ' mig' : ''}${set(p) ? '' : ' gammel'}" style="--c:${STATUS[p.status]?.farve}">${esc(initialer)}</div>`,
+    html: `<div class="foto-pin${migSelv ? ' mig' : ''}${set(p) ? '' : ' gammel'}${f ? ' har-foto' : ''}" style="--c:${STATUS[p.status]?.farve}">${f ? `<img src="${f}" alt="">` : esc(initialerAf(p))}</div>`,
     iconSize: [30, 30], iconAnchor: [15, 15],
   });
 }
@@ -893,4 +902,49 @@ export function regionFraPostnr(tekst) {
   if (pn === 9632) return 'Midtjylland';
   if (pn >= 9000 && pn <= 9999) return 'Nordjylland';
   return null;
+}
+
+// ---------------------------------------------------------------------------------
+// Vælg et billede (kamera eller fotos), skær det til et kvadrat og gør det lille (160x160 JPEG, ca. 10 KB)
+export function vælgFoto() {
+  return new Promise((resolve, reject) => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = async () => {
+      const fil = inp.files?.[0]; if (!fil) return resolve(null);
+      try {
+        const url = URL.createObjectURL(fil);
+        const img = await new Promise((ok, fejl) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => fejl(new Error('Billedet kunne ikke læses.')); i.src = url; });
+        const side = Math.min(img.naturalWidth, img.naturalHeight), str = 160;
+        const c = document.createElement('canvas'); c.width = c.height = str;
+        c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, str, str);
+        URL.revokeObjectURL(url);
+        let q = 0.82, data = c.toDataURL('image/jpeg', q);
+        while (data.length > 140000 && q > 0.4) { q -= 0.1; data = c.toDataURL('image/jpeg', q); }
+        resolve(data);
+      } catch (e) { reject(e); }
+    };
+    inp.click();
+  });
+}
+// Felt med billede + "Vælg billede"/"Fjern" (bruges i Min profil og i kontorets fotograf-dialog)
+export function fotoFelt(el, p) {
+  const tegn = () => {
+    el.innerHTML = `${avatar(p, 64)}<div class="foto-felt-knapper">
+      <button type="button" class="secondary lille-knap" data-foto-vælg>📷 ${fotoAf(p.id) ? 'Skift billede' : 'Vælg billede'}</button>
+      ${fotoAf(p.id) ? '<button type="button" class="link fare" data-foto-fjern>Fjern</button>' : ''}
+      <small class="hint">Lille billede, som kontoret og kollegerne kan se.</small></div>`;
+  };
+  el.onclick = async e => {
+    if (e.target.closest('[data-foto-vælg]')) {
+      try {
+        const data = await vælgFoto(); if (!data) return;
+        if (await prøv(() => store.gemFoto(p.id, data), 'Billedet er gemt.')) tegn();
+      } catch (err) { toast(err.message || String(err), 'fejl'); }
+    }
+    if (e.target.closest('[data-foto-fjern]') && confirm('Fjern billedet?')) {
+      if (await prøv(() => store.sletFoto(p.id), 'Billedet er fjernet.')) tegn();
+    }
+  };
+  tegn();
 }

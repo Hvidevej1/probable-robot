@@ -8,7 +8,7 @@ import {
   pushKanBruges, abonnérPush, afmeldPush, aktiveSos, sosBoks, sosIkon, alarm, nedtælling,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
   PRIO, prioAf, efterPrio, iNærheden, indsigt, indsigtHtml,
-  stationsKontrol, regionFraPostnr,
+  stationsKontrol, regionFraPostnr, avatar, fotoFelt,
 } from './faelles.js';
 
 let sLag;
@@ -72,7 +72,7 @@ function tegnFotografer() {
     const gammel = p.status !== 'offline' && !set(p);
     return `
       <div class="foto-række${p.status === 'offline' ? ' offline' : ''}" data-foto="${p.id}">
-        <i class="dot" style="--c:${st.farve}"></i>
+        ${avatar(p, 40)}
         <div class="foto-info">
           <b>${esc(p.navn)}</b>${aktiveSos().some(x => x.bruger === p.id) ? ' <span class="sos-maerke">SOS</span>' : ''}
           <span class="lille"><span class="status-tekst" style="--c:${st.farve}">${st.tekst}</span> · ${siden(p.status_tid)}${gammel ? ` · <span class="advarsel">ikke set i ${siden(p.sidst_set) || 'lang tid'}</span>` : ''}</span>
@@ -392,7 +392,7 @@ function åbnTildel(id) {
       ${fotos.map(({ p, d }) => {
         const opt = p.haendelse_id && p.haendelse_id !== id;
         return `<button class="tildel-række secondary" data-vælg="${p.id}" ${opt ? 'disabled' : ''}>
-          <i class="dot" style="--c:${STATUS[p.status]?.farve}"></i>
+          ${avatar(p, 34)}
           <span><b>${esc(p.navn)}</b> <small>${STATUS[p.status]?.tekst}${opt ? ' · har en opgave' : ''}${p.id === h.taget_af ? ' · har denne' : ''}</small></span>
           <span class="afstand">${kmTekst(d)}</span></button>`;
       }).join('')}
@@ -485,6 +485,7 @@ function områdeValg(valgt) {
 function åbnFoto(id) {
   const p = P(id), f = $('#form-foto'), dlg = $('#dlg-foto');
   f.navn.value = p.navn; f.telefon.value = p.telefon || ''; f.status.value = p.status; f.rolle.value = p.rolle;
+  fotoFelt($('#foto-foto'), p);
   f.omraade_id.innerHTML = områdeValg(p.omraade_id);
   f.base_adresse.value = p.base_adresse || ''; f.base_lat.value = p.base_lat ?? ''; f.base_lon.value = p.base_lon ?? '';
   const hint = () => { $('#base-hint').textContent = f.base_lat.value

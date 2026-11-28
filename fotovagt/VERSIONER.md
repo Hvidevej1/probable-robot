@@ -10,6 +10,7 @@ Versionsnummeret står i `version.json` og vises i appen (login, Min profil og K
 
 | Version | Indhold |
 |---|---|
+| 11.04 | Profilbilleder: fotografen (eller kontoret) vælger et lille billede, som vises i fotograflisten, kollegalisten, tildeling og på kortet |
 | 11.03 | Rettet: assistentens infoboks hang på "Tænker …" (to hjælpefunktioner var faldet ud). Viser nu forventede ressourcer – også uden historik |
 | 11.02 | Tabt gods: lav prioritet og ingen tilbud/blink, indtil den udvikler sig |
 | 11.01 | ISL-forespørgsel: lav, hæves til normal ved assistance; assistance lægges ind i forespørgslen |

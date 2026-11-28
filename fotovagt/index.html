@@ -15,11 +15,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=22">
+  <link rel="stylesheet" href="style.css?v=23">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script type="module" src="marken.js?v=28"></script>
+  <script type="module" src="marken.js?v=29"></script>
 </head>
 <body class="marken">
   <section id="login" class="login" hidden>
@@ -89,6 +89,7 @@
   <dialog id="dlg-profil" class="ark">
     <form method="dialog" class="ark-indhold" id="form-profil">
       <h2>Min profil</h2>
+      <div class="foto-felt" id="mit-foto"></div>
       <label>Navn <input name="navn" required></label>
       <label>Telefon <input name="telefon" type="tel" autocomplete="tel"></label>
       <label>Mit område (region) <select name="omraade" id="sel-omraade"></select></label>
