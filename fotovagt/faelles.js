@@ -959,6 +959,7 @@ export function varslerFor(h) {
   const re = region && VARSEL_OMR[region];
   return alle.filter(v => re ? re.test(v.omraade || '') : /danmark|hele landet/i.test(v.omraade || ''));
 }
+const trafikEllerVej = t => /trafik|uheld|færdsel|motorvej|\be\d{2}\b|rute \d|kørsel|bil/.test(t);
 export function risiko(h) {
   const t = `${h?.titel || ''} ${h?.kategori || ''} ${String(h?.tekst || '').split('\n').slice(0, 6).join(' ')}`.toLowerCase();
   const v = h?.vejr || null;
@@ -1043,6 +1044,24 @@ export function risiko(h) {
   if (farlig) udvikling.push(`Farlige stoffer: afspærringen kan udvides${vindTil ? ` mod ${vindTil}, som vinden driver` : ' med vinden'}, og evakuering er mulig. Kemikaliedykkere og miljøenheder kan blive tilkaldt.`);
   if (/eksplosion/.test(t)) udvikling.push('Efter en eksplosion er der risiko for ny eksplosion eller sammenstyrtning – afspærringen kan være stor.');
   if (/storm|oversvøm|skybrud/.test(t)) udvikling.push('Storm eller skybrud giver ofte mange samtidige hændelser i området – flere opgaver kan komme til.');
+  // Vejret de næste 6 timer (DMI's prognosemodel HARMONIE)
+  const u = v?.udsigt;
+  if (u) {
+    const nuStød = +(v.stoed ?? v.vind) || 0, maks = +u.stoed_max_6t || 0, kl = u.stoed_tid ? klokken(u.stoed_tid) : null;
+    if ((brand || natur) && maks >= 12 && maks >= nuStød + 3) {
+      udvikling.push(`DMI forventer, at vinden tager til: stød op til ${komma(maks)} m/s${kl ? ` omkring kl. ${kl}` : ''}. Branden kan blusse op eller sprede sig, og røgen kan skifte retning.`);
+      point += maks >= 13.9 ? 1 : 0;
+    } else if (maks >= 20.8) {
+      udvikling.push(`DMI forventer kuling med stød op til ${komma(maks)} m/s${kl ? ` omkring kl. ${kl}` : ''} – flere vejrrelaterede hændelser kan komme til.`);
+      point += 1;
+    }
+    if (u.temp_min_6t != null && +u.temp_min_6t <= 0 && (+u.nedboer_6t > 0.2 || +(v.nedboer || 0) > 0)) {
+      udvikling.push(`Frost (ned til ${komma(u.temp_min_6t)} °C) og nedbør de næste timer: risiko for isslag og glatte veje – flere trafikuheld kan komme til.`);
+      if (trafikEllerVej(t)) point += 1;
+    } else if (u.temp_min_6t != null && +u.temp_min_6t <= -1 && motorvej) {
+      udvikling.push(`Frost ned til ${komma(u.temp_min_6t)} °C i løbet af natten – mulig rimfrost på vejene.`);
+    }
+  }
   const niveau = point >= 4 ? 'høj' : point >= 2 ? 'forhøjet' : 'normal';
   return { niveau, point, grunde, råd, udvikling, varsler };
 }
@@ -1061,6 +1080,7 @@ export function sikkerhedHtml(h) {
   return `<div class="sikkerhed-boks r-${r.niveau === 'høj' ? 'hoej' : r.niveau === 'forhøjet' ? 'forhoejet' : 'normal'}">
     <p class="sikkerhed-top"><b>${r.niveau === 'normal' ? '🛡️' : '⚠️'} ${RISIKO_NAVN[r.niveau]}</b>${r.grunde.length ? ` <small>– ${esc(r.grunde.join(', '))}</small>` : ''}</p>
     ${v ? `<p>${vejrIkonFor(v.symbol)} <b>Vejret på stedet:</b> ${esc(vejrTekst(v))}<br><small>${esc(vejrKilder(v))}</small></p>` : '<p class="lille">Vejret er ikke hentet endnu (det hentes automatisk et minut efter, at hændelsen har fået en placering).</p>'}
+    ${v?.udsigt ? `<p class="lille">📡 <b>Næste 6 timer (DMI):</b> vindstød op til ${komma(v.udsigt.stoed_max_6t)} m/s${v.udsigt.stoed_tid ? ` (kl. ${klokken(v.udsigt.stoed_tid)})` : ''}${v.udsigt.temp_min_6t != null ? ` · laveste ${komma(v.udsigt.temp_min_6t)} °C` : ''}${+v.udsigt.nedboer_6t > 0 ? ` · nedbør ${komma(v.udsigt.nedboer_6t)} mm` : ' · tørt'}</p>` : ''}
     ${r.varsler.map(vs => `<p class="vejr-fare">⚠️ DMI-varsel: ${esc(vs.beskrivelse || vs.haendelse || '')}${vs.til ? ` (til ${klokken(vs.til)})` : ''}</p>`).join('')}
     ${r.udvikling.length ? `<p class="udvikling-top"><b>📈 Kan udvikle sig</b></p><ul class="udvikling">${r.udvikling.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${r.råd.length ? `<p class="udvikling-top"><b>🦺 Sikkerhed for fotografen</b></p><ul>${r.råd.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
