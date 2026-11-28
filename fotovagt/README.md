@@ -292,3 +292,11 @@ beredskab højst 20 km væk, inden for 2 timer), lægges den ind i forespørgsle
 **normal** (logbog: "assistance kaldt efter ISL-forespørgsel – prioritet hævet fra lav til normal"). Derefter gælder de
 øvrige regler: fx forslag om stor hændelse ved mere end 3 assistancer eller 4 enheder, opgradering ved bygningsbrand,
 og kontorets egne valg. Assistenten foreslår det samme. SQL: `supabase/isl-forespoergsel.sql`.
+
+## Tabt gods
+**Tabt gods** starter som **lav prioritet** og "hviler": ingen automatiske tilbud – og derfor heller intet blink og ingen
+alarm på kontoret. Den **udvikler sig** og følger det normale forløb (prioritet normal, tilbud, blink hvis ingen tager den), når
+* der kaldes **assistance**, eller en mere alvorlig melding lægges ind i den (fx et uheld samme sted), eller
+* der sker et **uheld/en ulykke inden for 1 km** (inden for 6 timer), eller
+* kontoret selv hæver prioriteten.
+Logbogen skriver hvorfor. SQL: `supabase/tabt-gods.sql`.
