@@ -712,3 +712,21 @@ body.marken #app { overflow: hidden; }
 .tlf-række { padding: 8px 10px; background: var(--flade2); border-radius: var(--radius-s); font-size: .9rem; }
 .tlf-række small { color: var(--dæmpet); }
 .leaflet-popup-content a.st-nav { color: #fff; background: var(--tekst, #111); border-radius: 10px; }
+
+/* Stedviden */
+dialog.ark.bred .ark-indhold { max-width: 760px; }
+.sv-tal { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 6px 0 10px; font-size: .9rem; color: var(--dæmpet); }
+.sv-tal b { color: var(--tekst, inherit); font-size: 1.05rem; }
+.sv-filtre { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.sv-filtre input { flex: 1 1 200px; margin: 0; }
+.sv-liste { display: grid; gap: 6px; max-height: 60vh; overflow: auto; }
+.sv-række { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 8px 10px; background: var(--flade2); border-radius: var(--radius-s); }
+.sv-type { font-size: 1.2rem; }
+.sv-navn small { color: var(--dæmpet); }
+.sv-kilde { font-weight: 600; }
+.sv-kilde.k-kontor { color: #16a34a; }
+.sv-kilde.k-nyhed { color: #d97706; }
+.sv-kilde.k-osm { color: #2563eb; }
+.sv-faner { display: flex; flex-wrap: wrap; gap: 4px; }
+.sv-faner button { min-height: 34px; padding: 6px 12px; font-size: .88rem; background: var(--flade2); color: var(--dæmpet); box-shadow: none; }
+.sv-faner button[aria-selected="true"] { background: var(--tekst, #111); color: var(--flade, #fff); }

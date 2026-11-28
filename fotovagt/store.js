@@ -156,6 +156,19 @@ function supabaseBackend() {
       return data;
     },
     get førsteLogin() { return førsteLogin; },
+    // Stedviden: det Fotovagt har lært om adresser, vejnavne og stationer
+    async hentStedviden() {
+      const ud = [];
+      for (let fra = 0; ; fra += 1000) {
+        const { data, error } = await sb.from('stedviden').select('noegle,type,navn,by,lat,lon,kilde,antal,opdateret').order('opdateret', { ascending: false }).range(fra, fra + 999);
+        if (error) throw new Error(error.message);
+        ud.push(...data); if (data.length < 1000) return ud;
+      }
+    },
+    async glemSted(noegle) {
+      const { error } = await sb.rpc('glem_sted', { k: noegle });
+      if (error) throw new Error(error.message);
+    },
     // Brand-, politi- og ambulancestationer fra OpenStreetMap (tabellen stationer)
     async hentStationer() {
       const ud = [];
@@ -567,6 +580,15 @@ function demoBackend() {
       return { ok: true, mail: false, link: 'https://vagt.hrc-fotos.dk/#demo-invitation', fejl: 'I demoen sendes der ikke mails.' };
     }),
     førsteLogin: false,
+    async hentStedviden() {
+      læs(); db.stedviden ||= [
+        { noegle: 'vej:uglehøjenhøjby', type: 'vej', navn: 'Uglehøjen', by: 'Højby', lat: 55.335, lon: 10.444, kilde: 'nyhed', antal: 1, opdateret: nu() },
+        { noegle: 'station:åsumodense', type: 'station', navn: 'Åsum - Odense', by: null, lat: 55.400, lon: 10.464, kilde: 'osm', antal: 3, opdateret: nu() },
+        { noegle: 'adresse:nymunkegade1148000aarhusc', type: 'adresse', navn: 'Ny Munkegade 114, 8000 Aarhus C', by: null, lat: 56.163, lon: 10.205, kilde: 'kontor', antal: 2, opdateret: nu() },
+      ];
+      return [...db.stedviden];
+    },
+    glemSted: kør(k => { kontor(); db.stedviden = (db.stedviden || []).filter(x => x.noegle !== k); }),
     // Demo: et par stationer, så filteret kan prøves
     async hentStationer() {
       return [

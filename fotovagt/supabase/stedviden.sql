@@ -113,3 +113,13 @@ do $$ declare h record; st text; nst record; del text[]; vej text; byen text; be
     end if;
   end loop;
 end $$;
+
+-- Kontoret kan glemme noget, der er lært forkert (Kontor → 🧠 Stedviden → Glem)
+create or replace function glem_sted(k text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not er_kontor() then raise exception 'Kun kontoret'; end if;
+  delete from stedviden where noegle = k;
+end $$;
+revoke execute on function glem_sted(text) from public, anon;
+grant execute on function glem_sted(text) to authenticated;

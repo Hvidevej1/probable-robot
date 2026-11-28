@@ -318,6 +318,66 @@ async function åbnInvitationer() {
 }
 
 // ---------------------------------------------------------------------------------
+// Stedviden: hvad Fotovagt har lært (adresser, vejnavne, stationer). Kontoret kan søge, se på kortet og glemme forkerte.
+const KILDE = { kontor: ['✋ Kontoret', 'k-kontor'], geokod: ['🔎 Opslag', 'k-geokod'], nyhed: ['📰 Nyhed', 'k-nyhed'], osm: ['🗺 Kortdata', 'k-osm'] };
+const SV_TYPE = { adresse: '📍 Adresser', vej: '🛣 Vejnavne', station: '🚒 Stationer' };
+let svData = [], svType = 'alle', svSøg = '';
+async function åbnStedviden() {
+  let dlg = $('#dlg-stedviden');
+  if (!dlg) {
+    dlg = document.createElement('dialog'); dlg.id = 'dlg-stedviden'; dlg.className = 'ark bred';
+    dlg.innerHTML = `
+      <div class="ark-indhold">
+        <div class="ark-top"><h2>🧠 Stedviden</h2><button class="luk" data-luk-sv aria-label="Luk">✕</button></div>
+        <p class="hint">Det Fotovagt har lært om steder. Nye beskeder slås først op her og først derefter hos OpenStreetMap.
+          <b>Kontorets rettelser vinder altid:</b> flyt nålen eller ret adressen under "Ret" på en hændelse, så huskes det.
+          Er noget lært forkert, så tryk <b>Glem</b>.</p>
+        <div class="sv-tal" id="sv-tal"></div>
+        <div class="sv-filtre">
+          <div class="sv-faner" role="tablist" id="sv-faner">
+            <button data-svt="alle" aria-selected="true">Alle</button>${Object.entries(SV_TYPE).map(([t, n]) => `<button data-svt="${t}" aria-selected="false">${n}</button>`).join('')}
+          </div>
+          <input type="search" id="sv-søg" placeholder="Søg (fx Uglehøjen, Odense)" autocomplete="off">
+        </div>
+        <div id="sv-liste" class="sv-liste"><p class="hint">Henter …</p></div>
+      </div>`;
+    document.body.append(dlg);
+    dlg.addEventListener('click', async e => {
+      if (e.target === dlg || e.target.closest('[data-luk-sv]')) return dlg.close();
+      const t = e.target.closest('[data-svt]');
+      if (t) { svType = t.dataset.svt; dlg.querySelectorAll('[data-svt]').forEach(b => b.setAttribute('aria-selected', String(b === t))); return vis(); }
+      const k = e.target.closest('[data-sv-kort]');
+      if (k) { const x = svData.find(v => v.noegle === k.dataset.svKort); dlg.close(); kort.setView([x.lat, x.lon], 15); L.popup().setLatLng([x.lat, x.lon]).setContent(`<b>${esc(x.navn)}</b>${x.by ? `<br>${esc(x.by)}` : ''}<br><small>${KILDE[x.kilde]?.[0] || esc(x.kilde)} · set ${x.antal} gang${x.antal === 1 ? '' : 'e'}</small>`).openOn(kort); return; }
+      const g = e.target.closest('[data-sv-glem]');
+      if (g) {
+        const x = svData.find(v => v.noegle === g.dataset.svGlem);
+        if (!confirm(`Glem "${x.navn}"? Næste gang slås stedet op igen hos OpenStreetMap.`)) return;
+        if (await prøv(() => store.glemSted(x.noegle), 'Glemt.')) { svData = svData.filter(v => v !== x); vis(); }
+      }
+    });
+    $('#sv-søg').addEventListener('input', e => { svSøg = e.target.value.trim().toLowerCase(); vis(); });
+  }
+  function vis() {
+    const tæl = t => svData.filter(v => v.type === t).length;
+    $('#sv-tal').innerHTML = `<span><b>${tæl('adresse')}</b> adresser</span><span><b>${tæl('vej')}</b> vejnavne</span><span><b>${tæl('station')}</b> stationer</span><span><b>${svData.filter(v => v.kilde === 'kontor').length}</b> rettet af kontoret</span>`;
+    const liste = svData.filter(v => (svType === 'alle' || v.type === svType)
+      && (!svSøg || `${v.navn} ${v.by || ''}`.toLowerCase().includes(svSøg)));
+    $('#sv-liste').innerHTML = liste.length ? liste.slice(0, 300).map(v => `
+      <div class="sv-række">
+        <span class="sv-type" title="${esc(v.type)}">${SV_TYPE[v.type]?.split(' ')[0] || ''}</span>
+        <div class="sv-navn"><b>${esc(v.navn)}</b>${v.by ? ` <small>${esc(v.by)}</small>` : ''}<br>
+          <small><span class="sv-kilde ${KILDE[v.kilde]?.[1] || ''}">${KILDE[v.kilde]?.[0] || esc(v.kilde)}</span> · set ${v.antal} gang${v.antal === 1 ? '' : 'e'} · ${siden(v.opdateret)} siden</small></div>
+        ${v.lat != null ? `<button class="ikon-knap" data-sv-kort="${esc(v.noegle)}" title="Vis på kortet">📍</button>` : '<span></span>'}
+        <button class="link fare" data-sv-glem="${esc(v.noegle)}">Glem</button>
+      </div>`).join('') + (liste.length > 300 ? `<p class="hint">Viser 300 af ${liste.length} – søg for at finde resten.</p>` : '')
+      : '<p class="hint">Intet fundet.</p>';
+  }
+  dlg.showModal();
+  try { svData = await store.hentStedviden(); } catch (e) { $('#sv-liste').innerHTML = `<p class="fejl-tekst">${esc(store.fejlTekst(e))}</p>`; return; }
+  vis();
+}
+
+// ---------------------------------------------------------------------------------
 // Tildel
 function åbnTildel(id) {
   const h = H(id), dlg = $('#dlg-tildel');
@@ -753,6 +813,7 @@ async function start() {
   $('#btn-logud').onclick = async () => { await store.logout(); location.reload(); };
   $('#btn-kode').onclick = () => åbnSkiftKode();
   $('#btn-rapport').onclick = () => åbnRapport();
+  $('#btn-stedviden').onclick = () => åbnStedviden();
   $('#btn-inviter').onclick = () => åbnInvitationer();
   $('#btn-omraader').onclick = () => åbnOmraader();
   // Telefon: knapperne ligger i en menu, så toppen ikke fylder halvdelen af skærmen

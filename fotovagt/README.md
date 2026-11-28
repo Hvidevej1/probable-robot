@@ -276,6 +276,8 @@ Tabellen `stedviden` (`supabase/stedviden.sql`) bliver klogere for hver hændels
   får en adresse. (Almindelige navne som Skovvej/Vestergade bruges ikke alene, da de findes i mange byer.)
 * **Stationer**: "Station: Åsum - Odense" kobles til den rigtige brandstation fra OpenStreetMap (helst en med samme navn
   inden for 12 km).
+Kontoret kan se det hele under **🧠 Stedviden** i topmenuen: tal, filtre (adresser/vejnavne/stationer), søgning, hvor det er lært fra
+(✋ kontoret, 🔎 opslag, 📰 nyhed, 🗺 kortdata), hvor mange gange det er set, 📍 vis på kortet og **Glem** for noget, der er lært forkert.
 Pushover-funktionen slår først op i stedviden (kontorets rettelser, tidligere fund, stationer) og først derefter hos
 OpenStreetMap. Ved start lærte den 209 adresser, 65 vejnavne og 49 stationer af historikken.
 
