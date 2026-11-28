@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fotovagt – marken</title>
+  <meta name="theme-color" content="#1c1c21">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Fotovagt">
+  <link rel="stylesheet" href="vendor/inter/inter.css">
+  <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
+  <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
+  <script src="vendor/supabase-js-2.119.0.js"></script>
+  <script type="module" src="marken.js"></script>
+</head>
+<body class="marken">
+  <section id="login" class="login" hidden>
+    <div class="login-kort">
+      <h1><img class="logo-maerke stor" src="logo.svg" alt="" width="46" height="46">Fotovagt</h1>
+      <p class="hint">Hændelser, kort og status for fotografer i marken.</p>
+      <form id="login-form">
+        <label>E-mail <input name="email" type="email" autocomplete="username" required></label>
+        <label>Adgangskode <input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Log ind</button>
+        <button type="button" id="btn-glemt" class="link">Glemt adgangskode?</button>
+      </form>
+      <div id="login-demo" hidden>
+        <p class="demo-mærke">Demo – intet er sat op endnu. Vælg hvem du vil være:</p>
+        <div class="demo-liste"></div>
+        <p class="hint">Åbn <a href="kontor.html" target="_blank">kontoret</a> i en anden fane for at se begge sider samtidig.</p>
+      </div>
+      <p id="login-msg" class="fejl-tekst" role="alert"></p>
+      <a class="hrc-logo" href="https://hrc-fotos.dk" target="_blank" rel="noopener"><img src="hrc-fotos-logo.png" alt="HRC-Fotos" width="93" height="48"></a>
+      <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a> · <span data-version>Fotovagt</span></p>
+    </div>
+  </section>
+
+  <div id="app" hidden>
+    <header class="top">
+      <div class="top-række">
+      <div class="brand"><img class="logo-maerke kun-smal" src="logo.svg" alt="HRC-Fotos" width="34" height="34"><img class="hrc-top kun-bred" src="hrc-fotos-logo.png" alt="HRC-Fotos" width="66" height="34"><span class="brand-skil kun-bred"></span><span>Fotovagt</span></div>
+      <span id="demo-mærke" class="demo-chip" hidden>DEMO</span>
+      <nav class="skift" id="skift" aria-label="Skift side" hidden><a href="index.html" aria-current="page">Marken</a><a href="kontor.html">Kontor</a></nav>
+      <button id="btn-mig" class="mig-knap" aria-label="Min profil"><span id="mig-navn"></span><span id="mig-status" class="chip"></span></button>
+      <button id="btn-sos" class="sos-knap" aria-label="SOS – tilkald hjælp">SOS</button>
+      </div>
+      <nav class="status-knapper" aria-label="Meld status">
+        <button data-status="ledig" class="s-ledig" aria-pressed="false">Ledig</button>
+        <button data-status="optaget" class="s-optaget" aria-pressed="false">Optaget</button>
+        <button data-status="pause" class="s-pause" aria-pressed="false">Pause</button>
+        <button data-status="ankommet" class="s-ankommet" aria-pressed="false">Ankommet</button>
+      </nav>
+    </header>
+
+    <section id="sos-omraade" aria-live="assertive"></section>
+
+    <div id="push-banner" class="push-banner" hidden>
+      <span>Få besked om nye hændelser, også når telefonen er låst.</span>
+      <button id="btn-push-ja">Slå til</button>
+      <button id="btn-push-nej" class="link" aria-label="Ikke nu">Ikke nu</button>
+    </div>
+
+    <section id="tilbud-omraade" aria-live="assertive"></section>
+
+    <section id="opgave" class="opgave" hidden aria-live="polite"></section>
+
+    <div class="faner" role="tablist">
+      <button role="tab" id="fane-kort" aria-controls="kort" data-fane="kort" aria-selected="true">Kort</button>
+      <button role="tab" id="fane-liste" aria-controls="liste" data-fane="liste" aria-selected="false">Hændelser <span id="antal-nye" class="tæller" hidden></span></button>
+    </div>
+
+    <main class="marken-main">
+      <div id="kort" class="kort" data-panel="kort" role="tabpanel" aria-labelledby="fane-kort"></div>
+      <div id="liste" class="liste" data-panel="liste" role="tabpanel" aria-labelledby="fane-liste" hidden></div>
+    </main>
+  </div>
+
+  <!-- Detaljer om en hændelse -->
+  <dialog id="dlg-haendelse" class="ark"><div class="ark-indhold"></div></dialog>
+
+  <!-- Profil -->
+  <dialog id="dlg-profil" class="ark">
+    <form method="dialog" class="ark-indhold" id="form-profil">
+      <h2>Min profil</h2>
+      <div class="foto-felt" id="mit-foto"></div>
+      <label>Navn <input name="navn" required></label>
+      <label>Telefon <input name="telefon" type="tel" autocomplete="tel"></label>
+      <label>Mit område (region) <select name="omraade" id="sel-omraade"></select></label>
+      <p class="hint">Skift, når du arbejder i en anden region – det gælder med det samme. Tilbud går altid først til den nærmeste fotograf; ved lige afstand vælges fotografen fra hændelsens region.</p>
+      <label class="check"><input type="checkbox" name="position"> Del min position med kontoret, mens appen er åben</label>
+      <label class="check"><input type="checkbox" name="lyd"> Bip og vibrér ved nye hændelser, mens appen er åben</label>
+      <label class="check"><input type="checkbox" name="push"> Push-beskeder på låst telefon (nye hændelser når du er ledig, opgaver fra kontoret og opdateringer på din opgave)</label>
+      <p class="hint" id="push-hint" hidden></p>
+      <button type="button" id="btn-test-push" class="secondary" hidden>Send en prøve til denne telefon</button>
+      <div class="knap-række">
+        <button value="gem" type="submit">Gem</button>
+        <button value="luk" type="submit" class="secondary" formnovalidate>Luk</button>
+      </div>
+      <button type="button" id="btn-kode" class="secondary">🔑 Skift adgangskode</button>
+      <button type="button" id="btn-logud" class="link fare">Log ud</button>
+      <p class="hint">Fotovagt viser kun det, kontoret og jeres Pushover-alarmer lægger ind. Din position deles kun, når du har slået det til (og mens en SOS er aktiv).</p>
+      <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a> · <span data-version>Fotovagt</span></p>
+    </form>
+  </dialog>
+
+  <!-- SOS: nedtælling, så alarmen ikke sendes ved et uheld -->
+  <dialog id="dlg-sos" class="sos-dialog">
+    <div class="sos-dialog-indhold">
+      <p class="sos-stor">🆘</p>
+      <h2>Sender SOS om <span id="sos-tal">5</span> sekunder</h2>
+      <p>Kontoret og fotografer inden for 20 km får besked med din placering.</p>
+      <button id="btn-sos-nu" class="hvid stor-knap">Send nu</button>
+      <button id="btn-sos-fortryd" class="fortryd">Fortryd</button>
+      <p class="sos-112">Er der fare for liv: <a href="tel:112">ring 112</a>.</p>
+    </div>
+  </dialog>
+
+  <!-- Afslut opgave -->
+  <dialog id="dlg-afslut" class="ark">
+    <form method="dialog" class="ark-indhold">
+      <h2>Afslut opgave</h2>
+      <label>Note til kontoret (valgfri) <textarea name="note" rows="3" placeholder="Fx antal billeder, hvor de er sendt hen"></textarea></label>
+      <div class="knap-række">
+        <button value="ok" type="submit">Afslut og meld ledig</button>
+        <button value="luk" type="submit" class="secondary" formnovalidate>Fortryd</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

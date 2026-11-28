@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
+  <title>Døgnets 112-hændelser – HRC-Fotos</title>
+  <meta name="description" content="Døgnets hændelser på kort – brand, trafik, politi og redning. Opdateres løbende af HRC-Fotos.">
+  <meta name="theme-color" content="#1c1c21">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/inter/inter.css">
+  <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
+  <style>
+    :root {
+      --bg: #eef1f5; --flade: #fff; --flade2: #f4f6f9; --tekst: #121722; --dæmpet: #5b6576; --kant: #e1e6ee;
+      --mørk: #1c1c21; --accent: #2f80ff; --ok: #1f9f4c; --aktiv: #ff7a1a;
+      --brand: #ff5a1f; --trafik: #e8343a; --politi: #2f6fe4; --redning: #f59e0b; --miljø: #16a34a; --vejr: #0ea5e9; --forsyning: #8b5cf6; --andet: #8c8c96; --heli: #e11d48; --isl: #c2410c;
+      --radius: 18px; --skygge: 0 1px 2px rgba(16,20,28,.05), 0 8px 24px rgba(16,20,28,.08);
+      --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --bg: #0b0e14; --flade: #151a23; --flade2: #1c222d; --tekst: #eef1f6; --dæmpet: #98a2b3; --kant: #273041; --skygge: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); color-scheme: dark; }
+    }
+    :root[data-theme="dark"] { --bg: #0b0e14; --flade: #151a23; --flade2: #1c222d; --tekst: #eef1f6; --dæmpet: #98a2b3; --kant: #273041; --skygge: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { background: var(--bg); color: var(--tekst); font: 15.5px/1.45 var(--font); -webkit-font-smoothing: antialiased; }
+    body.indlejret { background: transparent; }
+    a { color: var(--accent); }
+    button { font: inherit; color: inherit; }
+    main { max-width: 1680px; margin: 0 auto; padding: 16px clamp(12px, 2.5vw, 32px); }
+    .indlejret main { padding: 4px 0 8px; }
+
+    /* Hoved med logo */
+    .hoved { background: var(--mørk); color: #f4f4f6; border-radius: var(--radius); padding: 18px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; box-shadow: var(--skygge); position: relative; overflow: hidden; }
+    .hoved::after { content: ""; position: absolute; inset: auto -40px -60px auto; width: 220px; height: 220px; border-radius: 50%;
+      background: conic-gradient(#1f9f4c 0 25%, #2f80ff 0 50%, #e8343a 0 75%, #ffc21a 0); opacity: .10; pointer-events: none; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; flex: none; }
+    .logo img { width: 44px; height: 44px; border-radius: 12px; display: block; }
+    .logo-tekst { line-height: 1; }
+    .logo-tekst b { display: block; font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; }
+    .logo-tekst small { display: block; font-size: .58rem; letter-spacing: .38em; color: #a3a3ad; margin-top: 3px; }
+    .skille { width: 1px; align-self: stretch; background: rgba(255,255,255,.14); }
+    .titel { flex: 1 1 260px; min-width: 0; position: relative; z-index: 1; }
+    .titel h1 { margin: 0; font-size: clamp(1.2rem, 4.8vw, 1.6rem); font-weight: 900; letter-spacing: -.02em; }
+    .titel p { margin: 3px 0 0; color: #b9bcc6; font-size: .92rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .live { display: inline-flex; align-items: center; gap: 6px; background: rgba(31,159,76,.16); color: #5fd88b; font-weight: 700; font-size: .74rem; padding: 3px 9px; border-radius: 99px; letter-spacing: .02em; }
+    .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: puls 2s infinite; }
+    .live.gammel { background: rgba(255,255,255,.08); color: #a3a3ad; }
+    .live.gammel::before { animation: none; }
+    @keyframes puls { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+    .dagknapper { display: flex; gap: 6px; position: relative; z-index: 1; }
+    .dagknapper button { font-weight: 600; font-size: .88rem; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: #f4f4f6; border-radius: 99px; padding: 8px 14px; cursor: pointer; }
+    .dagknapper button:hover:not(:disabled) { background: rgba(255,255,255,.14); }
+    .dagknapper button:disabled { opacity: .35; cursor: default; }
+    @media (max-width: 620px) { .skille { display: none; } .dagknapper { width: 100%; } .dagknapper button { flex: 1; } .hoved { padding: 16px; } }
+
+    /* Filter */
+    .filtre { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0; }
+    .filtre-navn { font-size: .78rem; font-weight: 700; color: var(--dæmpet); text-transform: uppercase; letter-spacing: .06em; margin-right: 2px; }
+    .filter { font-size: .88rem; font-weight: 600; background: var(--flade); border: 1px solid var(--kant); border-radius: 99px; padding: 7px 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background .15s, border-color .15s, transform .1s; -webkit-tap-highlight-color: transparent; }
+    .filter:hover { border-color: var(--dæmpet); }
+    .filter:active { transform: scale(.96); }
+    .filter b { font-variant-numeric: tabular-nums; }
+    .filter.valgt { background: var(--k, var(--accent)); border-color: var(--k, var(--accent)); color: #fff; }
+    .filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Kort og liste */
+    .gitter { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(380px, 1fr); gap: 16px; align-items: start; }
+    @media (min-width: 1400px) { .gitter { grid-template-columns: minmax(0, 1.6fr) minmax(460px, 1fr); } }
+    @media (max-width: 860px) { .gitter { grid-template-columns: minmax(0, 1fr); } }
+    .kort-boks { background: var(--flade); border-radius: var(--radius); box-shadow: var(--skygge); overflow: hidden; position: sticky; top: 12px; }
+    .indlejret .kort-boks, .gitter.smal .kort-boks { position: static; }
+    @media (max-width: 860px) { .kort-boks { position: static; } }
+    #kort { height: min(78vh, 820px); min-height: 320px; }
+    @media (max-width: 860px) { #kort { height: 52vh; } }
+    .indlejret #kort { height: 640px; min-height: 0; }
+    @media (max-width: 860px) { .indlejret #kort { height: 360px; } }
+    .kort-tom { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 500; }
+    .kort-tom span { background: color-mix(in srgb, var(--flade) 92%, transparent); color: var(--tekst); border: 1px solid var(--kant); border-radius: 12px; padding: 10px 14px; font-size: .9rem; font-weight: 600; box-shadow: var(--skygge); max-width: 80%; text-align: center; }
+    .kort-ramme { position: relative; }
+    [hidden] { display: none !important; }
+    .liste { display: grid; gap: 10px; }
+    .h { background: var(--flade); border-radius: 16px; box-shadow: var(--skygge); padding: 13px 14px 13px 16px; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; cursor: pointer; border: 2px solid transparent; position: relative; overflow: hidden; transition: border-color .15s, transform .15s; }
+    .h::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--k, var(--andet)); }
+    .h:hover { transform: translateY(-1px); }
+    .h.valgt { border-color: var(--k, var(--accent)); }
+    .ikon { width: 44px; height: 44px; border-radius: 13px; background: color-mix(in srgb, var(--k, var(--andet)) 14%, var(--flade)); display: grid; place-items: center; font-size: 1.4rem; }
+    .h h3 { margin: 1px 0 0; font-size: 1.02rem; font-weight: 800; letter-spacing: -.01em; }
+    .h .sted { margin: 2px 0 0; color: var(--dæmpet); font-size: .9rem; }
+    .h .tid { font-variant-numeric: tabular-nums; font-weight: 700; font-size: .85rem; color: var(--dæmpet); white-space: nowrap; }
+    .mærker { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+    .mærke { font-size: .72rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: var(--flade2); color: var(--dæmpet); }
+    .mærke.aktiv { background: color-mix(in srgb, var(--aktiv) 16%, var(--flade)); color: var(--aktiv); }
+    .mærke.foto { background: color-mix(in srgb, var(--accent) 14%, var(--flade)); color: var(--accent); }
+    .kommentarer { list-style: none; margin: 9px 0 0; padding: 0; display: grid; gap: 6px; }
+    .kommentarer li { font-size: .9rem; background: var(--flade2); border-radius: 10px; padding: 7px 10px; overflow-wrap: anywhere; }
+    .kommentarer time { color: var(--dæmpet); font-size: .78rem; font-weight: 700; margin-right: 6px; font-variant-numeric: tabular-nums; }
+    @media (max-width: 520px) { .h { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; padding: 12px 12px 12px 14px; } .ikon { width: 38px; height: 38px; font-size: 1.2rem; } }
+    .h .vejr { margin: 6px 0 0; font-size: .84rem; color: var(--dæmpet); }
+    .h .nyheder { margin: 6px 0 0; font-size: .86rem; }
+    .h .nyheder a { font-weight: 700; text-decoration: none; }
+    .h .nyheder a:hover { text-decoration: underline; }
+    .annonce { background: var(--flade); border-radius: 14px; box-shadow: var(--skygge); padding: 8px 10px 10px; min-height: 100px; }
+    .annonce.top { margin: 14px 0 0; }
+    .annonce-mærke { display: block; font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--dæmpet); margin-bottom: 4px; }
+    .tom { background: var(--flade); border-radius: var(--radius); padding: 26px; text-align: center; color: var(--dæmpet); box-shadow: var(--skygge); }
+    .fod { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--dæmpet); font-size: .8rem; margin: 18px 0 6px; flex-wrap: wrap; text-align: center; }
+    .fod img { width: 20px; height: 20px; border-radius: 6px; }
+    .pin { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; background: #fff; border: 3px solid var(--k, var(--aktiv)); box-shadow: 0 2px 8px rgba(0,0,0,.3); transition: transform .15s; }
+    .pin.afsluttet { opacity: .8; filter: saturate(.7); }
+    .pin.valgt { transform: scale(1.3); }
+    .leaflet-popup-content { font: 14px/1.4 var(--font); margin: 10px 12px; }
+  </style>
+  <script src="config.js"></script>
+  <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
+</head>
+<body>
+  <main>
+    <header class="hoved">
+      <a class="logo" href="https://hrc-fotos.dk" target="_top" aria-label="HRC-Fotos">
+        <img src="icon-192.png" alt="" width="44" height="44">
+        <span class="logo-tekst"><b>hrc</b><small>FOTOS</small></span>
+      </a>
+      <span class="skille" aria-hidden="true"></span>
+      <div class="titel">
+        <h1>Døgnets 112-hændelser</h1>
+        <p><span id="dag-titel">I dag</span><span class="live" id="opdateret">Henter …</span></p>
+      </div>
+      <div class="dagknapper">
+        <button id="forrige" aria-label="Forrige dag">‹ Forrige</button>
+        <button id="idag">I dag</button>
+        <button id="naeste" aria-label="Næste dag">Næste ›</button>
+      </div>
+    </header>
+    <div id="annonce-top" hidden></div>
+    <div class="filtre" id="tal" role="group" aria-label="Filtrér efter kategori"></div>
+    <div class="gitter">
+      <section class="kort-boks" aria-label="Kort"><div class="kort-ramme"><div id="kort"></div><div class="kort-tom" id="kort-tom" hidden><span></span></div></div></section>
+      <section class="liste" id="liste" aria-live="polite"></section>
+    </div>
+    <p class="fod"><img src="icon-192.png" alt="" width="20" height="20"> Placeringer er omtrentlige og viser kun by eller område. Udkaldsdata bl.a. fra <a href="http://www.odin.dk/112puls" target="_blank" rel="noopener">ODIN 1-1-2 puls</a> (Beredskabsstyrelsen). Vejrdata: <a href="https://www.met.no/" target="_blank" rel="noopener">MET Norway</a> (CC BY 4.0) og <a href="https://www.dmi.dk/" target="_blank" rel="noopener">DMI</a>. © <a href="https://hrc-fotos.dk" target="_top">HRC-Fotos.dk</a></p>
+  </main>
+  <script src="doegn.js"></script>
+</body>
+</html>

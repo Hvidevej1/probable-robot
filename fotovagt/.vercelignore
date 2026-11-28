@@ -1,0 +1,5 @@
+# Serverkode og noter udgives ikke på vagt.hrc-fotos.dk (parse.js bruges i browseren og skal med)
+supabase/*.sql
+supabase/functions/*/index.ts
+supabase/functions/**/*.mjs
+*.md

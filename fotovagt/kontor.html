@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
+  <title>Fotovagt – kontoret</title>
+  <meta name="theme-color" content="#1c1c21">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+  <link rel="stylesheet" href="vendor/inter/inter.css">
+  <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
+  <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
+  <script src="vendor/supabase-js-2.119.0.js"></script>
+  <script type="module" src="kontor.js"></script>
+</head>
+<body class="kontor">
+  <section id="login" class="login" hidden>
+    <div class="login-kort">
+      <h1><img class="logo-maerke stor" src="logo.svg" alt="" width="46" height="46">Fotovagt <small>kontoret</small></h1>
+      <p class="hint">Overblik over hændelser og fotografer.</p>
+      <form id="login-form">
+        <label>E-mail <input name="email" type="email" autocomplete="username" required></label>
+        <label>Adgangskode <input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Log ind</button>
+        <button type="button" id="btn-glemt" class="link">Glemt adgangskode?</button>
+      </form>
+      <div id="login-demo" hidden>
+        <p class="demo-mærke">Demo – intet er sat op endnu.</p>
+        <div class="demo-liste"></div>
+        <p class="hint">Åbn <a href="index.html" target="_blank">marken</a> i en anden fane og log ind som en fotograf.</p>
+      </div>
+      <p id="login-msg" class="fejl-tekst" role="alert"></p>
+      <a class="hrc-logo" href="https://hrc-fotos.dk" target="_blank" rel="noopener"><img src="hrc-fotos-logo.png" alt="HRC-Fotos" width="93" height="48"></a>
+      <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a> · <span data-version>Fotovagt</span></p>
+    </div>
+  </section>
+
+  <div id="app" class="kontor-app" hidden>
+    <header class="top">
+      <div class="brand"><img class="logo-maerke kun-smal" src="logo.svg" alt="HRC-Fotos" width="34" height="34"><img class="hrc-top kun-bred" src="hrc-fotos-logo.png" alt="HRC-Fotos" width="66" height="34"><span class="brand-skil kun-bred"></span><span>Fotovagt <small>kontoret</small></span></div>
+      <span id="demo-mærke" class="demo-chip" hidden>DEMO</span>
+      <nav class="skift" aria-label="Skift side"><a href="index.html">Marken</a><a href="kontor.html" aria-current="page">Kontor</a></nav>
+      <div class="nøgletal" id="nøgletal"></div>
+      <div class="top-knapper">
+        <button id="btn-ny">+ Ny hændelse</button>
+        <button id="btn-menu" class="secondary menu-knap" aria-expanded="false" aria-controls="top-menu" aria-haspopup="menu">
+          Værktøjer <span class="prikker" id="vaerktoej-prikker" aria-hidden="true"><i data-prik="auto" class="grå"></i><i data-prik="push" class="grå"></i><i data-prik="po" class="grå"></i></span>
+        </button>
+        <div class="top-menu" id="top-menu" role="menu">
+          <button id="btn-auto" role="menuitemcheckbox" aria-checked="false" title="Automatiske tilbud til nærmeste fotograf">Auto-tilbud til nærmeste <small id="auto-tekst"></small></button>
+          <button id="btn-push" role="menuitemcheckbox" aria-checked="false" title="Få SOS-alarmer som push på denne computer">Push på denne computer <small id="push-tekst"></small></button>
+          <button id="btn-pushover" role="menuitem"><span id="po-prik" class="prik"></span>Pushover <small id="po-tekst"></small></button>
+          <hr>
+          <button id="btn-nyheder-menu" role="menuitem" title="112-nyheder fra medierne">Nyheder</button>
+          <button id="btn-stedviden" role="menuitem" title="Det Fotovagt har lært om adresser, vejnavne og stationer">Stedviden</button>
+          <button id="btn-rapport" role="menuitem" title="Indsatsrapport: hvilke hændelser fotograferne har kørt på">Indsatsrapport</button>
+          <hr>
+          <button id="btn-kode" role="menuitem">Skift adgangskode</button>
+          <button id="btn-logud" role="menuitem">Log ud</button>
+          <span class="app-version" data-version title="Fotovagts version"></span>
+        </div>
+      </div>
+    </header>
+
+    <section id="sos-omraade" class="sos-kontor" aria-live="assertive"></section>
+
+    <main class="kontor-grid">
+      <section class="panel fotografer">
+        <div class="panel-top"><h2>Fotografer</h2><span class="panel-knapper"><button id="btn-omraader" class="secondary lille-knap" title="Regioner">🗺 Regioner</button><button id="btn-inviter" class="secondary lille-knap" title="Opret adgang til en ny fotograf eller en fra kontoret">＋ Ny bruger</button></span></div>
+        <div id="fotografer"></div>
+      </section>
+
+      <section class="panel kort-panel">
+        <div id="kort" class="kort"></div>
+        <div class="kort-forklaring">
+          <span class="fk-gruppe"><span class="fk-navn">Hændelser</span>
+            <span><i class="pin-mini pin-ny"></i>Ny</span><span><i class="pin-mini pin-taget"></i>Taget</span><span><i class="pin-mini pin-ankommet"></i>Fotograf på stedet</span><span><b class="pin-prio-mini">!</b>Høj prioritet</span></span>
+          <span class="fk-skille" aria-hidden="true"></span>
+          <span class="fk-gruppe"><span class="fk-navn">Fotografer</span>
+            <span><i class="dot" style="--c:var(--ledig)"></i>Ledig</span><span><i class="dot" style="--c:var(--optaget)"></i>Optaget</span>
+            <span><i class="dot" style="--c:var(--pause)"></i>Pause</span><span><i class="dot" style="--c:var(--ankommet)"></i>Ankommet</span></span>
+        </div>
+      </section>
+
+      <section class="panel haendelser">
+        <div class="panel-top">
+          <h2>Hændelser</h2>
+          <button id="btn-nyheder" class="secondary lille-knap" title="Nyheds-dashboard: 112-nyheder fra DR, TV 2-regionerne og Ritzau">📰 Nyheder <span id="nyheder-antal" class="tæller" hidden></span></button>
+          <div class="filter" role="tablist">
+            <button data-filter="aktive" aria-selected="true">Aktive</button>
+            <button data-filter="alle" aria-selected="false">Seneste døgn</button>
+          </div>
+        </div>
+        <div id="haendelser"></div>
+        <h2 class="log-titel">Logbog</h2>
+        <ol id="logbog" class="logbog"></ol>
+      </section>
+    </main>
+    <p class="copyright kontor-fod">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a></p>
+  </div>
+
+  <!-- Ny / ret hændelse -->
+  <dialog id="dlg-ret" class="ark bred">
+    <form method="dialog" class="ark-indhold" id="form-ret">
+      <h2 id="ret-titel">Ny hændelse</h2>
+      <details id="indsaet-besked">
+        <summary>Indsæt tekst fra en Pushover-besked</summary>
+        <label>Beskedens tekst <textarea name="raa" rows="3" placeholder="Fx: Brand i etageejendom, Vestergade 12, 8000 Aarhus C"></textarea></label>
+        <button type="button" id="btn-laes" class="secondary">Læs beskeden</button>
+      </details>
+      <label>Titel <input name="titel" required></label>
+      <label>Beskrivelse <textarea name="tekst" rows="3"></textarea></label>
+      <div class="to-kol">
+        <label>Kategori
+          <select name="kategori">
+            <option>Brand</option><option>Trafik</option><option>Politi</option><option>Redning</option>
+            <option>Miljø</option><option>Vejr</option><option>Forsyning</option><option selected>Andet</option>
+          </select>
+        </label>
+        <label>Link <input name="url" type="url" placeholder="https://"></label>
+      </div>
+      <label>Adresse
+        <span class="input-knap"><input name="adresse" placeholder="Vej og nummer, postnr. by"><button type="button" id="btn-find" class="secondary">Find</button></span>
+      </label>
+      <p class="hint" id="ret-pos-hint">Tryk "Find", eller klik på kortet for at sætte nålen. Nålen kan trækkes.</p>
+      <div id="ret-kort" class="mini-kort"></div>
+      <input type="hidden" name="lat"><input type="hidden" name="lon">
+      <fieldset class="doegn-felt">
+        <legend>Døgnrapport på hrc-fotos.dk</legend>
+        <label class="check"><input type="checkbox" name="offentlig" checked> Vis hændelsen på døgnrapporten</label>
+        <label>Overskrift på døgnrapporten <small>(valgfri – ellers kategorien, fx "Brand")</small>
+          <input name="offentlig_titel" maxlength="80" placeholder="Fx Brand i villa"></label>
+        <p class="hint">Stedet vises uden vej og husnummer: <b id="ret-offentlig-sted"></b></p>
+      </fieldset>
+      <div class="knap-række">
+        <button value="gem" type="submit">Gem</button>
+        <button value="luk" type="submit" class="secondary" formnovalidate>Annullér</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Tidslinje og kommentarer -->
+  <dialog id="dlg-tidslinje" class="ark"><div class="ark-indhold"></div></dialog>
+
+  <!-- Tildel -->
+  <dialog id="dlg-tildel" class="ark"><div class="ark-indhold"></div></dialog>
+
+  <!-- Fotograf -->
+  <dialog id="dlg-foto" class="ark">
+    <form method="dialog" class="ark-indhold" id="form-foto">
+      <h2>Fotograf</h2>
+      <div class="foto-felt" id="foto-foto"></div>
+      <label>Navn <input name="navn" required></label>
+      <label>Telefon <input name="telefon" type="tel"></label>
+      <div class="to-kol">
+        <label>Status
+          <select name="status"><option value="ledig">Ledig</option><option value="optaget">Optaget</option><option value="pause">Pause</option><option value="ankommet">Ankommet</option><option value="offline">Offline</option></select>
+        </label>
+        <label>Rolle
+          <select name="rolle"><option value="foto">Fotograf</option><option value="kontor">Kontor</option></select>
+        </label>
+      </div>
+      <label>Region <select name="omraade_id"></select></label>
+      <label>Kører ud fra (bopæl eller kontor)
+        <span class="input-knap"><input name="base_adresse" autocomplete="off" placeholder="Fx Hvidevej 1, 8800 Viborg"><button type="button" class="secondary" id="btn-find-base">Find</button></span>
+      </label>
+      <p class="hint" id="base-hint"></p>
+      <input type="hidden" name="base_lat"><input type="hidden" name="base_lon">
+      <div class="knap-række">
+        <button value="gem" type="submit">Gem</button>
+        <button value="luk" type="submit" class="secondary" formnovalidate>Luk</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Pushover -->
+  <dialog id="dlg-pushover" class="ark"><div class="ark-indhold"></div></dialog>
+</body>
+</html>
