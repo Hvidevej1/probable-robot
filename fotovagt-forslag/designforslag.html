@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fotovagt designforslag</title>
+<!-- Designforslag til Fotovagt. Selvstændig side: ændrer intet i den rigtige app.
+     Tokens i :root herunder er forslaget til en ny top i style.css. -->
+<style>
+/* ================= FORSLAG: tokens ================= */
+:root {
+  /* flader */
+  --bg: #eef1f5; --flade: #fff; --flade2: #f6f8fb; --flade3: #eaeef4;
+  --tekst: #121722; --daempet: #556070; --kant: #dfe4ec; --kant2: #cfd6e1;
+  --top: #1c1c21; --top2: #26262d; --top-tekst: #f4f4f6; --top-daempet: #a3a3ad;
+  --fokus: #2f80ff;
+  /* Status: fyld (prik/kant/nål) + tonet baggrund + tekst. Alle tekst/baggrund-par >= 4.5:1 */
+  --ledig: #1f9f4c;    --ledig-bg: #e3f5ea;    --ledig-tekst: #146c34;
+  --optaget: #c2410c;  --optaget-bg: #fdebe1;  --optaget-tekst: #9a3412;  /* rød-orange: ikke SOS-rød */
+  --pause: #ffc21a;    --pause-bg: #fff4cf;    --pause-tekst: #7a5600;
+  --ankommet: #2f80ff; --ankommet-bg: #e4eeff; --ankommet-tekst: #1d5fd1;
+  --offline: #8c8c96;  --offline-bg: #eceef2;  --offline-tekst: #4f5562;
+  --ny: #ff7a1a;       --ny-bg: #fff0e3;       --ny-tekst: #a64400;
+  --taget: #8b5cf6;    --taget-bg: #f0ebff;    --taget-tekst: #6233c9;
+  /* Kun SOS må bruge rød flade */
+  --sos: #d4001a; --sos-moerk: #a80014; --sos-bg: #ffe5e8;
+  --fare: #b42318; --valgt: #f2c200; --ai: #7c3aed;
+  --primaer: #1c1c21; --primaer-tekst: #fff;   /* hovedknap: mørk i lys tilstand, lys i mørk */
+  /* skala */
+  --r-1: 4px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 24px;
+  --fs-xs: .75rem; --fs-s: .85rem; --fs-m: 1rem; --fs-l: 1.15rem;
+  --radius: 16px; --radius-s: 11px;
+  --skygge-s: 0 1px 2px rgba(16,20,28,.06);
+  --skygge: 0 1px 2px rgba(16,20,28,.05), 0 6px 20px rgba(16,20,28,.07);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0e14; --flade: #151a23; --flade2: #1b212c; --flade3: #232a36;
+    --tekst: #eef1f6; --daempet: #a3adbd; --kant: #262d3a; --kant2: #313a4a;
+    --top: #121216; --top2: #1c1c21;
+    --ledig-bg: #12301f;    --ledig-tekst: #7fe0a3;
+    --optaget-bg: #3a1d10;  --optaget-tekst: #ffb08a;
+    --pause-bg: #3a2f0c;    --pause-tekst: #ffd766;
+    --ankommet-bg: #142a4d; --ankommet-tekst: #9cc2ff;
+    --offline-bg: #22262e;  --offline-tekst: #b7bcc6;
+    --ny-bg: #3a2210;       --ny-tekst: #ffb27a;
+    --taget-bg: #261d45;    --taget-tekst: #c7b3ff;
+    --sos-bg: #3a0a10; --fare: #ff8a80;
+    --primaer: #eef1f6; --primaer-tekst: #121722;
+    color-scheme: dark;
+  }
+}
+
+/* ================= side til forslaget ================= */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--tekst); font: 15.5px/1.45 var(--font); -webkit-font-smoothing: antialiased; }
+.side { max-width: 1180px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 1.7rem; margin: 0 0 4px; letter-spacing: -.02em; }
+h2.afsnit { font-size: 1.2rem; margin: 48px 0 6px; }
+.ingress { color: var(--daempet); max-width: 70ch; margin: 0 0 8px; }
+.note { color: var(--daempet); font-size: var(--fs-s); max-width: 70ch; }
+.note b { color: var(--tekst); }
+.raekke { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; margin-top: 18px; }
+.forklaring { flex: 1 1 300px; max-width: 460px; }
+.forklaring ol { padding-left: 20px; margin: 8px 0; }
+.forklaring li { margin: 0 0 10px; }
+
+/* token-tavle */
+.tavle { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.tok { background: var(--flade); border: 1px solid var(--kant); border-radius: var(--r-3); padding: 10px; font-size: var(--fs-s); }
+.tok .prov { height: 34px; border-radius: var(--r-2); margin-bottom: 8px; background: var(--c); }
+.tok code { font-size: .72rem; color: var(--daempet); }
+
+/* ================= Chips (forslag) ================= */
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); font-weight: 700; padding: 3px 9px; border-radius: 99px;
+  background: var(--b); color: var(--t); white-space: nowrap; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.s-ledig    { --c: var(--ledig);    --b: var(--ledig-bg);    --t: var(--ledig-tekst); }
+.s-optaget  { --c: var(--optaget);  --b: var(--optaget-bg);  --t: var(--optaget-tekst); }
+.s-pause    { --c: var(--pause);    --b: var(--pause-bg);    --t: var(--pause-tekst); }
+.s-ankommet { --c: var(--ankommet); --b: var(--ankommet-bg); --t: var(--ankommet-tekst); }
+.s-offline  { --c: var(--offline);  --b: var(--offline-bg);  --t: var(--offline-tekst); }
+.h-ny       { --c: var(--ny);       --b: var(--ny-bg);       --t: var(--ny-tekst); }
+.h-taget    { --c: var(--taget);    --b: var(--taget-bg);    --t: var(--taget-tekst); }
+
+/* ================= Telefon (Marken) ================= */
+.telefon { width: 390px; max-width: 100%; height: 780px; border-radius: 44px; border: 10px solid #0d0d10; background: var(--bg);
+  overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0,0,0,.25); flex: none; }
+.statuslinje { height: 44px; background: var(--top); flex: none; }
+.m-top { background: var(--top); color: var(--top-tekst); padding: 4px 12px 10px; display: flex; align-items: center; gap: 8px; }
+.logo { width: 32px; height: 32px; border-radius: 9px; background: #2a2a31; display: grid; place-items: center; flex: none; }
+.logo i { width: 16px; height: 16px; border-radius: 50%; border: 3px solid; border-color: #2f80ff #22b455 #ffc21a #ff3b3b; }
+.mig { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.mig b { font-size: var(--fs-m); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sos { background: var(--sos); color: #fff; font-weight: 900; letter-spacing: .08em; border: 0; border-radius: 99px; min-height: 48px; padding: 0 22px;
+  font-size: 1.05rem; box-shadow: 0 0 0 3px rgba(212,0,26,.35); flex: none; }
+/* segmentkontrol til status: 44 px i stedet for ca. 76 px */
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 4px; padding: 4px; margin: 0 12px; background: #2a2a31; border-radius: 14px; }
+.seg button { border: 0; background: none; color: var(--top-daempet); font: inherit; font-weight: 650; font-size: var(--fs-s); min-height: 40px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.seg button::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.seg button[aria-pressed="true"] { background: var(--b); color: var(--t); }
+.seg button:disabled { opacity: .4; }
+.m-top-wrap { background: var(--top); padding-bottom: 10px; }
+.faner { display: flex; gap: 4px; padding: 6px; background: var(--flade); border-bottom: 1px solid var(--kant); }
+.faner button { flex: 1; border: 0; background: none; font: inherit; font-weight: 650; color: var(--daempet); min-height: 40px; border-radius: 10px; }
+.faner button[aria-selected="true"] { background: var(--flade3); color: var(--tekst); }
+.taeller { background: var(--ny-bg); color: var(--ny-tekst); border-radius: 99px; font-size: var(--fs-xs); padding: 1px 7px; margin-left: 4px; }
+.sorter { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 2px; font-size: var(--fs-s); color: var(--daempet); }
+.sorter .vaelg { display: inline-flex; background: var(--flade3); border-radius: 9px; padding: 2px; }
+.sorter .vaelg span { padding: 4px 10px; border-radius: 7px; font-weight: 600; }
+.sorter .vaelg span.til { background: var(--flade); color: var(--tekst); box-shadow: var(--skygge-s); }
+.liste { flex: 1; overflow: auto; padding: 8px 12px 16px; }
+
+/* hændelseskort */
+.hk { position: relative; background: var(--flade); border: 1px solid var(--kant); border-radius: var(--radius); padding: 12px 12px 12px 16px; margin-bottom: 10px;
+  box-shadow: var(--skygge-s); display: grid; grid-template-columns: 40px 1fr; gap: 4px 12px; overflow: hidden; }
+.hk::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--c); }
+.hk .kat { width: 40px; height: 40px; border-radius: 12px; background: var(--flade2); display: grid; place-items: center; font-size: 1.3rem; grid-row: span 2; }
+.hk .hoved { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.hk h3 { margin: 0; font-size: 1.02rem; line-height: 1.25; }
+.hk .adr { margin: 2px 0 0; font-size: .92rem; overflow-wrap: anywhere; }
+.hk .bund { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.afstand { display: inline-flex; flex-direction: column; line-height: 1.1; white-space: nowrap; }
+.tag-knap, .tid { white-space: nowrap; }
+.afstand b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.afstand small { color: var(--daempet); font-size: var(--fs-xs); }
+.tid { color: var(--daempet); font-size: var(--fs-s); margin-left: 2px; }
+.tag-knap { margin-left: auto; border: 0; background: var(--primaer); color: var(--primaer-tekst); font: inherit; font-weight: 700; border-radius: var(--radius-s); min-height: 46px; padding: 0 18px; }
+.prio-hoej { border-color: color-mix(in srgb, var(--sos) 45%, var(--kant)); }
+.prio-ikon { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--sos); color: #fff; font-size: 11px; font-weight: 900; margin-right: 4px; vertical-align: 1px; }
+.hk.taget-af-andre { opacity: .75; }
+.hk.taget-af-andre .tag-knap { display: none; }
+.hk.taget-af-andre .hvem { margin-left: auto; font-size: var(--fs-s); color: var(--taget-tekst); font-weight: 600; }
+.offline-bjaelke { background: var(--pause-bg); color: var(--pause-tekst); font-size: var(--fs-s); font-weight: 600; padding: 7px 14px; display: flex; gap: 8px; align-items: center; }
+
+/* ================= Kontorets top ================= */
+.k-top { background: linear-gradient(180deg, var(--top2), var(--top)); color: var(--top-tekst); border-radius: var(--r-4); padding: 10px 14px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
+.k-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; white-space: nowrap; }
+.k-brand small { font-weight: 500; opacity: .6; }
+.skift { display: inline-flex; background: rgba(255,255,255,.08); border-radius: 11px; padding: 3px; }
+.skift a { color: var(--top-daempet); text-decoration: none; font-weight: 650; font-size: var(--fs-s); padding: 6px 12px; border-radius: 8px; }
+.skift a[aria-current] { background: #fff; color: var(--top); }
+.tal { display: flex; gap: 6px; margin-left: auto; }
+.tal div { background: rgba(255,255,255,.06); border-radius: 10px; padding: 4px 12px; text-align: center; min-width: 64px; }
+.tal b { display: block; font-size: 1.2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tal span { font-size: .68rem; color: var(--top-daempet); }
+.tal .n b { color: #ffa066; } .tal .g b { color: #c7b3ff; } .tal .l b { color: #7fe0a3; }
+.k-knap { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.07); color: var(--top-tekst); font: inherit; font-weight: 650; border-radius: var(--radius-s);
+  min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; }
+.k-knap.primaer { background: #fff; color: var(--top); border-color: #fff; }
+.k-knap .prikker { display: inline-flex; gap: 3px; }
+.k-knap .prikker i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.k-knap svg, .ikon { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.menu { background: var(--top2); color: var(--top-tekst); border-radius: 14px; padding: 6px; width: 260px; margin: 8px 0 0 auto; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+.menu div { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 9px; font-weight: 600; }
+.menu div:hover { background: rgba(255,255,255,.08); }
+.menu small { margin-left: auto; font-weight: 500; color: var(--top-daempet); }
+.menu hr { border: 0; border-top: 1px solid rgba(255,255,255,.1); margin: 4px 0; }
+
+/* kontor-panel: fotografer */
+.panel { background: var(--flade); border: 1px solid var(--kant); border-radius: var(--radius); padding: 14px; box-shadow: var(--skygge-s); width: 320px; max-width: 100%; flex: none; }
+.panel h3 { margin: 0 0 10px; font-size: 1.05rem; }
+.region { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--daempet); display: flex; justify-content: space-between; margin: 12px 0 4px; }
+.tomme { font-size: var(--fs-s); color: var(--daempet); background: var(--flade2); border-radius: var(--r-2); padding: 8px 10px; }
+.foto { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--kant); }
+.av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--b); color: var(--t); box-shadow: 0 0 0 3px var(--c); flex: none; }
+.foto .info { flex: 1; min-width: 0; }
+.foto .info b { display: block; }
+.ikonknap { width: 44px; height: 44px; border-radius: 10px; border: 0; background: none; color: var(--tekst); display: grid; place-items: center; }
+.ikonknap:hover { background: var(--flade3); }
+
+/* kontor: hændelseskort med prioritet i én vælger */
+.k-hk { background: var(--flade); border: 1px solid var(--kant); border-radius: var(--radius); padding: 12px 14px 12px 18px; position: relative; overflow: hidden; width: 420px; max-width: 100%; box-shadow: var(--skygge-s); flex: none; }
+.k-hk::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--ny); }
+.k-hk .hoved { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.k-hk h3 { margin: 0; font-size: 1.02rem; }
+.k-hk p { margin: 2px 0; font-size: .92rem; }
+.k-hk .meta { color: var(--daempet); font-size: var(--fs-s); }
+.naer { background: var(--ledig-bg); color: var(--ledig-tekst); border-radius: var(--r-2); padding: 7px 10px; font-size: var(--fs-s); margin: 8px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.naer button { border: 0; background: var(--ledig-tekst); color: var(--ledig-bg); font: inherit; font-weight: 700; border-radius: 8px; min-height: 36px; padding: 0 12px; }
+.k-handl { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.k-handl button, .k-handl select { font: inherit; font-weight: 650; min-height: 44px; border-radius: var(--radius-s); padding: 0 14px; border: 1px solid var(--kant2); background: var(--flade); color: var(--tekst); }
+.k-handl button.primaer { background: var(--primaer); color: var(--primaer-tekst); border-color: var(--primaer); }
+.k-handl select { margin-left: auto; padding-right: 8px; }
+
+/* SOS med og uden bevægelse */
+.sos-boks { background: linear-gradient(160deg, #e3001c, var(--sos-moerk)); color: #fff; border-radius: 18px; padding: 14px 16px; border: 3px solid #fff;
+  outline: 3px solid var(--sos); width: 360px; max-width: 100%; flex: none; }
+.sos-boks b { font-size: 1.2rem; }
+.sos-boks .aktiv-maerke { display: inline-block; background: #fff; color: var(--sos); font-weight: 900; font-size: var(--fs-xs); letter-spacing: .08em; padding: 2px 8px; border-radius: 6px; margin-bottom: 6px; }
+@media (prefers-reduced-motion: no-preference) { .sos-boks { animation: puls 1.4s ease-in-out infinite; } }
+@keyframes puls { 50% { box-shadow: 0 0 0 10px rgba(212,0,26,.25); } }
+
+code.blok { display: block; white-space: pre; overflow-x: auto; background: var(--flade); border: 1px solid var(--kant); border-radius: var(--r-3); padding: 14px; font-size: .8rem; line-height: 1.5; margin-top: 12px; }
+@media (max-width: 480px) { .telefon { height: 720px; border-width: 6px; border-radius: 30px; } }
+</style>
+</head>
+<body>
+<div class="side">
+  <h1>Fotovagt: designforslag</h1>
+  <p class="ingress">Et forslag til, hvordan Marken og Kontoret kan se ud med en strammere farvebrug, bedre kontrast og mere plads til det vigtige. Siden står alene og ændrer ikke appen. Tokens øverst i filen kan bruges som ny start på <code>style.css</code>.</p>
+
+  <!-- ============ 1. Farver ============ -->
+  <h2 class="afsnit">1. Farver: én regel for rød, og tekst der kan læses</h2>
+  <p class="note"><b>Regel:</b> mættet rød flade bruges <i>kun</i> til SOS. Status vises som tonede chips med mørk tekst (alle par er mindst 4,5:1). "Optaget" flyttes til rødorange, så den ikke kan forveksles med SOS på kortet. Hver status har tre tokens: fyld (prik, kant, nål), tonet baggrund og tekst.</p>
+  <div class="tavle">
+    <div class="tok s-ledig" style="--c:var(--ledig)"><div class="prov"></div><span class="chip s-ledig">Ledig</span><br><code>--ledig / -bg / -tekst</code></div>
+    <div class="tok" style="--c:var(--optaget)"><div class="prov"></div><span class="chip s-optaget">Optaget</span><br><code>--optaget (#c2410c)</code></div>
+    <div class="tok" style="--c:var(--pause)"><div class="prov"></div><span class="chip s-pause">Pause</span><br><code>--pause-tekst #7a5600</code></div>
+    <div class="tok" style="--c:var(--ankommet)"><div class="prov"></div><span class="chip s-ankommet">Ankommet</span><br><code>--ankommet</code></div>
+    <div class="tok" style="--c:var(--offline)"><div class="prov"></div><span class="chip s-offline">Offline</span><br><code>--offline</code></div>
+    <div class="tok" style="--c:var(--ny)"><div class="prov"></div><span class="chip h-ny">Ny</span><br><code>--ny-tekst #a64400</code></div>
+    <div class="tok" style="--c:var(--taget)"><div class="prov"></div><span class="chip h-taget">Taget</span><br><code>--taget</code></div>
+    <div class="tok" style="--c:var(--sos)"><div class="prov"></div><b style="color:var(--fare)">Kun SOS</b><br><code>--sos #d4001a</code></div>
+  </div>
+  <p class="note">I dag: hvid tekst på "Ny"-orange er 2,6:1, og den gule <code>.advarsel</code>-tekst på hvid er 1,6:1. Med forslaget er alle chips over 4,5:1, i både lys og mørk tilstand.</p>
+
+  <!-- ============ 2. Marken ============ -->
+  <h2 class="afsnit">2. Marken på telefon</h2>
+  <div class="raekke">
+    <div class="telefon" aria-label="Forslag til Marken, listevisning">
+      <div class="statuslinje"></div>
+      <div class="m-top-wrap">
+        <div class="m-top">
+          <span class="logo" aria-hidden="true"><i></i></span>
+          <div class="mig"><b>Mads</b><span class="chip s-ledig">Ledig</span></div>
+          <button class="sos" aria-label="SOS – tilkald hjælp">SOS</button>
+        </div>
+        <div class="seg" role="group" aria-label="Meld status">
+          <button class="s-ledig" aria-pressed="true">Ledig</button>
+          <button class="s-optaget" aria-pressed="false">Optaget</button>
+          <button class="s-pause" aria-pressed="false">Pause</button>
+          <button class="s-ankommet" aria-pressed="false" disabled>Ankommet</button>
+        </div>
+      </div>
+      <div class="offline-bjaelke"><svg class="ikon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5.2-2.8M19 13a10 10 0 0 0-2-1.6M2 8.8a15 15 0 0 1 4.2-2.7M22 8.8A15 15 0 0 0 11 5"/></svg>Ingen net – din status sendes, når der er forbindelse</div>
+      <div class="faner" role="tablist">
+        <button role="tab" aria-selected="false">Kort</button>
+        <button role="tab" aria-selected="true">Hændelser<span class="taeller">3 nye</span></button>
+      </div>
+      <div class="sorter"><span>3 ledige · 1 taget</span><span class="vaelg"><span class="til">Nærmest</span><span>Nyeste</span></span></div>
+      <div class="liste">
+        <article class="hk prio-hoej" style="--c:var(--ny)">
+          <span class="kat" aria-hidden="true">🔥</span>
+          <div class="hoved"><h3><span class="prio-ikon" title="Høj prioritet">!</span>Brand i etageejendom</h3><span class="chip h-ny">Ny</span></div>
+          <p class="adr">Frederiks Allé 40, 8000 Aarhus C</p>
+          <div class="bund">
+            <span class="afstand"><b>1,4 km</b><small>ca. 4 min</small></span>
+            <span class="tid">· 3 min siden</span>
+            <button class="tag-knap">Tag opgaven</button>
+          </div>
+        </article>
+        <article class="hk" style="--c:var(--ny)">
+          <span class="kat" aria-hidden="true">🚗</span>
+          <div class="hoved"><h3>Færdselsuheld E45</h3><span class="chip h-ny">Ny</span></div>
+          <p class="adr">E45 ved Vejle</p>
+          <div class="bund">
+            <span class="afstand"><b>65 km</b><small>ca. 45 min</small></span>
+            <span class="tid">· 7 min siden</span>
+            <button class="tag-knap">Tag opgaven</button>
+          </div>
+        </article>
+        <article class="hk" style="--c:var(--ny)">
+          <span class="kat" aria-hidden="true">🛟</span>
+          <div class="hoved"><h3>Person i vandet</h3><span class="chip h-ny">Ny</span></div>
+          <p class="adr">Havnegade, 5000 Odense C</p>
+          <div class="bund">
+            <span class="afstand"><b>85 km</b><small>ca. 1 t</small></span>
+            <span class="tid">· 1 min siden</span>
+            <button class="tag-knap">Tag opgaven</button>
+          </div>
+        </article>
+        <article class="hk taget-af-andre" style="--c:var(--taget)">
+          <span class="kat" aria-hidden="true">🚓</span>
+          <div class="hoved"><h3>Større politiaktion</h3><span class="chip h-taget">Taget</span></div>
+          <p class="adr">Nørrebrogade 45, 2200 København N</p>
+          <div class="bund">
+            <span class="afstand"><b>155 km</b><small>18 min siden</small></span>
+            <span class="hvem">Sofie er på vej</span>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <div class="forklaring">
+      <h3>Hvad er ændret</h3>
+      <ol>
+        <li><b>Status i toppen som segmentkontrol</b> (44 px høj i stedet for ca. 76 px). Hændelserne starter ca. 90 px højere oppe. Den valgte status har samme tonede farve som chippen ved navnet.</li>
+        <li><b>Navnet til venstre, SOS til højre.</b> Den tomme plads ved logoet bruges. SOS bliver i hjørnet, hvor tommelfingeren er, og er stadig 48 px høj.</li>
+        <li><b>Afstand og køretid er det største tal på kortet</b>, lige ved knappen. "Nærmest" er standardsortering i marken.</li>
+        <li><b>Status som pille øverst til højre</b> i stedet for "Ledig opgave" brudt over to linjer.</li>
+        <li><b>Høj prioritet</b> vises med et lille "!" og en rødlig kant, ikke med rød flade.</li>
+        <li><b>"Tag opgaven"</b> i stedet for "Tag". Opgaver, som andre har taget, viser "Sofie er på vej" i stedet for knappen.</li>
+        <li><b>Offline-bjælke</b> (forslag 3.5): fotografen kan se, at status venter på net.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ============ 3. Kontoret ============ -->
+  <h2 class="afsnit">3. Kontoret: én række i toppen</h2>
+  <p class="note">I dag er der ni knapper på to rækker. Forslag: kun "+ Ny hændelse" er altid synlig. Resten ligger i "Værktøjer", og prikkerne i knappen viser status for Auto, Push og Pushover. Kode og Log ud flyttes til en profilmenu.</p>
+  <div class="k-top">
+    <span class="k-brand"><span class="logo" aria-hidden="true"><i></i></span>Fotovagt <small>kontoret</small></span>
+    <nav class="skift"><a href="#">Marken</a><a href="#" aria-current="page">Kontor</a></nav>
+    <div class="tal"><div class="n"><b>3</b><span>Nye</span></div><div class="g"><b>2</b><span>I gang</span></div><div class="l"><b>3</b><span>Ledige</span></div><div><b>6</b><span>Aktive</span></div></div>
+    <button class="k-knap primaer"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Ny hændelse</button>
+    <button class="k-knap" aria-expanded="true">Værktøjer <span class="prikker" aria-label="Auto til, Push fra, Pushover forbundet"><i style="--c:var(--ledig)"></i><i style="--c:var(--offline)"></i><i style="--c:var(--ledig)"></i></span></button>
+    <button class="k-knap" aria-label="Profil"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></button>
+  </div>
+  <div class="menu" role="menu" aria-label="Værktøjer">
+    <div><svg class="ikon" viewBox="0 0 24 24"><path d="M4 4h16v12H5l-1 4z"/></svg>Auto-tilbud<small>til</small></div>
+    <div><svg class="ikon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21a2 2 0 0 0 4 0"/></svg>Push på denne computer<small>fra</small></div>
+    <div><svg class="ikon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pushover<small>forbundet</small></div>
+    <hr>
+    <div><svg class="ikon" viewBox="0 0 24 24"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Stedviden</div>
+    <div><svg class="ikon" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/></svg>Indsatsrapport</div>
+  </div>
+
+  <div class="raekke">
+    <div class="panel">
+      <h3>Fotografer</h3>
+      <div class="tomme">Ingen fotografer endnu i Hovedstaden, Midtjylland, Nordjylland, Sjælland og Syddanmark.</div>
+      <div class="region"><span>Uden område</span><span>3 ledige af 7</span></div>
+      <div class="foto s-ledig"><span class="av">A</span><div class="info"><b>Anna</b><span class="chip s-ledig">Ledig</span> <small class="tid">21 min</small></div><button class="ikonknap" aria-label="Ring til Anna"><svg class="ikon" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></button></div>
+      <div class="foto s-optaget"><span class="av">J</span><div class="info"><b>Jonas</b><span class="chip s-optaget">Optaget</span> <small class="tid">4 min</small></div><button class="ikonknap" aria-label="Ring til Jonas"><svg class="ikon" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></button></div>
+      <div class="foto s-ankommet"><span class="av">P</span><div class="info"><b>Peter</b><span class="chip s-ankommet">Ankommet</span> <small class="tid">37 min</small></div><button class="ikonknap" aria-label="Ring til Peter"><svg class="ikon" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></button></div>
+    </div>
+
+    <article class="k-hk">
+      <div class="hoved"><h3>🔥 Brand i etageejendom</h3><span class="chip h-ny">Ny</span></div>
+      <p>Frederiks Allé 40, 8000 Aarhus C</p>
+      <p class="meta">kl. 10.07 · 3 min siden · pushover · Døgnrapport: Brand</p>
+      <div class="naer"><span>Nærmeste ledige: <b>Mads</b>, 1,4 km</span><button>Giv til Mads</button></div>
+      <div class="k-handl">
+        <button class="primaer">Tildel</button>
+        <button>Kommentér</button>
+        <select aria-label="Prioritet"><option>Prioritet: Normal</option><option>Høj</option><option>Lav</option></select>
+        <button aria-label="Flere handlinger">⋯</button>
+      </div>
+    </article>
+
+    <div class="sos-boks" role="alert">
+      <span class="aktiv-maerke">AKTIV SOS</span><br>
+      <b>🆘 Mads har brug for hjælp</b>
+      <p style="margin:6px 0 0">kl. 10.12 · Vejlevej 12, 7100 Vejle · 2 er på vej</p>
+      <p class="note" style="color:#fff;opacity:.9;margin:8px 0 0">Har brugeren slået bevægelse fra, er boksen stadig tydelig: hvid kant, rød ramme og "AKTIV SOS" (forslag 1.8).</p>
+    </div>
+  </div>
+  <p class="note" style="margin-top:14px">Prioritet: én vælger i stedet for tre knapper på hvert kort. Afslut, Annullér og Ret ligger under "⋯". Fem tomme regioner bliver til én linje. Alle trykflader er 44 px.</p>
+
+  <!-- ============ 4. CSS-opbygning ============ -->
+  <h2 class="afsnit">4. Opbygning af style.css</h2>
+  <p class="note">Forslag til rækkefølge med <code>@layer</code>, så nye regler ikke skal lægges nederst for at "vinde", og så de dobbelte regler kan samles.</p>
+<code class="blok">@layer tokens, base, komponenter, marken, kontor, sos, hjaelpere;
+
+@layer tokens     { :root { /* farver, skala, skygger (som øverst i denne fil) */ } }
+@layer base       { *, body, h1–h4, a, :focus-visible, input/select/textarea }
+@layer komponenter{ knap, chip, pille, ark/dialog, toast, h-kort, tidslinje, kort/nåle }
+@layer marken     { body.marken … (topbjælke, segmentkontrol, faner, liste) }
+@layer kontor     { body.kontor … (grid, paneler, top med Værktøjer-menu, rapport) }
+@layer sos        { .sos-knap, .sos-boks, dialog.sos-dialog, .sos-pin }
+@layer hjaelpere  { [hidden], .kun-smal/.kun-bred, .skjult-label, reduced-motion }
+
+/* Dark mode for kortfliser, når der ikke bruges et mørkt kortlag */
+@media (prefers-color-scheme: dark) {
+  .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
+}</code>
+</div>
+</body>
+</html>
