@@ -102,6 +102,12 @@ function supabaseBackend() {
         ændret(); state.nytTilbud = null;
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'omraader' }, () => hentOmraader())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'nyhedsartikler' }, e => {
+        if (!state.nyheder) return;   // kun når dashboardet har været åbnet
+        if (e.eventType === 'DELETE') state.nyheder = state.nyheder.filter(x => x.id !== e.old.id);
+        else { const i = state.nyheder.findIndex(x => x.id === e.new.id); if (i >= 0) state.nyheder[i] = { ...state.nyheder[i], ...e.new }; else state.nyheder.unshift(e.new); }
+        ændret();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'helikoptere' }, e => {
         if (e.eventType === 'DELETE') state.helikoptere = state.helikoptere.filter(x => x.hex !== e.old.hex);
         else { const i = state.helikoptere.findIndex(x => x.hex === e.new.hex); if (i >= 0) state.helikoptere[i] = e.new; else state.helikoptere.push(e.new); }
@@ -230,6 +236,21 @@ function supabaseBackend() {
     async ikkeSamme(a, b) {
       const { error } = await sb.rpc('ikke_samme_par', { x: a, y: b });
       if (error) throw new Error(error.message);
+    },
+    // Nyheds-dashboard (nyhedsfeed.sql): 112-nyheder fra DR, TV 2-regionerne og Ritzau
+    async hentNyheder() {
+      const { data, error } = await sb.from('nyhedsartikler').select('id,kilde,titel,resume,url,udgivet,kategori,haendelse_id,koblet,koblet_point')
+        .gt('udgivet', new Date(Date.now() - 3 * 864e5).toISOString()).order('udgivet', { ascending: false }).limit(400);
+      if (error) throw new Error(error.message);
+      state.nyheder = data; ændret();
+      return data;
+    },
+    async koblNyhed(artikel, haendelse) {
+      const { error } = await sb.rpc('nyhed_kobl', { artikel, haendelse });
+      if (error) throw new Error(error.message);
+      const a = (state.nyheder || []).find(x => x.id === artikel);
+      if (a) { a.haendelse_id = haendelse; a.koblet = haendelse ? 'manuel' : null; }
+      ændret();
     },
     async sammenForslag() {
       const { data, error } = await sb.rpc('sammen_forslag');
@@ -672,6 +693,23 @@ function demoBackend() {
     ikkeSamme: kør((a, b) => { kontor(); (db.ikkeSamme ||= []).push({ a: a < b ? a : b, b: a < b ? b : a }); }),
     async hentSammenlaegViden() { læs(); return { laert: [], ikke: db.ikkeSamme || [] }; },
     async sammenForslag() { return []; },
+    hentNyheder: kør(async () => {
+      const t = m => new Date(Date.now() - m * 60e3).toISOString();
+      db.nyheder ||= [
+        { id: 1, kilde: 'TV SYD', titel: 'Brand i etageejendom i Aarhus – beboere evakueret', resume: 'Beredskabet er kørt til Frederiks Allé, hvor der er brand i en lejlighed.', url: 'https://www.tvsyd.dk/demo/brand', udgivet: t(12), kategori: 'Brand', haendelse_id: null, koblet: null },
+        { id: 2, kilde: 'TV 2 Fyn', titel: 'Person i vandet ved Odense Havn', resume: 'Redningsfolk leder efter en person i havnebassinet.', url: 'https://www.tv2fyn.dk/demo/havn', udgivet: t(25), kategori: 'Redning', haendelse_id: null, koblet: null },
+        { id: 3, kilde: 'DR', titel: 'Færdselsuheld spærrer E45 ved Vejle', resume: 'To biler er stødt sammen i nordgående retning.', url: 'https://www.dr.dk/demo/e45', udgivet: t(40), kategori: 'Trafik', haendelse_id: null, koblet: null },
+      ];
+      state.nyheder = db.nyheder; return db.nyheder;
+    }),
+    koblNyhed: kør((artikel, haendelse) => {
+      kontor();
+      const a = (db.nyheder || []).find(x => x.id === artikel); if (!a) throw new Error('Nyheden findes ikke');
+      for (const h of db.haendelser) h.nyheder = (h.nyheder || []).filter(n => n.url !== a.url);
+      a.haendelse_id = haendelse; a.koblet = haendelse ? 'manuel' : null;
+      const h = haendelse && H(haendelse); if (h) h.nyheder = [...(h.nyheder || []), { url: a.url, titel: a.titel, tid: a.udgivet }];
+      state.nyheder = db.nyheder;
+    }),
     // Demo: et par stationer, så filteret kan prøves
     async hentStationer() {
       return [

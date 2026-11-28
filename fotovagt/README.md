@@ -344,3 +344,9 @@ Bygget efter `fotovagt-forslag/IMPLEMENTERING.md` (trin 2–6). Appens arbejdsga
 - **Kører ud fra**: forslagsliste med rigtige adresser (vej, husnummer, postnummer) fra OpenStreetMaps adressedata. En adresse, der ikke findes, gemmes ikke.
 - **Døgnrapport på hrc-fotos.dk** (`supabase/functions/doegn-wp`): hver morgen laves en side for i går under hrc-fotos.dk/doegnrapport/. Kræver hemmelighederne `WP_BRUGER` og `WP_APP_KODE` (WordPress-programadgangskode) i Supabase → Edge Functions → Secrets.
 - **AdSense**: sæt `adsense.klient` (ca-pub-…) og pladsnumre i `config.js`. Annoncer vises kun, når døgnrapporten åbnes direkte, ikke i rammen på hrc-fotos.dk.
+
+## Version 15.11–15.20 (risiko, sammenlægning, nyheder)
+- **Risikovurdering** (`risiko()` i `faelles.js`): vejr og vind på alle hændelseskort og en sikkerhedsboks i detaljerne for kontor og fotograf: risikoniveau, hvordan hændelsen kan udvikle sig (brand, landbrug, naturbrand, bilbrand, flysikkerhedslanding/standby, højderedning, frigørelse, vand, farlige stoffer) og råd (fx stå vindop for røgen, motorvej, lufthavn).
+- **Sammenlægning** (`supabase/sammenlaeg.sql`): knappen "🔗 Læg sammen" og forslag fra `sammen_forslag()` (point for afstand, tid, adresse, vej, gade, station, kategori, bilbrand og tidligere sammenlægninger). Hver sammenlægning gemmes i `sammenlaegninger`, og "Ikke samme" i `ikke_samme`, så forslagene bliver bedre.
+- **Nyheder** (`supabase/nyhedsfeed.sql`): feeds i `nyhedsfeeds`, artikler i `nyhedsartikler`. `er_112_nyhed()` filtrerer, `nyhed_kobl_auto()` kobler automatisk ved mindst 5 point, `nyhed_kobl()` kobler i hånden. Nye feeds lægges ind i tabellen `nyhedsfeeds`.
+- **Udkald til akuthjælper** står på kontorets ignorér-liste (Pushover → Sprunget over) og oprettes ikke.

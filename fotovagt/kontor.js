@@ -381,6 +381,95 @@ async function åbnInvitationer() {
 const KILDE = { kontor: ['✋ Kontoret', 'k-kontor'], geokod: ['🔎 Opslag', 'k-geokod'], nyhed: ['📰 Nyhed', 'k-nyhed'], osm: ['🗺 Kortdata', 'k-osm'] };
 const SV_TYPE = { adresse: '📍 Adresser', vej: '🛣 Vejnavne', station: '🚒 Stationer' };
 let svData = [], svType = 'alle', svSøg = '';
+// ---------------------------------------------------------------------------------
+// Nyheds-dashboard: 112-nyheder fra medierne (databasen henter dem hvert 5. minut og kobler dem selv til
+// hændelser, når by/vej/slags passer). Kontoret kan koble og fjerne i hånden.
+let nyhedsFilter = 'alle', nyhedsSøg = '';
+const nyhedsKat = { Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Vejr: '🌧️', Miljø: '☣️', Andet: '📰' };
+// Forslag til manuel kobling: hændelser fra de seneste 12 timer med samme by/kategori først
+function nyhedsKandidater(a) {
+  const t = `${a.titel} ${a.resume || ''}`.toLowerCase();
+  const byAf = h => ((String(h.adresse || '').match(/\d{4}\s+([^,]+)$/) || [])[1] || (/\d/.test(h.adresse || '') ? '' : String(h.adresse || '').split(',').pop())).replace(/\s+[A-ZÆØÅ]{1,2}$/, '');
+  return S().haendelser.filter(h => h.status !== 'annulleret' && Date.now() - new Date(h.oprettet) < 12 * 3600e3)
+    .map(h => {
+      const by = byAf(h).trim().toLowerCase();
+      const p = (by.length >= 4 && t.includes(by) ? 3 : 0) + (h.kategori === a.kategori ? 2 : 0) + (aktiv(h) ? 1 : 0);
+      return { h, p };
+    }).sort((x, y) => y.p - x.p || String(y.h.oprettet).localeCompare(String(x.h.oprettet)));
+}
+function tegnNyheder() {
+  const dlg = $('#dlg-nyheder'); if (!dlg?.open) return;
+  const alle = S().nyheder || [];
+  const søg = nyhedsSøg.trim().toLowerCase();
+  const vis = alle.filter(a => (nyhedsFilter === 'alle' || (nyhedsFilter === 'koblet' ? a.haendelse_id : !a.haendelse_id))
+    && (!søg || `${a.titel} ${a.resume || ''} ${a.kilde}`.toLowerCase().includes(søg)));
+  const iDag = alle.filter(a => Date.now() - new Date(a.udgivet) < 24 * 3600e3);
+  const pr = {}; for (const a of iDag) pr[a.kategori || 'Andet'] = (pr[a.kategori || 'Andet'] || 0) + 1;
+  dlg.querySelector('.nyh-oversigt').innerHTML = `<b>Seneste døgn:</b> ${iDag.length} nyheder om 112-området`
+    + (Object.keys(pr).length ? ` – ${Object.entries(pr).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${nyhedsKat[k] || '📰'} ${n} ${esc(k.toLowerCase())}`).join(' · ')}` : '')
+    + ` · ${iDag.filter(a => a.haendelse_id).length} koblet til hændelser`;
+  dlg.querySelector('.nyh-liste').innerHTML = vis.length ? vis.map(a => {
+    const h = a.haendelse_id ? H(a.haendelse_id) : null;
+    return `<article class="nyh" data-artikel="${a.id}">
+      <div class="nyh-ikon">${nyhedsKat[a.kategori] || '📰'}</div>
+      <div class="nyh-tekst">
+        <p class="nyh-meta">${esc(a.kilde || '')} · kl. ${klokken(a.udgivet)} · ${siden(a.udgivet)} siden</p>
+        <h3><a href="${esc(sikkerUrlK(a.url))}" target="_blank" rel="noopener noreferrer">${esc(a.titel)}</a></h3>
+        ${a.resume ? `<p class="nyh-resume">${esc(a.resume)}</p>` : ''}
+        ${h ? `<p class="nyh-koblet">🔗 ${a.koblet === 'auto' ? 'Koblet automatisk' : 'Koblet'} til <button class="link" data-zoom="${h.id}">${ikonFor(h)} ${esc(h.titel)}</button> <button class="link" data-afkobl="${a.id}">Fjern</button></p>`
+          : `<div class="nyh-kobl"><select data-kobl="${a.id}" aria-label="Kobl nyheden til en hændelse"><option value="">Kobl til hændelse …</option>
+              ${nyhedsKandidater(a).slice(0, 25).map(({ h: x, p }) => `<option value="${x.id}">${p >= 4 ? '★ ' : ''}${esc(x.titel.slice(0, 60))} – ${esc((x.adresse || '').slice(0, 30))} (kl. ${klokken(x.oprettet)})</option>`).join('')}
+            </select></div>`}
+      </div>
+    </article>`;
+  }).join('') : '<p class="tom">Ingen nyheder i det valgte filter.</p>';
+}
+const sikkerUrlK = u => /^https?:\/\//i.test(String(u || '')) ? u : '#';
+async function åbnNyheder() {
+  let dlg = $('#dlg-nyheder');
+  if (!dlg) {
+    dlg = document.createElement('dialog'); dlg.id = 'dlg-nyheder'; dlg.className = 'ark bred';
+    dlg.innerHTML = `<div class="ark-indhold">
+      <div class="ark-top"><h2>📰 Nyheder fra 112-området</h2><button class="luk" data-luk-nyh aria-label="Luk">✕</button></div>
+      <p class="hint">DR, TV 2-regionerne og Ritzau hentes hvert 5. minut. Fotovagt frasorterer det, der ikke handler om brand, ulykker, politi og redning, og kobler selv nyheden til den hændelse, den handler om, når by, vej og slags passer. Du kan også koble og fjerne i hånden – nyheden vises så på hændelsen og i døgnrapporten.</p>
+      <p class="nyh-oversigt"></p>
+      <div class="nyh-værktøj">
+        <div class="filter" role="tablist">
+          <button data-nyh-filter="alle" aria-selected="true">Alle</button>
+          <button data-nyh-filter="ikke" aria-selected="false">Ikke koblet</button>
+          <button data-nyh-filter="koblet" aria-selected="false">Koblet</button>
+        </div>
+        <input type="search" class="nyh-søg" placeholder="Søg i nyhederne" aria-label="Søg i nyhederne">
+      </div>
+      <div class="nyh-liste"></div></div>`;
+    document.body.append(dlg);
+    dlg.addEventListener('click', async e => {
+      if (e.target === dlg || e.target.closest('[data-luk-nyh]')) return dlg.close();
+      const f = e.target.closest('[data-nyh-filter]');
+      if (f) { nyhedsFilter = f.dataset.nyhFilter; dlg.querySelectorAll('[data-nyh-filter]').forEach(b => b.setAttribute('aria-selected', String(b === f))); return tegnNyheder(); }
+      const af = e.target.closest('[data-afkobl]');
+      if (af) return prøv(() => store.koblNyhed(+af.dataset.afkobl, null), 'Koblingen er fjernet.');
+      const z = e.target.closest('[data-zoom]');
+      if (z) { dlg.close(); return vælg(z.dataset.zoom); }
+    });
+    dlg.addEventListener('change', e => {
+      const s = e.target.closest('select[data-kobl]'); if (!s || !s.value) return;
+      prøv(() => store.koblNyhed(+s.dataset.kobl, s.value), 'Nyheden er koblet til hændelsen.');
+    });
+    dlg.querySelector('.nyh-søg').addEventListener('input', e => { nyhedsSøg = e.target.value; tegnNyheder(); });
+  }
+  dlg.showModal();
+  dlg.querySelector('.nyh-liste').innerHTML = '<p class="tom">Henter nyheder …</p>';
+  try { await store.hentNyheder(); } catch (e) { dlg.querySelector('.nyh-liste').innerHTML = `<p class="tom">Kunne ikke hente nyheder: ${esc(store.fejlTekst(e))}</p>`; return; }
+  tegnNyheder();
+}
+// Antal nye (ikke koblede) nyheder den seneste time på knappen
+function tegnNyhedsAntal() {
+  const el = $('#nyheder-antal'); if (!el) return;
+  const n = (S().nyheder || []).filter(a => !a.haendelse_id && Date.now() - new Date(a.udgivet) < 3600e3).length;
+  el.hidden = !n; el.textContent = n;
+}
+
 async function åbnStedviden() {
   let dlg = $('#dlg-stedviden');
   if (!dlg) {
@@ -771,7 +860,7 @@ async function start() {
   hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort); helikopterLag(kort);
 
   store.lyt(s => {
-    tegn();
+    tegn(); tegnNyheder(); tegnNyhedsAntal();
     if (s.nyHaendelse) { bip(); toast(`Ny hændelse: ${s.nyHaendelse.titel}`, 'ny'); hentForslagSammen(); }
     // Nye forslag om opgradering: lyd og besked
     const nuForslag = s.haendelser.filter(forslag).map(h => h.id);
@@ -903,6 +992,9 @@ async function start() {
   $('#btn-kode').onclick = () => åbnSkiftKode();
   $('#btn-rapport').onclick = () => åbnRapport();
   $('#btn-stedviden').onclick = () => åbnStedviden();
+  $('#btn-nyheder').onclick = () => åbnNyheder();
+  $('#btn-nyheder-menu').onclick = () => åbnNyheder();
+  store.hentNyheder().catch(() => {});
   $('#btn-inviter').onclick = () => åbnInvitationer();
   $('#btn-omraader').onclick = () => åbnOmraader();
   // Telefon: knapperne ligger i en menu, så toppen ikke fylder halvdelen af skærmen
