@@ -12,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=21">
+  <link rel="stylesheet" href="style.css?v=22">
   <script src="config.js?v=1"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script type="module" src="kontor.js?v=27"></script>
+  <script type="module" src="kontor.js?v=28"></script>
 </head>
 <body class="kontor">
   <section id="login" class="login" hidden>
@@ -36,7 +36,7 @@
       </div>
       <p id="login-msg" class="fejl-tekst" role="alert"></p>
       <a class="hrc-logo" href="https://hrc-fotos.dk" target="_blank" rel="noopener"><img src="hrc-fotos-logo.png" alt="HRC-Fotos" width="93" height="48"></a>
-      <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a></p>
+      <p class="copyright">© <a href="https://hrc-fotos.dk" target="_blank" rel="noopener">HRC-Fotos.dk</a> · <span data-version>Fotovagt</span></p>
     </div>
   </section>
 
@@ -57,6 +57,7 @@
         <button id="btn-rapport" class="secondary" title="Indsatsrapport: hvilke hændelser fotograferne har kørt på">📄 Rapport</button>
         <button id="btn-kode" class="secondary" title="Skift din adgangskode">🔑 Kode</button>
         <button id="btn-logud" class="secondary">Log ud</button>
+        <span class="app-version" data-version title="Fotovagts version"></span>
         </div>
       </div>
     </header>

@@ -1,0 +1,15 @@
+# Fotovagts versioner
+
+Versionsnummeret står i `version.json` og vises i appen (login, Min profil og Kontorets topmenu).
+Ændres nummeret, får åbne apps besked om at opdatere.
+
+* **Nyt hovednummer** (fx 11 → 12): kun ved store ændringer og nye funktioner.
+* **Små trin** (fx 11.01, 11.02 … 11.10): rettelser og mindre justeringer.
+
+(Supabase tæller selv hver udrulning af en serverfunktion – det tal er ikke Fotovagts version.)
+
+| Version | Indhold |
+|---|---|
+| 11.02 | Tabt gods: lav prioritet og ingen tilbud/blink, indtil den udvikler sig |
+| 11.01 | ISL-forespørgsel: lav, hæves til normal ved assistance; assistance lægges ind i forespørgslen |
+| 11.00 | Stedviden (lærer adresser, vejnavne, stationer) + 🧠 Stedviden på kontoret; eftersyn lægges ind i brand fra seneste døgn |

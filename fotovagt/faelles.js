@@ -552,6 +552,8 @@ async function tjekVersion() {
     const r = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
     if (!r.ok) return;
     const { version } = await r.json();
+    // Versionsnummer vises i appen ("Fotovagt 11.02"): store ændringer/nye funktioner = nyt hovednummer, ellers .01-trin
+    document.querySelectorAll('[data-version]').forEach(e => { e.textContent = `Fotovagt ${version}`; });
     if (!kendtVersion) { kendtVersion = version; return; }
     if (version === kendtVersion) return;
     const iGang = document.querySelector('dialog[open]') || [...document.querySelectorAll('textarea')].some(t => t.value.trim());
