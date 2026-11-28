@@ -9,7 +9,7 @@ import {
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
   PRIO, prioAf, efterPrio, iNærheden, indsigt, indsigtHtml,
   stationsKontrol, regionFraPostnr, avatar, fotoFelt,
-  nyhederHtml, adresseForslag, adresseFelt, helikopterLag,
+  nyhederHtml, adresseForslag, adresseFelt, helikopterLag, vejrRisikoLinje, sikkerhedHtml,
 } from './faelles.js';
 
 let sLag;
@@ -126,6 +126,55 @@ function tilbudLinjer(h) {
 // Forslag om opgradering, som kontoret ikke har taget stilling til endnu
 const forslag = h => h.eskalering_forslag && !h.eskaleret && !h.eskalering_afvist && aktiv(h);
 
+// Forslag om sammenlægning (databasefunktionen sammen_forslag i sammenlaeg.sql). Hentes ved ændringer og hvert minut.
+let forslagSammen = [], forslagTimer = null;
+function hentForslagSammen(straks = false) {
+  clearTimeout(forslagTimer);
+  forslagTimer = setTimeout(async () => {
+    try { forslagSammen = await store.sammenForslag(); tegnHaendelser(); } catch { /* ikke kørt endnu */ }
+  }, straks ? 0 : 4000);
+}
+function sammenForslagHtml(h) {
+  const f = forslagSammen.find(x => x.b === h.id && H(x.a) && aktiv(H(x.a)));
+  if (!f) return '';
+  const a = H(f.a);
+  return `<div class="samme-forslag">
+    <p>🔗 <b>Måske samme hændelse som</b> «${esc(a.titel)}»${f.km != null ? ` · ${String(f.km).replace('.', ',')} km` : ''} · ${f.minutter} min før
+      <br><small>${(f.grunde || []).map(esc).join(' · ')}</small></p>
+    <div class="knap-række"><button data-slaa="${f.a}" data-fjern="${h.id}">Læg sammen</button>
+      <button class="secondary" data-ikke="${h.id}" data-ikke-med="${f.a}">Ikke samme</button></div>
+  </div>`;
+}
+// Manuel sammenlægning: vælg en anden aktiv hændelse, der lægges ind i denne
+function åbnSammenlæg(id) {
+  const h = H(id); if (!h) return;
+  let dlg = $('#dlg-samml');
+  if (!dlg) {
+    dlg = document.createElement('dialog'); dlg.id = 'dlg-samml'; dlg.className = 'ark';
+    dlg.innerHTML = '<div class="ark-indhold"></div>'; document.body.append(dlg);
+    dlg.addEventListener('click', async e => {
+      if (e.target === dlg || e.target.closest('[data-luk-samml]')) return dlg.close();
+      const b = e.target.closest('[data-ind]'); if (!b) return;
+      const behold = dlg.dataset.behold, fjern = b.dataset.ind;
+      if (!confirm(`Læg «${H(fjern)?.titel}» ind i «${H(behold)?.titel}»?`)) return;
+      dlg.close();
+      await prøv(() => store.slaaSammen(behold, fjern), 'Hændelserne er lagt sammen.');
+      hentForslagSammen(true);
+    });
+  }
+  dlg.dataset.behold = id;
+  const andre = S().haendelser.filter(x => x.id !== id && aktiv(x))
+    .map(x => ({ x, d: h.lat != null && x.lat != null ? km(h, x) : null, f: forslagSammen.find(f => (f.a === id && f.b === x.id) || (f.b === id && f.a === x.id)) }))
+    .sort((p, q) => (q.f?.point || 0) - (p.f?.point || 0) || (p.d ?? 999) - (q.d ?? 999));
+  dlg.querySelector('.ark-indhold').innerHTML = `
+    <div class="ark-top"><h2>🔗 Læg sammen med «${esc(h.titel)}»</h2><button class="luk" data-luk-samml aria-label="Luk">✕</button></div>
+    <p class="hint">Vælg den hændelse, der er den samme. Den lægges ind i denne (tekst, nyheder, placering og fotograf flyttes med), og Fotovagt husker det til næste gang.</p>
+    <div class="samml-liste">${andre.length ? andre.map(({ x, d, f }) => `
+      <div class="samml-række">${ikonFor(x)} <div><b>${esc(x.titel)}</b><br><small>${esc(x.adresse || '')} · kl. ${klokken(x.oprettet)}${d != null ? ` · ${kmTekst(d)}` : ''}${f ? ` · <b>forslag (${f.point} point)</b>` : ''}</small></div>
+        <button class="lille-knap" data-ind="${x.id}">Læg ind her</button></div>`).join('') : '<p class="tom">Ingen andre aktive hændelser.</p>'}</div>`;
+  dlg.showModal();
+}
+
 function haendelseKort(h) {
   const taget = h.taget_af ? P(h.taget_af) : null;
   return `
@@ -135,6 +184,8 @@ function haendelseKort(h) {
         <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille h-${h.status}">${H_STATUS[h.status]}</span></div>
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}${O(h.omraade_id) ? ` · <span class="omr-mærke" style="--c:${esc(O(h.omraade_id).farve)}">${esc(O(h.omraade_id).navn)}</span>` : ''}</p>
+        ${aktiv(h) ? (valgtId === h.id ? sikkerhedHtml(h) : vejrRisikoLinje(h)) : ''}
+        ${aktiv(h) ? sammenForslagHtml(h) : ''}
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)}${h.taget_tid ? ` · taget kl. ${klokken(h.taget_tid)}` : ''}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
         ${aktiv(h) ? (() => {
           const nær = iNærheden(h, S().haendelser);
@@ -161,6 +212,7 @@ function haendelseKort(h) {
             <button class="secondary" data-luk="${h.id}" data-s="annulleret">Annullér</button>`
             : `<button class="secondary" data-luk="${h.id}" data-s="ny">Genåbn</button>`}
           <button class="secondary" data-ret="${h.id}">Ret</button>
+          ${aktiv(h) ? `<button class="secondary" data-saml="${h.id}" title="Læg en anden hændelse sammen med denne">🔗 Læg sammen</button>` : ''}
           ${(n => n ? `<button class="ny-kommentar-knap" data-kommentarer="${h.id}">💬 ${n} ny${n > 1 ? 'e' : ''}</button>`
             : `<button class="secondary" data-kommentarer="${h.id}">💬${kommentarerTil(h.id).length ? ` ${kommentarerTil(h.id).length}` : ' Kommentér'}</button>`)(nyeKommentarer(h))}
         </div>
@@ -720,7 +772,7 @@ async function start() {
 
   store.lyt(s => {
     tegn();
-    if (s.nyHaendelse) { bip(); toast(`Ny hændelse: ${s.nyHaendelse.titel}`, 'ny'); }
+    if (s.nyHaendelse) { bip(); toast(`Ny hændelse: ${s.nyHaendelse.titel}`, 'ny'); hentForslagSammen(); }
     // Nye forslag om opgradering: lyd og besked
     const nuForslag = s.haendelser.filter(forslag).map(h => h.id);
     const nyeF = nuForslag.filter(id => !kendteForslag.has(id));
@@ -760,6 +812,13 @@ async function start() {
   });
   // Klik overalt på siden (lister, kort-popups)
   document.body.addEventListener('click', e => {
+    const sl = e.target.closest('[data-slaa],[data-ikke],[data-saml]');
+    if (sl && !sl.closest('dialog')) {
+      if (sl.dataset.saml) return åbnSammenlæg(sl.dataset.saml);
+      if (sl.dataset.slaa) return prøv(() => store.slaaSammen(sl.dataset.slaa, sl.dataset.fjern), 'Hændelserne er lagt sammen.').then(() => hentForslagSammen(true));
+      if (sl.dataset.ikke) { forslagSammen = forslagSammen.filter(f => !(f.b === sl.dataset.ikke && f.a === sl.dataset.ikkeMed)); tegnHaendelser();
+        return prøv(() => store.ikkeSamme(sl.dataset.ikke, sl.dataset.ikkeMed), 'Forslaget er fjernet. Fotovagt husker det.'); }
+    }
     const t = e.target.closest('[data-prio],[data-eskaler],[data-giv],[data-tildel],[data-luk],[data-ret],[data-kommentarer],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
     if (!t || t.closest('dialog')) return;
     const d = t.dataset;
@@ -859,6 +918,8 @@ async function start() {
   for (const id of ['#dlg-ret', '#dlg-foto']) $(id).addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
   setInterval(() => { if (!document.hidden) { tegnFotografer(); tegnHaendelser(); tegnNøgletal(); } }, 30e3);
+  hentForslagSammen(true);
+  setInterval(() => { if (!document.hidden) hentForslagSammen(true); }, 60e3);
   setInterval(hentPoStatus, 60e3);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') store.hentAlt().catch(() => {}); });
 }

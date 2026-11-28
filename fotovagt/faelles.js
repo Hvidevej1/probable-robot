@@ -920,6 +920,115 @@ export function vejrTekst(v) {
     v.vind != null ? `vind ${komma(v.vind)} m/s${v.stoed != null && v.stoed > v.vind + 2 ? ` (stød ${komma(v.stoed)})` : ''}${v.retning != null ? ` fra ${VINDRETNING[Math.round(v.retning / 45) % 8]}` : ''}` : '',
     v.nedboer > 0 ? `${komma(v.nedboer)} mm nedbør/t` : ''].filter(Boolean).join(' · ');
 }
+// Risikovurdering ud fra det, vi ved: hændelsestype, vejret, stedet (motorvej, vand), farlige stoffer, mørke
+// og omfang (enheder/assistancer). Giver niveau, grunde og sikkerhedsråd til fotografen.
+const RET_KORT = ['N', 'NØ', 'Ø', 'SØ', 'S', 'SV', 'V', 'NV'];
+function mørkt(nu = new Date()) {
+  // Groft for Danmark: solopgang/-nedgang pr. måned (lokal tid)
+  const op = [8.7, 8.0, 6.9, 6.5, 5.3, 4.6, 4.8, 5.6, 6.6, 7.6, 7.6, 8.5], ned = [16.0, 17.0, 18.1, 20.1, 21.0, 21.8, 21.7, 20.8, 19.5, 18.2, 16.3, 15.7];
+  const t = new Intl.DateTimeFormat('da-DK', { hour: 'numeric', minute: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Copenhagen' }).formatToParts(nu);
+  const timer = +t.find(x => x.type === 'hour').value + +t.find(x => x.type === 'minute').value / 60, m = nu.getMonth();
+  return timer < op[m] || timer > ned[m];
+}
+export function risiko(h) {
+  const t = `${h?.titel || ''} ${h?.kategori || ''} ${String(h?.tekst || '').split('\n').slice(0, 6).join(' ')}`.toLowerCase();
+  const v = h?.vejr || null;
+  const grunde = [], råd = [];
+  let point = 0;
+  const brand = /brand|røg|ild|btbf|bygn\.?brand/.test(t) && !/brandalarm|\baba\d*\b|eftersyn/.test(t);
+  const motorvej = /motorvej|\be\d{2}\b|\bmtv\b/.test(t);
+  const farlig = /farlige stoffer|kemikal|ammoniak|gasudslip|\bgas\b|udslip|klor|syre|asbest|eksplosion|brint|el\/brint|elbil|lithium|batteri/.test(t);
+  const vand = /drukn|person i vand|(?<!luft)havn|kæntr|gennem isen|redning til søs|strand|kajkant/.test(t);
+  const stor = h?.eskaleret || (h?.antal_ass || 0) >= 2 || (h?.antal_enheder || 0) >= 6 || /\boc\b|stor brand|storbrand/.test(t);
+  if (/bygn\.?\s?brand|bygningsbrand|etage|lejlighed/.test(t) && brand) { point += 2; grunde.push('bygningsbrand'); }
+  else if (brand) { point += 1; grunde.push('brand'); }
+  if (/frontal|fastklemt|dødsulykke|omkommet|dræbt|alvorligt kvæstet|skud|knivstik|bevæbnet/.test(t)) { point += 2; grunde.push('alvorlig personskade eller vold'); }
+  if (stor) { point += 2; grunde.push('stort udkald (flere enheder/assistance)'); }
+  if (farlig) { point += 2; grunde.push('mulige farlige stoffer'); råd.push('Mulige farlige stoffer: hold god afstand (mindst 300 m) og stå vindop. Følg beredskabets afspærring.'); }
+  if (motorvej) { point += 1; grunde.push('motorvej'); råd.push('Motorvej: stop aldrig i nødsporet for at fotografere. Brug afkørsel eller rasteplads, og bær refleksvest.'); }
+  if (vand) { point += 1; grunde.push('ved vand'); råd.push('Ved vand: hold afstand til kajkant og is.'); }
+  if (v) {
+    const vind = +v.vind || 0, stød = +(v.stoed ?? v.vind) || 0, temp = v.temp != null ? +v.temp : null, regn = +v.nedboer || 0, sym = v.symbol || '';
+    const fra = v.retning != null ? Math.round(v.retning / 45) % 8 : null;
+    if (brand && fra != null && vind >= 2) {
+      const til = (fra + 4) % 8;
+      råd.push(`Røgen driver mod ${VINDRETNING[til]} (vind fra ${VINDRETNING[fra]}, ${komma(vind)} m/s). Stil dig vindop – på ${VINDRETNING[fra]}siden.`);
+    }
+    if (brand && stød >= 13.9) { point += 2; grunde.push(`hård vind (stød ${komma(stød)} m/s) kan sprede branden`); }
+    if (stød >= 24.5) { point += 2; grunde.push(`stormvejr (stød ${komma(stød)} m/s)`); råd.push('Storm: pas på væltende træer og løse genstande.'); }
+    if (temp != null && temp <= 1 && (regn > 0 || /sleet|snow|rain/.test(sym))) { point += 1; grunde.push(`glat føre (${komma(temp)} °C med nedbør)`); råd.push('Glatte veje: kør forsigtigt – der er risiko for isslag.'); }
+    else if (temp != null && temp <= 0) råd.push(`Frost (${komma(temp)} °C): mulig rimfrost på vejene.`);
+    if (/^fog/.test(sym) || (+v.taage || 0) >= 50) { point += 1; grunde.push('tåge'); råd.push('Tåge: nedsat sigtbarhed – særligt farligt ved motorvej.'); }
+    if (vand && (vind >= 10.8 || (temp != null && temp < 8))) { point += 1; grunde.push('koldt eller blæsende ved vand'); }
+  }
+  if (mørkt()) { råd.push('Mørkt: brug refleksvest og lygte.'); if (motorvej) point += 1; }
+  // Hvordan kan hændelsen udvikle sig? (typisk forløb efter hændelsestype, justeret for vind, tid og omfang)
+  const udvikling = [];
+  const vindTil = v?.retning != null ? VINDRETNING[(Math.round(v.retning / 45) + 4) % 8] : null, vindMs = +(v?.vind) || 0;
+  const nat = mørkt();
+  const fly = /flysikkerhed|sikkerhedslanding|nødlanding|standby.*(fly|lufthavn)|fly.*standby|flystyrt|flyulykke/.test(t);
+  const højde = /højderedning|redn\.?\s?-?\s?højde|person på (tag|kran|mast|bro|stillads)|redning fra højde|drejestige.*redning/.test(t);
+  if (fly) {
+    if (/flystyrt|flyulykke|nødlanding/.test(t)) { point += 3; grunde.push('fly i nød'); udvikling.push('Ved en landingsulykke eskalerer det til massetilskadekomst: mange enheder, ambulancer og lægehelikoptere, og lufthavnen lukkes.'); }
+    else udvikling.push('Standby ved flysikkerhedslanding: beredskabet står klar ved banen. Langt de fleste lander normalt, og standby afsluttes typisk inden for 30 min. Går landingen galt, eskalerer det straks til massetilskadekomst.');
+    råd.push('Lufthavn: fotografér kun fra offentligt område uden for hegnet – aldrig ved indkørsler, beredskabsveje eller i landingsretningen.');
+  }
+  if (højde) {
+    point += 1; grunde.push('højderedning');
+    udvikling.push('Højderedning tager ofte 1–3 timer: drejestige eller lift, evt. specialhold, og vejen spærres under stigen. Kan ende med lægehelikopter, hvis personen er kvæstet.');
+    if (/selvmord|truer med|vil springe/.test(t)) udvikling.push('Ved trussel om at springe forhandler politiet – det kan vare længe. Vis hensyn: ingen genkendelige billeder af personen.');
+    råd.push('Højderedning: hold afstand til arbejdsområdet under stigen/liften – der kan falde ting ned.');
+  }
+  if (/bygn\.?\s?brand|bygningsbrand|etage|lejlighed/.test(t) && brand) {
+    udvikling.push(`Etage/lejlighed: kan sprede sig via trappeopgang, skakte og loft til naboer. Røg i opgangen kan kræve redning med stige${nat ? ' – om natten sover beboerne, så redningsbehovet er større' : ''}. Breder den sig til tagkonstruktionen, kommer der typisk assistance inden for 15–30 min og slukning i flere timer.`);
+  } else if (/villa|rækkehus|parcelhus|enfamiliehus|sommerhus/.test(t) && brand) {
+    udvikling.push(`Villa/rækkehus: tagbrand kan brede sig under tagudhænget til nabohuse${/rækkehus/.test(t) ? ' i rækken' : ''}. Stråtag eller tagbrand giver lang slukning (timer) og kan kræve vandtankvogn og drejestige.`);
+  }
+  if (/landbrug|stald|lade|halm|gård|svinestald|kostald/.test(t) && brand) {
+    point += 1; grunde.push('landbrug');
+    udvikling.push('Landbrug: halm- og ladebrande brænder længe (timer til døgn). Dyr skal måske reddes, og røgfanen kan drive ind over veje. Ofte flere vandtankvogne og ekstra mandskab.');
+  }
+  if (/industri|fabrik|lager|virksomhed|værksted/.test(t) && brand) {
+    point += 1; grunde.push('industri/lager');
+    udvikling.push('Industri/lager: risiko for farlige stoffer og en stor røgfane. Borgere kan få besked om at holde vinduer og døre lukket.');
+  }
+  if (/naturbrand|markbrand|skovbrand|hedebrand|krat|græsbrand|halm i mark/.test(t)) {
+    udvikling.push(`Naturbrand: spreder sig med vinden${vindTil ? ` – fronten bevæger sig mod ${vindTil}` : ''}${vindMs >= 8 ? ' og hurtigt i den hårde vind' : ''}. Kan kræve flere stationer, vandtankvogne og evt. landbrugets hjælp. Efterslukning kan vare et døgn.`);
+    if (vindMs >= 8) point += 1;
+  }
+  if (/bilbrand|brand[- ]bil|btbf|køretøj (i brand|brænder)|bil (i brand|brænder)/.test(t)) {
+    udvikling.push(`Bilbrand: dæk, tanke og airbags kan eksplodere – hold afstand. ${/\bel\b|el\/brint|brint|elbil|lithium|batteri/.test(t) ? 'El- eller brintbil kan genantænde og kræve lang køling (timer) eller en vandcontainer. ' : ''}${motorvej ? 'På motorvej spærres vejen ofte helt, og der kommer lang kø og risiko for følgeuheld.' : ''}`.trim());
+  }
+  if (/skorsten/.test(t)) udvikling.push('Skorstensbrand er oftest lille, men kan sprede sig til tagkonstruktionen. Afsluttes typisk med eftersyn af skorstensfejer.');
+  if (/\baba\d*\b|automatisk brandalarm/.test(t)) udvikling.push('Automatisk brandalarm er oftest uden brand. Bekræftes en brand, opgraderes den straks til bygningsbrand.');
+  if (/fastklemt|frigørelse|frontal/.test(t)) udvikling.push('Frigørelse af fastklemte tager typisk 30–60 min med vejen spærret. Lægehelikopter er mulig.');
+  if (vand) udvikling.push(`Eftersøgning i vand kan vare timer med både, dykkere og redningshelikopter${v?.temp != null && +v.temp < 8 ? ` – i koldt vejr (${komma(v.temp)} °C) er tiden afgørende` : ''}.`);
+  if (farlig) udvikling.push(`Farlige stoffer: afspærringen kan udvides${vindTil ? ` mod ${vindTil}, som vinden driver` : ' med vinden'}, og evakuering er mulig. Kemikaliedykkere og miljøenheder kan blive tilkaldt.`);
+  if (/eksplosion/.test(t)) udvikling.push('Efter en eksplosion er der risiko for ny eksplosion eller sammenstyrtning – afspærringen kan være stor.');
+  if (/storm|oversvøm|skybrud/.test(t)) udvikling.push('Storm eller skybrud giver ofte mange samtidige hændelser i området – flere opgaver kan komme til.');
+  const niveau = point >= 4 ? 'høj' : point >= 2 ? 'forhøjet' : 'normal';
+  return { niveau, point, grunde, råd, udvikling };
+}
+const RISIKO_NAVN = { høj: 'Høj risiko', forhøjet: 'Forhøjet risiko', normal: 'Normal risiko' };
+// Kort linje til hændelseskort: vejr og vind + risikoniveau
+export function vejrRisikoLinje(h) {
+  const r = risiko(h), v = h?.vejr;
+  if (!v && r.niveau === 'normal') return '';
+  const vind = v ? [v.temp != null ? `${komma(v.temp)} °C` : '', v.vind != null ? `${komma(v.vind)} m/s${v.retning != null ? ` ${RET_KORT[Math.round(v.retning / 45) % 8]}` : ''}` : '', v.nedboer > 0 ? `${komma(v.nedboer)} mm/t` : ''].filter(Boolean).join(' · ') : '';
+  return `<p class="lille vejr-linje">${v ? `${vejrIkonFor(v.symbol)} ${esc(vind)}` : ''}${r.niveau !== 'normal' ? `${v ? ' · ' : ''}<span class="risiko r-${r.niveau === 'høj' ? 'hoej' : 'forhoejet'}" title="${esc(r.grunde.join(', '))}">⚠️ ${RISIKO_NAVN[r.niveau]}</span>` : ''}</p>`;
+}
+// Boks med vejret og sikkerhedsråd (detaljevisning for fotograf og kontor)
+export function sikkerhedHtml(h) {
+  const r = risiko(h), v = h?.vejr;
+  if (!v && !r.råd.length && !r.udvikling.length && r.niveau === 'normal') return '';
+  return `<div class="sikkerhed-boks r-${r.niveau === 'høj' ? 'hoej' : r.niveau === 'forhøjet' ? 'forhoejet' : 'normal'}">
+    <p class="sikkerhed-top"><b>${r.niveau === 'normal' ? '🛡️' : '⚠️'} ${RISIKO_NAVN[r.niveau]}</b>${r.grunde.length ? ` <small>– ${esc(r.grunde.join(', '))}</small>` : ''}</p>
+    ${v ? `<p>${vejrIkonFor(v.symbol)} <b>Vejret på stedet:</b> ${esc(vejrTekst(v))} <small>(met.no)</small></p>` : '<p class="lille">Vejret er ikke hentet endnu (det hentes automatisk et minut efter, at hændelsen har fået en placering).</p>'}
+    ${r.udvikling.length ? `<p class="udvikling-top"><b>📈 Kan udvikle sig</b></p><ul class="udvikling">${r.udvikling.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    ${r.råd.length ? `<p class="udvikling-top"><b>🦺 Sikkerhed for fotografen</b></p><ul>${r.råd.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+  </div>`;
+}
+const vejrIkonFor = s => !s ? '🌡️' : /thunder/.test(s) ? '⛈️' : /snow|sleet/.test(s) ? '🌨️' : /rain/.test(s) ? '🌧️' : /^fog/.test(s) ? '🌫️' : /^clearsky/.test(s) ? (/night/.test(s) ? '🌙' : '☀️') : /^fair|^partly/.test(s) ? '⛅' : '☁️';
 function vejrHtml(h, d) {
   const v = h?.vejr || d?.vejr;
   if (!v) return '';

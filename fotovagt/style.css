@@ -816,3 +816,21 @@ dialog.ark.bred .ark-indhold { max-width: 760px; }
 .heli-pin b { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); background: #e11d48; color: #fff; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 6px; white-space: nowrap; }
 .heli-pin.gammel { opacity: .5; filter: grayscale(.6); }
 .heli-pin.jorden b { background: var(--offline-tekst); }
+.vejr-linje { margin: 4px 0 0; }
+.risiko { font-weight: 700; }
+.risiko.r-hoej { color: var(--fare); }
+.risiko.r-forhoejet { color: var(--pause-tekst); }
+.sikkerhed-boks { margin: 8px 0; padding: 10px 12px; border-radius: var(--radius-s); border: 1px solid var(--kant); background: var(--flade2); font-size: .9rem; }
+.sikkerhed-boks p { margin: 0 0 6px; }
+.sikkerhed-boks ul { margin: 4px 0 0; padding-left: 18px; }
+.sikkerhed-boks li { margin: 2px 0; }
+.sikkerhed-boks.r-hoej { border-color: color-mix(in srgb, var(--fare) 50%, var(--kant)); background: color-mix(in srgb, var(--fare) 8%, var(--flade)); }
+.sikkerhed-boks.r-forhoejet { border-color: color-mix(in srgb, var(--pause) 60%, var(--kant)); background: var(--pause-bg); }
+.sikkerhed-top small { color: var(--dæmpet); font-weight: 500; }
+.samme-forslag { margin: 8px 0; padding: 10px 12px; border-radius: var(--radius-s); border: 1.5px dashed color-mix(in srgb, var(--ai) 55%, var(--kant)); background: color-mix(in srgb, var(--ai) 6%, var(--flade)); font-size: .88rem; }
+.samme-forslag p { margin: 0 0 8px; }
+.samme-forslag small { color: var(--dæmpet); }
+.samml-liste { display: grid; gap: 6px; }
+.samml-række { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; background: var(--flade2); border-radius: var(--radius-s); }
+.samml-række small { color: var(--dæmpet); }
+.udvikling-top { margin: 8px 0 2px !important; }

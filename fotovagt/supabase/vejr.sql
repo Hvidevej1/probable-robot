@@ -110,7 +110,7 @@ begin
   brand := t ~ 'brand|røg|ild' and t !~ 'brandalarm|\maba\M|eftersyn';
   natur := t ~ 'naturbrand|markbrand|skovbrand|halmbrand|krat|hede|græs';
   trafik := t ~ 'trafik|uheld|færdsel|motorvej|kørt|bil|lastbil|frontal|rute \d|glat';
-  vand := t ~ 'drukn|person i vand|havn|kæntr|skib|båd|redning til søs|strand';
+  vand := t ~ 'drukn|person i vand|(?<!luft)havn|kæntr|skib|båd|redning til søs|strand';
   vejrsag := t ~ 'storm|træ.*vej|væltet træ|tag.*blæst|oversvøm|vand i kælder|skybrud';
 
   if stoed >= 24.5 then fare := fare || format('Stormvejr (vindstød %s m/s) – risiko for væltede træer, løse tagplader og flere hændelser', stoed); retning := 1;

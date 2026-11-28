@@ -221,6 +221,28 @@ function supabaseBackend() {
         ud.push(...data); if (data.length < 1000) return ud;
       }
     },
+    // Sammenlægning (sammenlaeg.sql): kontoret lægger to hændelser sammen; Fotovagt lærer af det
+    async slaaSammen(behold, fjern) {
+      const { data, error } = await sb.rpc('slaa_sammen', { behold, fjern });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    async ikkeSamme(a, b) {
+      const { error } = await sb.rpc('ikke_samme_par', { x: a, y: b });
+      if (error) throw new Error(error.message);
+    },
+    async sammenForslag() {
+      const { data, error } = await sb.rpc('sammen_forslag');
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+    async hentSammenlaegViden() {
+      const [l, n] = await Promise.all([
+        sb.rpc('laerte_par'),
+        sb.from('ikke_samme').select('a,b').gt('tid', new Date(Date.now() - 3 * 864e5).toISOString()),
+      ]);
+      return { laert: l.error ? [] : l.data, ikke: n.error ? [] : n.data };
+    },
     // Assistenten (databasefunktionen ai_indsigt i ai-indsigt.sql)
     async indsigt(id) {
       const { data, error } = await sb.rpc('ai_indsigt', { h: id });
@@ -635,6 +657,21 @@ function demoBackend() {
       return [...db.stedviden];
     },
     glemSted: kør(k => { kontor(); db.stedviden = (db.stedviden || []).filter(x => x.noegle !== k); }),
+    slaaSammen: kør((behold, fjern) => {
+      kontor();
+      const a = H(behold), b = H(fjern);
+      if (!a || !b || a === b) throw new Error('Vælg to forskellige hændelser');
+      a.tekst = [a.tekst, ...String(b.tekst || b.titel).split('\n').map(l => l.startsWith('— ') ? l : `— ${b.app || 'Lagt sammen'}: ${l}`)].filter(Boolean).join('\n');
+      if ((a.lat == null || (a.cirka && !b.cirka)) && b.lat != null) Object.assign(a, { lat: b.lat, lon: b.lon, adresse: b.adresse || a.adresse, cirka: b.cirka });
+      a.nyheder = [...(a.nyheder || []), ...(b.nyheder || [])].filter((n, i, l) => l.findIndex(m => m.url === n.url) === i);
+      a.prio = Math.min(a.prio || 2, b.prio || 2);
+      b.status = 'annulleret'; b.note = `Lagt sammen med "${a.titel}"`;
+      (db.sammenlaegninger ||= []).push({ a: a.titel, b: b.titel });
+      return { ok: true, beholdt: a.id };
+    }),
+    ikkeSamme: kør((a, b) => { kontor(); (db.ikkeSamme ||= []).push({ a: a < b ? a : b, b: a < b ? b : a }); }),
+    async hentSammenlaegViden() { læs(); return { laert: [], ikke: db.ikkeSamme || [] }; },
+    async sammenForslag() { return []; },
     // Demo: et par stationer, så filteret kan prøves
     async hentStationer() {
       return [

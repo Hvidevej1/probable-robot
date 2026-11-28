@@ -6,7 +6,7 @@ import {
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
   PRIO, prioAf, efterPrio, indsigt, indsigtHtml,
-  stationsKontrol, avatar, fotoFelt, sikkerUrl, nyhederHtml, helikopterLag,
+  stationsKontrol, avatar, fotoFelt, sikkerUrl, nyhederHtml, helikopterLag, vejrRisikoLinje, sikkerhedHtml,
 } from './faelles.js';
 
 const pref = {
@@ -49,6 +49,7 @@ function tegnOpgave() {
         <h2>${esc(h.titel)}</h2>
         <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${h.cirka ? ' (ca.)' : ''}${afstand(h) != null ? ` · ${kmTekst(afstand(h))}` : ''}</p>
         ${(n => n ? `<p class="opdatering"><span>${n.ikon} ${esc(n.tekst)}</span></p>` : '')(senesteNyt(h))}
+        ${vejrRisikoLinje(h)}
       </div>
     </div>
     <div class="knap-række">
@@ -84,6 +85,7 @@ function kort_(h) {
         <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
         ${naboHjælp(h) ? `<p class="lille nabo-hjælp">🆘 Naboområdet${omrNavn(h.omraade_id) ? ` (${esc(omrNavn(h.omraade_id))})` : ''} mangler en fotograf</p>`
           : andetOmråde(h) && aktiv(h) ? `<p class="lille base-lille">Andet område${omrNavn(h.omraade_id) ? `: ${esc(omrNavn(h.omraade_id))}` : ''}</p>` : ''}
+        ${aktiv(h) ? vejrRisikoLinje(h) : ''}
       </div>
       <div class="h-bund">
         ${d != null && aktiv(h) ? `<span class="afstand"><b>${kmTekst(d)}</b><small>${køretid(d)}</small></span>` : ''}
@@ -260,6 +262,7 @@ function visHaendelse(id, åbn = true) {
     <h2>${esc(h.titel)}</h2>
     <p class="adresse">${esc(h.adresse || 'Ingen adresse')}${d != null ? ` · ${kmTekst(d)} væk` : ''}</p>
     ${h.antal_enheder ? `<p class="lille">🚒 ${h.antal_ass || 0} assistance${h.antal_ass === 1 ? '' : 'r'} · ${h.antal_enheder} enheder</p>` : ''}
+    ${aktiv(h) ? sikkerhedHtml(h) : ''}
     ${aktiv(h) ? `<div id="ai-plads">${indsigtHtml(h, indsigt(h, d => { if (åbenId === h.id) { const el = $('#ai-plads'); if (el) el.innerHTML = indsigtHtml(h, d); } }))}</div>` : ''}
     ${h.cirka ? '<p class="hint">Placeringen er cirka (kun by eller station kendt). Tjek adressen i teksten.</p>' : ''}
     <p class="lille">Modtaget kl. ${klokken(h.oprettet)} (${siden(h.oprettet)} siden) · ${esc(h.kategori || '')}</p>
