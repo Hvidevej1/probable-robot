@@ -2,8 +2,8 @@
 -- Kilde: adsb.lol (fællesskabsdrevne ADS-B-modtagere, ODbL – må bruges kommercielt med kildeangivelse).
 -- Helikopterne flyves af Norsk Luftambulanse med kaldesignal DOC01–DOC09 (norske LN-registreringer).
 -- Databasen henter alle fly inden for 250 sømil af Danmark hvert 3. minut (480 kald/døgn – grænsen uden nøgle er 500).
--- Med en gratis nøgle fra https://www.adsb.lol/request (1.000/døgn) kan den gemmes i intern.adsb_noegle,
--- og cron-jobbet kan sættes til hvert 2. minut.
+-- Med en gratis nøgle fra https://www.adsb.lol/request (1.000/døgn) gemmes den i intern.adsb_noegle
+-- (Supabase → SQL Editor: update intern set adsb_noegle = '<nøglen>' where id = 1;) – så hentes der hvert 2. minut.
 alter table intern add column if not exists adsb_noegle text;
 
 create table if not exists helikoptere (
@@ -30,9 +30,11 @@ alter table heli_koe enable row level security;
 
 create or replace function heli_hent() returns void
 language plpgsql security definer set search_path = public as $$
-declare k text; h jsonb := '{"User-Agent":"Fotovagt/15 https://vagt.hrc-fotos.dk"}';
+declare k text; h jsonb := '{"User-Agent":"Fotovagt/15 https://vagt.hrc-fotos.dk"}'; m int := extract(minute from now())::int;
 begin
   select adsb_noegle into k from intern where id = 1;
+  -- Uden nøgle: hvert 3. minut (480 kald/døgn, grænsen er 500). Med gratis nøgle (1.000/døgn): hvert 2. minut.
+  if (k is null and m % 3 <> 0) or (k is not null and m % 2 <> 0) then return; end if;
   if k is not null then h := h || jsonb_build_object('x-api-key', k); end if;
   insert into heli_koe (id, req_id, sendt)
   values (1, net.http_get('https://api.adsb.lol/v2/point/56.0/11.0/250', headers := h, timeout_milliseconds := 15000), now())
@@ -69,5 +71,5 @@ revoke execute on function heli_hent(), heli_saml() from public, anon, authentic
 
 -- Hent hvert 3. minut; saml svaret hvert minut (så positionen højst er ca. et minut gammel, når den kommer frem)
 select cron.unschedule(jobname) from cron.job where jobname in ('fotovagt-heli', 'fotovagt-heli-hent', 'fotovagt-heli-saml');
-select cron.schedule('fotovagt-heli-hent', '*/3 * * * *', $$select heli_hent();$$);
+select cron.schedule('fotovagt-heli-hent', '* * * * *', $$select heli_hent();$$);   -- heli_hent bestemmer selv takten
 select cron.schedule('fotovagt-heli-saml', '* * * * *', $$select heli_saml();$$);

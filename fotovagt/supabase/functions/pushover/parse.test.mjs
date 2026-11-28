@@ -210,5 +210,11 @@ tjek('Nyhed om bilbrand 70 min senere lægges stadig ind', findMatch({ ...bbTvSy
 tjek('To præcise bilbrande 8 km fra hinanden holdes adskilt', !findMatch({ ...bbUheld, lat: 55.62, lon: 9.62, cirka: false }, [aktiv({ ...bbKolding, cirka: false, lat: 55.5648, lon: 9.5571 }, 5)]));
 tjek('Assistance til samme adresse 45 min efter ABA lægges ind', findMatch(P.aba112b, [aktiv(P.ass112, 46)]));
 tjek('Samme adresse 4 timer senere er en ny hændelse', !findMatch(P.aba112b, [aktiv(P.ass112, 240)]));
+// ODIN (http://www.odin.dk/RSS/RSS.aspx?beredskabsID=0000) kommer ofte 30–90 min forsinket
+const odinVejle = parseBesked({ title: '', app: 'ODIN', message: '🔥 Brand-Bil i det fri\nBeredskab: Vejle Brandvæsen\nStation: Vejle\n28-11-2026 15:36:52' });
+const pfVejle = parseBesked({ title: '', app: 'Pf-upload 3 backup', message: '🔥 Brand-Bil i det fri\nBeredskab: Vejle Brandvæsen\nStation: Vejle\n28-11-2026 15:36' });
+tjek('ODIN-alarm 50 min efter Pf-upload (samme type og station) lægges sammen', !!findMatch({ ...odinVejle, lat: 55.7, lon: 9.53, cirka: true }, [aktiv({ ...pfVejle, id: 'pf', lat: 55.7, lon: 9.53, cirka: true }, 50)]));
+tjek('Samme type fra en anden station lægges ikke sammen efter 50 min', !findMatch({ ...odinVejle, tekst: odinVejle.tekst.replace('Station: Vejle', 'Station: Give'), station: 'Give', lat: 55.84, lon: 9.24, cirka: true }, [aktiv({ ...pfVejle, id: 'pf', lat: 55.7, lon: 9.53, cirka: true }, 50)]));
+tjek('ODIN-titel og kategori', odinVejle.titel === 'Brand-Bil i det fri' && odinVejle.kategori === 'Brand' && odinVejle.station === 'Vejle');
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

@@ -848,3 +848,4 @@ dialog.ark.bred .ark-indhold { max-width: 760px; }
 .nyh-koblet { margin: 4px 0 0; font-size: .86rem; color: var(--ledig-tekst); font-weight: 600; }
 .nyh-kobl select { max-width: 100%; font-size: .86rem; min-height: 36px; }
 .panel-top #btn-nyheder { margin-left: auto; margin-right: 8px; }
+.varsel-bjaelke { background: var(--pause-bg); color: var(--pause-tekst); border-bottom: 1px solid var(--pause); padding: 7px 14px; font-size: .88rem; }

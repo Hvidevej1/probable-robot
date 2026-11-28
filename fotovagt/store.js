@@ -6,7 +6,7 @@ import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './s
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey) && !/[?&]demo\b/.test(location.search);
 const lyttere = new Set();
-const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], omraader: [], fotos: {}, indst: {}, helikoptere: [], mig: null };
+const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], omraader: [], fotos: {}, indst: {}, helikoptere: [], varsler: [], mig: null };
 const fejlTekst = e => (e && (e.message || e.error_description)) || String(e);
 const ændret = () => lyttere.forEach(f => f(state));
 const kodeFejl = m => /different from the old/i.test(m) ? 'Den nye adgangskode skal være forskellig fra den gamle.'
@@ -55,8 +55,16 @@ function supabaseBackend() {
     await hentOmraader(false);
     await hentFotos(false);
     await hentHelikoptere(false);
+    await hentVarsler(false);
     ændret();
   }
+  // DMI-farevarsler (vejr2.sql) – hentes igen hvert 15. minut
+  async function hentVarsler(vis = true) {
+    const { data, error } = await sb.from('vejrvarsler').select('*');
+    state.varsler = error ? [] : data;
+    if (vis) ændret();
+  }
+  setInterval(() => { if (state.mig && !document.hidden) hentVarsler().catch(() => {}); }, 15 * 60e3);
   // Lægehelikoptere (helikopter.sql) – findes tabellen ikke, er listen bare tom
   async function hentHelikoptere(vis = true) {
     const { data, error } = await sb.from('helikoptere').select('*');

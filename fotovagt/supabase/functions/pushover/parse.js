@@ -424,11 +424,14 @@ export function findMatch(ny, aktive, nu = Date.now()) {
     // Samme præcise adresse (vej + husnummer) inden for 3 timer, mens den første stadig er aktiv: fx ABA kl. 6.26 og
     //   assistance til samme adresse kl. 7.11, eller samme bygningsbrand meldt igen 45 min senere
     if (na && na === adrNøgle(h.adresse)) return h;
-    if (alder > 45 * 60e3) continue;
     const a = nøgle(h.titel), kort = Math.min(a.length, n.length), fælles = fællesStart(a, n);
     // (næsten ens kun for koder med tal, fx forvanskede "Assistance VB V-1 /-`Q" – ikke for "Færdselsuheld …")
     const sammeTitel = (kort >= 6 && fælles === kort) || (fælles >= 10 && fælles >= 0.8 * kort && /\d/.test(a.slice(0, fælles)));
     const hs = stationAf(h), ns = String(ny.station || '').trim().toLowerCase();
+    // Samme alarmtype fra samme station inden for 2 timer: fx ODIN, der kommer 30–90 min efter Pf-upload/Mast
+    //   (ikke når begge har hver sin præcise adresse)
+    if (sammeTitel && hs && ns && hs === ns && alder < 2 * 3600e3 && !(na && adrNøgle(h.adresse) && na !== adrNøgle(h.adresse))) return h;
+    if (alder > 45 * 60e3) continue;
     const andenStation = hs && ns && hs !== ns;
     if (sammeTitel && !andenStation && !(afstand > (præcis ? 2 : 25))) return h;
     if (præcis && (afstand < 0.1 || (afstand < 0.3 && ny.kategori === h.kategori))) return h;

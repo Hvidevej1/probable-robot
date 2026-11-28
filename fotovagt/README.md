@@ -350,3 +350,8 @@ Bygget efter `fotovagt-forslag/IMPLEMENTERING.md` (trin 2–6). Appens arbejdsga
 - **Sammenlægning** (`supabase/sammenlaeg.sql`): knappen "🔗 Læg sammen" og forslag fra `sammen_forslag()` (point for afstand, tid, adresse, vej, gade, station, kategori, bilbrand og tidligere sammenlægninger). Hver sammenlægning gemmes i `sammenlaegninger`, og "Ikke samme" i `ikke_samme`, så forslagene bliver bedre.
 - **Nyheder** (`supabase/nyhedsfeed.sql`): feeds i `nyhedsfeeds`, artikler i `nyhedsartikler`. `er_112_nyhed()` filtrerer, `nyhed_kobl_auto()` kobler automatisk ved mindst 5 point, `nyhed_kobl()` kobler i hånden. Nye feeds lægges ind i tabellen `nyhedsfeeds`.
 - **Udkald til akuthjælper** står på kontorets ignorér-liste (Pushover → Sprunget over) og oprettes ikke.
+
+## Version 15.30 (ODIN og vejr fra flere kilder)
+- **ODIN** (`supabase/odin.sql`): `odin_kilder` har adresserne (http://www.odin.dk/RSS/RSS.aspx?beredskabsID=0 og =0000). Kun http virker, og ODIN afviser forespørgsler med ekstra headers. Nye alarmer sendes til Edge Function `pushover` som webhook (app "ODIN") og tolkes som Mast/Pf-upload. Alarmer, Fotovagt allerede har fra en anden kilde, springes over. Kildeangivelse til ODIN står i døgnrapporten (krav fra Beredskabsstyrelsen).
+- **Vejr** (`supabase/vejr2.sql`): `haendelser.vejr` har `prognose` (met.no), `obs` (DMI, nærmeste station inden for 30 km) og samlede felter, hvor DMI-målingen vinder for vind, stød, retning, temperatur og fugt. DMI-farevarsler i `vejrvarsler` (MeteoAlarm hvert 15. minut).
+- **adsb.lol-nøgle**: Supabase → SQL Editor: `update intern set adsb_noegle = '<nøglen>' where id = 1;` – så hentes helikopterne hvert 2. minut.

@@ -580,6 +580,20 @@ export async function lækketKode(pw) {
 }
 export const LÆKKET_TEKST = 'Den adgangskode er kendt fra datalæk og kan gættes. Vælg en anden.';
 
+// Bjælke med aktive DMI-farevarsler (vises på kontoret og i Marken)
+export function varselBjælke() {
+  const alle = (store.state.varsler || []).filter(v => !v.til || new Date(v.til) > Date.now());
+  let el = document.getElementById('varsel-bjaelke');
+  if (!alle.length) { if (el) el.hidden = true; return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'varsel-bjaelke'; el.className = 'varsel-bjaelke'; el.setAttribute('role', 'status');
+    document.querySelector('#app header.top')?.after(el);
+  }
+  el.innerHTML = `⚠️ <b>DMI-varsel:</b> ${alle.slice(0, 3).map(v => `${esc(v.haendelse || v.beskrivelse || '')}${v.omraade ? ` – ${esc(v.omraade)}` : ''}${v.til ? ` (til ${klokken(v.til)})` : ''}`).join(' · ')}${alle.length > 3 ? ` · +${alle.length - 3} flere` : ''}`;
+  el.hidden = false;
+}
+if (!store.demo) store.lyt(varselBjælke);
+
 // Bjælke øverst, når forbindelsen til serveren er tabt (realtime) eller telefonen er uden net
 function forbindelsesBjælke() {
   let el = document.getElementById('forbindelse-bjaelke');
@@ -930,6 +944,21 @@ function mørkt(nu = new Date()) {
   const timer = +t.find(x => x.type === 'hour').value + +t.find(x => x.type === 'minute').value / 60, m = nu.getMonth();
   return timer < op[m] || timer > ned[m];
 }
+// DMI-farevarsler (tabellen vejrvarsler): hvilke gælder hændelsens område? (MeteoAlarm-områder → regioner)
+const VARSEL_OMR = {
+  Nordjylland: /nordjylland|vendsyssel|himmerland|thy|mors|læsø/i,
+  Midtjylland: /midtjylland|østjylland|vestjylland|midt- og|djursland|samsø/i,
+  Syddanmark: /sønderjylland|sydjylland|syddanmark|fyn|langeland|ærø|als|fanø/i,
+  Sjælland: /sjælland|lolland|falster|møn/i,
+  Hovedstaden: /hovedstad|københavn|nordsjælland|bornholm|frederiksberg|amager/i,
+};
+export function varslerFor(h) {
+  const alle = (store.state.varsler || []).filter(v => !v.til || new Date(v.til) > Date.now());
+  if (!alle.length) return [];
+  const region = (store.state.omraader || []).find(o => o.id === h?.omraade_id)?.navn?.replace(/^Region\s+/, '');
+  const re = region && VARSEL_OMR[region];
+  return alle.filter(v => re ? re.test(v.omraade || '') : /danmark|hele landet/i.test(v.omraade || ''));
+}
 export function risiko(h) {
   const t = `${h?.titel || ''} ${h?.kategori || ''} ${String(h?.tekst || '').split('\n').slice(0, 6).join(' ')}`.toLowerCase();
   const v = h?.vejr || null;
@@ -962,6 +991,14 @@ export function risiko(h) {
     if (vand && (vind >= 10.8 || (temp != null && temp < 8))) { point += 1; grunde.push('koldt eller blæsende ved vand'); }
   }
   if (mørkt()) { råd.push('Mørkt: brug refleksvest og lygte.'); if (motorvej) point += 1; }
+  // Målt sigtbarhed (DMI) under 1 km = tåge, også selvom prognosen ikke siger det
+  if (v?.obs?.sigt_m != null && +v.obs.sigt_m < 1000 && !grunde.includes('tåge')) { point += 1; grunde.push(`tåge (sigt ${Math.round(v.obs.sigt_m)} m målt)`); råd.push('Tåge: nedsat sigtbarhed – særligt farligt ved motorvej.'); }
+  // DMI-farevarsler for området
+  const varsler = varslerFor(h);
+  for (const vs of varsler.slice(0, 2)) {
+    point += /severe|extreme/i.test(vs.niveau || '') ? 2 : 1;
+    grunde.push(`DMI-varsel: ${(vs.haendelse || vs.beskrivelse || 'farligt vejr').toLowerCase()}`);
+  }
   // Hvordan kan hændelsen udvikle sig? (typisk forløb efter hændelsestype, justeret for vind, tid og omfang)
   const udvikling = [];
   const vindTil = v?.retning != null ? VINDRETNING[(Math.round(v.retning / 45) + 4) % 8] : null, vindMs = +(v?.vind) || 0;
@@ -1007,7 +1044,7 @@ export function risiko(h) {
   if (/eksplosion/.test(t)) udvikling.push('Efter en eksplosion er der risiko for ny eksplosion eller sammenstyrtning – afspærringen kan være stor.');
   if (/storm|oversvøm|skybrud/.test(t)) udvikling.push('Storm eller skybrud giver ofte mange samtidige hændelser i området – flere opgaver kan komme til.');
   const niveau = point >= 4 ? 'høj' : point >= 2 ? 'forhøjet' : 'normal';
-  return { niveau, point, grunde, råd, udvikling };
+  return { niveau, point, grunde, råd, udvikling, varsler };
 }
 const RISIKO_NAVN = { høj: 'Høj risiko', forhøjet: 'Forhøjet risiko', normal: 'Normal risiko' };
 // Kort linje til hændelseskort: vejr og vind + risikoniveau
@@ -1023,10 +1060,18 @@ export function sikkerhedHtml(h) {
   if (!v && !r.råd.length && !r.udvikling.length && r.niveau === 'normal') return '';
   return `<div class="sikkerhed-boks r-${r.niveau === 'høj' ? 'hoej' : r.niveau === 'forhøjet' ? 'forhoejet' : 'normal'}">
     <p class="sikkerhed-top"><b>${r.niveau === 'normal' ? '🛡️' : '⚠️'} ${RISIKO_NAVN[r.niveau]}</b>${r.grunde.length ? ` <small>– ${esc(r.grunde.join(', '))}</small>` : ''}</p>
-    ${v ? `<p>${vejrIkonFor(v.symbol)} <b>Vejret på stedet:</b> ${esc(vejrTekst(v))} <small>(met.no)</small></p>` : '<p class="lille">Vejret er ikke hentet endnu (det hentes automatisk et minut efter, at hændelsen har fået en placering).</p>'}
+    ${v ? `<p>${vejrIkonFor(v.symbol)} <b>Vejret på stedet:</b> ${esc(vejrTekst(v))}<br><small>${esc(vejrKilder(v))}</small></p>` : '<p class="lille">Vejret er ikke hentet endnu (det hentes automatisk et minut efter, at hændelsen har fået en placering).</p>'}
+    ${r.varsler.map(vs => `<p class="vejr-fare">⚠️ DMI-varsel: ${esc(vs.beskrivelse || vs.haendelse || '')}${vs.til ? ` (til ${klokken(vs.til)})` : ''}</p>`).join('')}
     ${r.udvikling.length ? `<p class="udvikling-top"><b>📈 Kan udvikle sig</b></p><ul class="udvikling">${r.udvikling.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${r.råd.length ? `<p class="udvikling-top"><b>🦺 Sikkerhed for fotografen</b></p><ul>${r.råd.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
   </div>`;
+}
+// Hvor kommer tallene fra? (måling fra DMI vinder over prognose fra met.no)
+export function vejrKilder(v) {
+  const o = v?.obs, dele = [];
+  if (o?.vind != null && o.km != null && +o.km <= 30) dele.push(`vind og temperatur målt af DMI ${String(o.km).replace('.', ',')} km væk${o.tid ? ` kl. ${klokken(o.tid)}` : ''}${o.stoed != null ? ` (stød ${komma(o.stoed)} m/s)` : ''}`);
+  if (v?.prognose || v?.symbol) dele.push(`vejrtype og nedbør: prognose fra met.no${o?.vind != null && v?.prognose?.vind != null ? ` (prognosens vind ${komma(v.prognose.vind)} m/s)` : ''}`);
+  return dele.length ? 'Kilder: ' + dele.join(' · ') : 'Kilde: met.no';
 }
 const vejrIkonFor = s => !s ? '🌡️' : /thunder/.test(s) ? '⛈️' : /snow|sleet/.test(s) ? '🌨️' : /rain/.test(s) ? '🌧️' : /^fog/.test(s) ? '🌫️' : /^clearsky/.test(s) ? (/night/.test(s) ? '🌙' : '☀️') : /^fair|^partly/.test(s) ? '⛅' : '☁️';
 function vejrHtml(h, d) {
