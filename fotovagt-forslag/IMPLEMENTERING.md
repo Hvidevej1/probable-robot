@@ -4,24 +4,90 @@ Denne vejledning beskriver, hvordan forslagene i `FORSLAG.md` og demoen i `demo.
 den rigtige Fotovagt-app (vagt.hrc-fotos.dk). Den kan gives direkte til en udvikler eller til Claude i
 en session, der har Fotovagts eget repository.
 
-**Sådan bruges den:** Tag ét trin ad gangen. Hvert trin kan udgives for sig, og hvert har en test til sidst.
-Start med trin 1 (sikkerhed). Det er små ændringer med stor effekt. Linjenumrene passer til den
+**Sådan bruges den:** Læs først afsnittet "Version 15" herunder. Trinene laves ét ad gangen på grenen `version-15`,
+med en commit pr. trin og en test efter hvert. De udgives samlet som Fotovagt 15.00. Start med trin 1 (sikkerhed). Linjenumrene passer til den
 udgave, der lå på vagt.hrc-fotos.dk den 28. november 2026 (`style.css?v=23`, `marken.js?v=29`, `kontor.js?v=30`).
 
+---
+
+## Version 15: grundregler, udgivelse og tilbagerulning
+
+Ændringerne samles i **én stor version: Fotovagt 15.00**. Den kører side om side med den nuværende version (11.04 i `version.json` i dag), indtil den er afprøvet. Går noget galt efter udgivelsen, kan der rulles tilbage til den forrige version på under et minut, uden at data går tabt.
+
+### A. Det må version 15 ikke ændre (grundfunktionerne)
+Version 15 ændrer udseende, opbygning og robusthed, men **ikke hvad appen gør**. Konkret:
+
+| Område | Skal være uændret |
+|---|---|
+| Arbejdsgang | Ny hændelse → tilbud/tag → ankommet → afslut. Slip opgave. Kontoret kan tildele, afslutte, annullere og rette. |
+| SOS | 5 sekunders nedtælling, hvem der får besked (kontor + fotografer inden for 20 km), lyd, vibration, `requireInteraction`, position under aktiv SOS, kvittering, stop. |
+| Auto-tilbud | Regler for nærmeste fotograf, region ved lige afstand, tidsfrister og eskalering. |
+| Push | Indhold i beskederne, hvem der får dem, og hvad der sker ved tryk (`sw.js` `push` og `notificationclick`). |
+| Pushover | Funktionen `supabase/functions/pushover` og `parse.js` røres ikke i version 15 (kun test lægges til, trin 6g). |
+| Database | Ingen tabeller, kolonner eller RPC-funktioner omdøbes eller slettes. Alle `security definer`-funktioner og RLS-regler er uændrede. Eneste databaseændring er constraint'en i trin 1b. |
+| Data i appen | `store.js` henter og gemmer de samme data på samme måde. Navne på eksisterende `localStorage`-nøgler (`fotovagt-*`) beholdes. |
+| Login | Log ind, glemt adgangskode, invitationer, skift kode. |
+| Demo | `?demo` virker som i dag. |
+
+Hvis en ændring kræver, at én af disse ting ændres, hører den **ikke** til i version 15. Den skal i en senere version med sin egen beskrivelse.
+
+**Hold uden for version 15** (de ændrer adfærd og har større risiko, så de udgives hver for sig bagefter):
+- Trin 6b (service worker med offline-cache) og 6c (status i kø uden net) → version 15.10
+- Trin 5d (danske kortfliser) → senere
+- Trin 7 (stor oprydning i style.css) → version 15.20, når 15.00 har kørt stabilt i et par uger
+
+### B. Sådan bygges version 15
+1. **Lås den nuværende version.** I Fotovagts repository: `git tag v11.04` på den commit, der kører i dag, og push tagget. Skriv også id'et på den aktuelle produktions-deployment i Vercel ned (Vercel → Deployments → den med "Production"). Det er den, der rulles tilbage til.
+2. **Egen gren.** Alt arbejde sker på grenen `version-15`. `main` bliver ved med at være den version, der kører, så der kan laves hastefejlrettelser til 11.x imens.
+3. **Ét trin pr. commit.** Hvert trin (1, 2, 3 …) er sin egen commit eller pull request på `version-15`. Så kan et enkelt trin tages ud igen, hvis netop det giver problemer, uden at resten skal rulles tilbage.
+4. **Versionsnummer.** Sæt `version.json` til `{ "version": "15.00" }` i sidste commit før udgivelse. Under afprøvning bruges `15.00-beta1`, `15.00-beta2` osv.
+
+### C. Afprøvning før udgivelse
+1. **Forhåndsvisning.** Vercel laver automatisk en preview-adresse for grenen `version-15` (fx `fotovagt-git-version-15-….vercel.app`). Den bruger samme database som produktion. Brug derfor **demo-tilstand** (`?demo`) til det meste af afprøvningen og kun én eller to testbrugere til den rigtige database.
+2. **Sammenligning med den gamle version.** Kør tjeklisten nederst i dokumentet på både den nuværende version og preview, og sammenlign. Alt i tabel A skal opføre sig ens.
+3. **Gammel og ny på samme tid.** Lad en tester bruge 11.04 og en anden 15.00-beta mod samme database i en hel vagt. De skal kunne se hinandens status, hændelser, tilbud og SOS. Det beviser, at de to versioner kan køre side om side, og dermed at der kan rulles tilbage.
+4. **Godkendelse.** Først når tjeklisten er gennemført uden fejl på iPhone (installeret på hjemmeskærmen), iPad og computer, flettes `version-15` ind i `main`.
+
+### D. Udgivelse
+- Udgiv på et roligt tidspunkt (ikke under en aktiv stor hændelse), og fortæl fotograferne det på forhånd.
+- Sæt et tag: `git tag v15.00`.
+- Appens eget versionstjek (`tjekVersion` i `faelles.js`) opdager det nye nummer i `version.json` og genindlæser alle åbne apps automatisk, når ingen er midt i at skrive. Der skal ikke gøres mere.
+- Hold øje i de første timer: Vercel-logs, Supabase-logs (Edge Functions og Postgres) og browserkonsollen på kontoret.
+
+### E. Tilbagerulning, hvis der er fejl
+**Hurtigst (under et minut, ingen kode):** Vercel → Deployments → vælg deployment'en fra punkt B.1 (11.04) → "Instant Rollback" (eller "Promote to Production").
+- Appens versionstjek ser, at `version.json` igen siger `11.04`. Det er forskelligt fra `15.00`, så alle åbne apps genindlæser selv den gamle version inden for 10 minutter, eller med det samme, når appen åbnes igen.
+- Data er uberørt, fordi version 15 ikke ændrer databasen (se A). Constraint'en fra trin 1b kan blive. Den gamle version gemmer allerede billeder som JPEG og overholder den.
+- De nye `localStorage`-nøgler fra version 15 (fx `fotovagt-sort-naer`) ignoreres af den gamle version og gør ingen skade.
+
+**Rul kun ét trin tilbage:** Lav `git revert` på det trins commit på `main`, sæt `version.json` til `15.01`, og udgiv.
+
+**Hvis det er databaseændringen (trin 1b), der giver fejl:**
+```sql
+alter table profilfoto drop constraint if exists profilfoto_gyldigt;
+```
+
+**Service worker:** Version 15.00 ændrer kun `sw.js` ved at fjerne den tomme `fetch`-handler. Ved tilbagerulning henter telefonerne selv den gamle `sw.js`, næste gang appen åbnes. Når trin 6b (offline-cache) kommer i 15.10, skal den nye `sw.js` have en "nødbremse": hvis `version.json` ikke kan læses, eller den siger en version under 15, slettes cachen, og der hentes fra netværket.
+
+**Hvornår rulles der tilbage?** Med det samme, hvis én af disse ikke virker: log ind, se nye hændelser, tage en opgave, melde status, SOS, push. Kosmetiske fejl (en forkert farve, en knap der sidder skævt) rettes i stedet med en 15.01.
+
+---
+
 **Gælder for alle trin:**
-- Hæv `?v=` på `style.css`, `marken.js` og `kontor.js` i `index.html` og `kontor.html`, når filerne ændres (indtil trin 6 er lavet).
+- Hæv `?v=` på `style.css`, `marken.js` og `kontor.js` i `index.html` og `kontor.html`, når filerne ændres (indtil trin 6a er lavet).
+- Hold dig inden for tabel A i afsnittet "Version 15": ingen ændring af, hvad appen gør.
 - Test altid i demo-tilstand (`?demo`) på telefon (iPhone-størrelse), iPad og computer, i både lys og mørk tilstand.
 - Hold øje med, at SOS, tilbud og push virker som før. Det er de vigtigste funktioner.
 
-| Trin | Indhold | Omfang | Risiko |
-|---|---|---|---|
-| 1 | Sikkerhed: skjul serverkode, rens profilbilleder, CSP | Lille | Lav |
-| 2 | Nye farver og bedre kontrast (CSS-tokens) | Mellem | Lav |
-| 3 | Marken: ny top, statusknapper og hændelseskort | Mellem | Mellem |
-| 4 | Kontoret: én række i toppen, tomme regioner, prioritet | Mellem | Mellem |
-| 5 | Kort: zoom, rækkefølge af nåle, mørk tilstand | Lille | Lav |
-| 6 | Teknik: versionering, service worker, timere, forbindelse | Mellem | Mellem |
-| 7 | Oprydning i style.css | Stor | Lav (kun CSS) |
+| Trin | Indhold | Omfang | Risiko | Version |
+|---|---|---|---|---|
+| 1 | Sikkerhed: skjul serverkode, rens profilbilleder, CSP | Lille | Lav | 15.00 |
+| 2 | Nye farver og bedre kontrast (CSS-tokens) | Mellem | Lav | 15.00 |
+| 3 | Marken: ny top, statusknapper og hændelseskort | Mellem | Mellem | 15.00 |
+| 4 | Kontoret: én række i toppen, tomme regioner, prioritet | Mellem | Mellem | 15.00 |
+| 5 | Kort: zoom, rækkefølge af nåle, mørk tilstand (5d senere) | Lille | Lav | 15.00 |
+| 6 | Teknik: 6a, 6d, 6e, 6f, 6g i 15.00. 6b og 6c (offline) i 15.10 | Mellem | Mellem | 15.00 / 15.10 |
+| 7 | Oprydning i style.css | Stor | Lav (kun CSS) | 15.20 |
 
 ---
 
@@ -459,6 +525,10 @@ Gøres til sidst, når de andre trin er på plads, og helst i én samlet ændrin
 ---
 
 ## Tjekliste før hver udgivelse
+Køres på både den nuværende version og den nye, og resultaterne sammenlignes (se "Version 15", afsnit C).
+- [ ] `version.json` har det nye nummer (fx `15.00`), og tagget for den forrige version findes
+- [ ] Id på forrige produktions-deployment i Vercel er skrevet ned (til tilbagerulning)
+- [ ] Gammel og ny version kan bruges samtidig mod samme database (status, hændelser, tilbud, SOS ses begge veje)
 - [ ] `?v=` hævet (eller fjernet, hvis trin 6a er lavet)
 - [ ] Log ind og log ud virker på Marken og Kontoret
 - [ ] Ny hændelse fra Pushover dukker op på begge sider
@@ -467,3 +537,4 @@ Gøres til sidst, når de andre trin er på plads, og helst i én samlet ændrin
 - [ ] Tilbud til nærmeste (Auto) virker
 - [ ] Ingen fejl i browserens konsol
 - [ ] Testet på iPhone (installeret på hjemmeskærm), iPad og computer
+- [ ] Tilbagerulning afprøvet én gang på preview: Instant Rollback, og appen skifter selv tilbage til den gamle version
