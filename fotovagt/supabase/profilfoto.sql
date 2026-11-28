@@ -4,7 +4,7 @@
 -- Kør i Supabase -> SQL Editor.
 create table if not exists profilfoto (
   id uuid primary key references profiles on delete cascade,
-  foto text not null check (foto like 'data:image/jpeg;base64,%' and length(foto) < 150000),
+  foto text not null check (foto ~ '^data:image/jpeg;base64,[A-Za-z0-9+/=]+$' and length(foto) < 150000),
   opdateret timestamptz not null default now()
 );
 alter table profilfoto enable row level security;

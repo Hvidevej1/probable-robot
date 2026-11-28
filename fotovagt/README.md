@@ -307,3 +307,14 @@ for en fotograf (✎ på fotografen). Billedet skæres til et kvadrat og gøres 
 gemmes. Det vises i kontorets fotografliste, i tildelingslisten, i kollegalisten i Marken og som nål på kortet (ellers
 initialer). Kun brugere, der er logget ind, kan se billederne; kun personen selv og kontoret kan skifte/fjerne dem.
 SQL: `supabase/profilfoto.sql`.
+
+## Sikkerhed (11.05)
+* **Serverkoden udgives ikke**: `.vercelignore` og omdirigeringer i `vercel.json` skjuler `supabase/*.sql`, serverfunktionernes
+  `index.ts`, testfiler og `*.md`. (`parse.js` skal med, fordi kontoret bruger den i browseren.)
+* **Content-Security-Policy**: kun egne scripts; forbindelser kun til Supabase, Dataforsyningen, Nominatim og Photon;
+  kortfliser kun fra OpenStreetMap; ingen indlejring (døgnrapporten kun på hrc-fotos.dk).
+* **Profilbilleder** godtages kun som rene JPEG-data (både i databasen og i appen) og escapes, før de sættes ind.
+* **Links** fra beskeder: kun http(s) – andre fjernes i databasen og vises ikke i appen.
+* **Push-funktionen** afviser kald uden den interne hemmelighed (databasen sender den med); prøvebeskeden kræver login.
+* Interne databasefunktioner kan ikke kaldes udefra; hjælpefunktioner har fast `search_path`. SQL: `supabase/sikkerhed.sql`.
+* **Husk i Supabase**: Authentication → Sign In / Providers → Email → slå **"Leaked password protection"** til.

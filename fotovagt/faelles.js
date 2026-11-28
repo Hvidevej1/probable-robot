@@ -24,6 +24,8 @@ export function senesteOpdatering(h) {
 }
 export const aktiv = h => ['ny', 'taget', 'ankommet'].includes(h.status);
 
+// Kun http(s)-links godtages fra beskeder (et "javascript:"-link ville kunne køre kode, selvom det er escapet)
+export const sikkerUrl = u => /^https?:\/\//i.test(String(u || '').trim()) ? String(u).trim() : null;
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const $ = (sel, rod = document) => rod.querySelector(sel);
 
@@ -236,19 +238,21 @@ export function haendelsesIkon(h, valgt = false) {
   });
 }
 // Profilbilleder (tabellen profilfoto): lille rundt billede – ellers initialer
-export const fotoAf = id => store.state.fotos?.[id] || null;
+// Kun rene JPEG-data godtages (databasen tjekker det samme) – og værdien escapes alligevel, før den sættes i HTML
+const RENT_FOTO = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
+export const fotoAf = id => { const f = store.state.fotos?.[id]; return f && RENT_FOTO.test(f) ? f : null; };
 const initialerAf = p => (p?.navn || '?').split(/\s+/).map(s => s[0]).join('').slice(0, 2).toUpperCase();
 export function avatar(p, str = 36) {
   const f = fotoAf(p?.id), c = STATUS[p?.status]?.farve || 'var(--offline)';
   return f
-    ? `<img class="avatar" src="${f}" alt="" style="--s:${str}px;--c:${c}" loading="lazy">`
+    ? `<img class="avatar" src="${esc(f)}" alt="" style="--s:${str}px;--c:${c}" loading="lazy">`
     : `<span class="avatar avatar-tom" style="--s:${str}px;--c:${c}">${esc(initialerAf(p))}</span>`;
 }
 export function fotografIkon(p, migSelv = false) {
   const f = fotoAf(p.id);
   return L.divIcon({
     className: '',
-    html: `<div class="foto-pin${migSelv ? ' mig' : ''}${set(p) ? '' : ' gammel'}${f ? ' har-foto' : ''}" style="--c:${STATUS[p.status]?.farve}">${f ? `<img src="${f}" alt="">` : esc(initialerAf(p))}</div>`,
+    html: `<div class="foto-pin${migSelv ? ' mig' : ''}${set(p) ? '' : ' gammel'}${f ? ' har-foto' : ''}" style="--c:${STATUS[p.status]?.farve}">${f ? `<img src="${esc(f)}" alt="">` : esc(initialerAf(p))}</div>`,
     iconSize: [30, 30], iconAnchor: [15, 15],
   });
 }

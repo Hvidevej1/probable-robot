@@ -6,7 +6,7 @@ import {
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
   PRIO, prioAf, efterPrio, indsigt, indsigtHtml,
-  stationsKontrol, avatar, fotoFelt,
+  stationsKontrol, avatar, fotoFelt, sikkerUrl,
 } from './faelles.js';
 
 const pref = {
@@ -237,7 +237,7 @@ function visHaendelse(id, åbn = true) {
     ${h.cirka ? '<p class="hint">Placeringen er cirka (kun by eller station kendt). Tjek adressen i teksten.</p>' : ''}
     <p class="lille">Modtaget kl. ${klokken(h.oprettet)} (${siden(h.oprettet)} siden) · ${esc(h.kategori || '')}</p>
     <p class="status-linje h-${h.status}">${h.status === 'ny' ? 'Ingen har taget den endnu' : min ? 'Det er din opgave' : `${H_STATUS[h.status]}: ${esc(navn(h.taget_af))}`}</p>
-    ${h.url ? `<p><a href="${esc(h.url)}" target="_blank" rel="noopener">Åbn link fra beskeden</a></p>` : ''}
+    ${sikkerUrl(h.url) ? `<p><a href="${esc(sikkerUrl(h.url))}" target="_blank" rel="noopener noreferrer">Åbn link fra beskeden</a></p>` : ''}
     ${h.note ? `<p class="note">Note: ${esc(h.note)}</p>` : ''}
     <div class="knap-række">
       ${h.status === 'ny' && !mig.haendelse_id ? `<button data-tag="${h.id}" class="stor-knap">Tag hændelsen</button>` : ''}

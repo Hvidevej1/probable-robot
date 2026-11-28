@@ -16,12 +16,13 @@
 //
 // Nøglesættet til push (VAPID) laver funktionen selv første gang og gemmer i tabellen intern.
 // Telefonerne henter den offentlige del med push_noegle(). Sæt gerne FOTOVAGT_URL (appens adresse).
-// "Verify JWT" skal være slået FRA for denne funktion.
+// "Verify JWT" skal være slået FRA for denne funktion. Alle kald undtagen { test } skal have hemmeligheden
+// (header x-fotovagt-secret = intern.cron_secret), som databasen sender med (intern_headers() i sikkerhed.sql).
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.119.0";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-fotovagt-secret" };
 const json = (d: unknown, status = 200) => new Response(JSON.stringify(d), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 const NYLIG = 10 * 60e3; // kun hændelser fra de sidste 10 minutter giver "ny"/"tildelt"-beskeder
 
@@ -221,6 +222,10 @@ Deno.serve(async (req) => {
       const sendt = await send([data.user.id], { title: "Fotovagt", body: "Push-beskeder virker på denne telefon. 👍", tag: "test", url: "./" });
       return json({ ok: true, sendt });
     }
+    // Alt andet kommer fra databasen og skal have hemmeligheden med
+    const korrekt = Deno.env.get("FOTOVAGT_SECRET")
+      || (await db.from("intern").select("cron_secret").eq("id", 1).single()).data?.cron_secret;
+    if (!korrekt || req.headers.get("x-fotovagt-secret") !== korrekt) return json({ ok: false, fejl: "Ikke adgang" }, 401);
     if (body.init) { await nøgler(); return json({ ok: true }); }   // laver nøglesættet, hvis det mangler
     if (body.kommentar) return json({ ok: true, ...(await kommentar(String(body.kommentar))) });
     if (body.tilbud) return json({ ok: true, ...(await tilbud(String(body.tilbud))) });
