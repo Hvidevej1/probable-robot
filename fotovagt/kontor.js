@@ -29,12 +29,14 @@ function tegn() {
 
 // SOS: rød boks øverst med navn, telefon og placering; alarmen lyder, indtil nogen har trykket "Set"
 let kendteBlink = new Set();
+// Prikkerne på "Værktøjer": grøn = til, gul = fejl, grå = fra
+function sætPrik(navn, farve) { const i = document.querySelector(`#vaerktoej-prikker [data-prik="${navn}"]`); if (i) i.className = farve; }
 function tjekBlink() {
   const nu = S().haendelser.filter(h => h.status === 'ny' && h.tilbud_status === 'ingen_svar').map(h => h.id);
   if (nu.some(id => !kendteBlink.has(id))) { bip(); setTimeout(bip, 700); toast('⚠️ En opgave er ikke taget – tildel manuelt', 'fejl'); }
   kendteBlink = new Set(nu);
   const knap = $('#btn-auto');
-  if (knap) { const til = S().indst?.auto_tilbud !== false; knap.textContent = til ? '📩 Auto: til' : '📩 Auto: fra'; knap.classList.toggle('slukket', !til); }
+  if (knap) { const til = S().indst?.auto_tilbud !== false; $('#auto-tekst').textContent = til ? 'til' : 'fra'; knap.setAttribute('aria-checked', String(til)); sætPrik('auto', til ? 'grøn' : 'grå'); }
 }
 
 function tegnSos() {
@@ -75,7 +77,7 @@ function tegnFotografer() {
         ${avatar(p, 40)}
         <div class="foto-info">
           <b>${esc(p.navn)}</b>${aktiveSos().some(x => x.bruger === p.id) ? ' <span class="sos-maerke">SOS</span>' : ''}
-          <span class="lille"><span class="status-tekst" style="--c:${st.farve}">${st.tekst}</span> · ${siden(p.status_tid)}${gammel ? ` · <span class="advarsel">ikke set i ${siden(p.sidst_set) || 'lang tid'}</span>` : ''}</span>
+          <span class="lille"><span class="status-tekst ${st.klasse}">${st.tekst}</span> · ${siden(p.status_tid)}${gammel ? ` · <span class="advarsel">ikke set i ${siden(p.sidst_set) || 'lang tid'}</span>` : ''}</span>
           ${p.base_adresse ? `<span class="lille base-lille">🏠 ${esc(p.base_adresse)}</span>` : ''}
           ${h ? `<button class="link opgave-link" data-zoom="${h.id}">${ikonFor(h)} ${esc(h.titel)}</button>` : ''}
         </div>
@@ -92,10 +94,12 @@ function tegnFotografer() {
   // Grupperet efter område (fotografer uden område til sidst)
   const grupper = [...områder.map(o => [o, liste.filter(p => p.omraade_id === o.id)]), [null, liste.filter(p => !O(p.omraade_id))]]
     .filter(([o, l]) => l.length || o);
-  $('#fotografer').innerHTML = grupper.map(([o, l]) => `
+  // Tomme regioner samles på én linje øverst
+  const tomme = grupper.filter(([o, l]) => o && !l.length).map(([o]) => esc(o.navn));
+  $('#fotografer').innerHTML = (tomme.length ? `<p class="omraade-tomme">Ingen fotografer i ${tomme.join(', ')}.</p>` : '') + grupper.filter(([, l]) => l.length).map(([o, l]) => `
     <div class="omraade-top"><i class="dot" style="--c:${o ? esc(o.farve) : 'var(--offline)'}"></i>${o ? esc(o.navn) : 'Uden område'}
       <small>${l.filter(p => p.status === 'ledig').length} ledig af ${l.length}</small></div>
-    ${l.length ? l.map(række).join('') : '<p class="omraade-tom">Ingen fotografer i området endnu.</p>'}`).join('');
+    ${l.map(række).join('')}`).join('');
 }
 
 // Tilbud: hvem har fået det, hvem har sagt nej, og nærmeste ledige som forslag
@@ -127,15 +131,16 @@ function haendelseKort(h) {
     <article class="h-kort h-${h.status} prio-${prioAf(h)}${valgtId === h.id ? ' valgt' : ''}${nyeKommentarer(h) ? ' har-ny-kommentar' : ''}${forslag(h) ? ' eskalering' : ''}${h.status === 'ny' && h.tilbud_status === 'ingen_svar' ? ' blink' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
-        <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille p-${h.status}">${H_STATUS[h.status]}</span></div>
+        <div class="h-linje"><h3>${esc(h.titel)}</h3><span class="pille h-${h.status}">${H_STATUS[h.status]}</span></div>
         <p class="adresse">${esc(h.adresse || '')}${h.lat == null ? ' <span class="advarsel">⚠ mangler placering</span>' : h.cirka ? ' <span class="advarsel">(cirka – ret placering)</span>' : ''}</p>
         <p class="lille">kl. ${klokken(h.oprettet)} · ${siden(h.oprettet)} siden · ${esc(h.kilde)}${h.app ? ` (${esc(h.app)})` : ''}${O(h.omraade_id) ? ` · <span class="omr-mærke" style="--c:${esc(O(h.omraade_id).farve)}">${esc(O(h.omraade_id).navn)}</span>` : ''}</p>
         ${taget ? `<p class="lille taget-linje">👤 ${esc(taget.navn)}${h.taget_tid ? ` · taget kl. ${klokken(h.taget_tid)}` : ''}${h.ankommet_tid ? ` · ankommet kl. ${klokken(h.ankommet_tid)}` : ''}</p>` : ''}
         ${aktiv(h) ? (() => {
           const nær = iNærheden(h, S().haendelser);
-          return `<div class="prio-række" role="group" aria-label="Prioritet">
-            <span class="prio-navn">Prioritet</span>
-            ${[1, 2, 3].map(p => `<button class="prio-knap p${p}${prioAf(h) === p ? ' valgt' : ''}" data-prio="${h.id}" data-p="${p}" aria-pressed="${prioAf(h) === p}">${PRIO[p].kort}</button>`).join('')}
+          return `<div class="prio-række">
+            <select class="prio-vælg p${prioAf(h)}" data-prio="${h.id}" aria-label="Prioritet for ${esc(h.titel)}">
+              ${[1, 2, 3].map(p => `<option value="${p}"${prioAf(h) === p ? ' selected' : ''}>Prioritet: ${PRIO[p].navn}</option>`).join('')}
+            </select>
             ${nær.length ? `<span class="nær" title="${esc(nær.map(x => x.titel).join(', '))}">📍 ${nær.length} andre inden for 10 km</span>` : ''}
           </div>`;
         })() : ''}
@@ -595,6 +600,8 @@ async function hentPoStatus() {
   const prik = $('#po-prik');
   prik.className = 'prik ' + (poStatus.forbundet ? (poStatus.fejl ? 'gul' : 'grøn') : 'grå');
   prik.title = poStatus.forbundet ? (poStatus.fejl || 'Forbundet') : 'Ikke forbundet';
+  $('#po-tekst').textContent = poStatus.forbundet ? (poStatus.fejl ? 'fejl' : 'forbundet') : 'ikke forbundet';
+  sætPrik('po', poStatus.forbundet ? (poStatus.fejl ? 'gul' : 'grøn') : 'grå');
   return poStatus;
 }
 async function åbnPushover() {
@@ -731,16 +738,19 @@ async function start() {
   tegn();
   hentPoStatus();
 
+  // Prioritet: én vælger pr. kort
+  document.body.addEventListener('change', e => {
+    const v = e.target.closest('select[data-prio]'); if (!v || v.closest('dialog')) return;
+    const p = +v.value, h = H(v.dataset.prio);
+    if (!h || ![1, 2, 3].includes(p) || prioAf(h) === p) return;
+    prøv(() => store.ret(h.id, { prio: p }), `Prioritet: ${PRIO[p].navn}.`);
+  });
   // Klik overalt på siden (lister, kort-popups)
   document.body.addEventListener('click', e => {
     const t = e.target.closest('[data-prio],[data-eskaler],[data-giv],[data-tildel],[data-luk],[data-ret],[data-kommentarer],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
     if (!t || t.closest('dialog')) return;
     const d = t.dataset;
-    if (d.prio) {
-      const p = +d.p, h = H(d.prio);
-      if (prioAf(h) === p) return;
-      return prøv(() => store.ret(d.prio, { prio: p }), `Prioritet: ${PRIO[p].navn}.`);
-    }
+    if (d.prio) return;   // prioritet skiftes i vælgeren (change herunder), klik må ikke vælge kortet
     if (d.eskaler) {
       const ja = d.ja === '1';
       return prøv(() => store.eskaler(d.eskaler, ja), ja ? 'Opgraderet. Fotograferne får besked.' : 'Forslaget er afvist.');
@@ -778,7 +788,8 @@ async function start() {
   // Push på kontorets computer (SOS-alarmer, også når fanen ikke er fremme)
   const pushTekst = async () => {
     const sub = await (await navigator.serviceWorker?.ready)?.pushManager?.getSubscription().catch(() => null);
-    $('#btn-push').textContent = sub ? '🔔 Push er slået til' : '🔕 Slå push til';
+    $('#push-tekst').textContent = sub ? 'til' : 'fra';
+    $('#btn-push').setAttribute('aria-checked', String(!!sub)); sætPrik('push', sub ? 'grøn' : 'grå');
     return !!sub;
   };
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(pushTekst).catch(() => {});
@@ -823,12 +834,13 @@ async function start() {
   menuKnap.onclick = e => { e.stopPropagation(); const åben = document.body.classList.toggle('menu-åben'); menuKnap.setAttribute('aria-expanded', String(åben)); };
   menu.addEventListener('click', e => { if (e.target.closest('button')) setTimeout(lukMenu, 0); });
   document.addEventListener('click', e => { if (!e.target.closest('#top-menu, #btn-menu')) lukMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('menu-åben')) { lukMenu(); menuKnap.focus(); } });
   const dlgTl = $('#dlg-tidslinje');
   kommentarHandlinger(dlgTl);
   dlgTl.addEventListener('click', e => { if (e.target === dlgTl || e.target.closest('[data-luk-tl]')) dlgTl.close(); });
   for (const id of ['#dlg-ret', '#dlg-foto']) $(id).addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
-  setInterval(() => { tegnFotografer(); tegnHaendelser(); tegnNøgletal(); }, 30e3);
+  setInterval(() => { if (!document.hidden) { tegnFotografer(); tegnHaendelser(); tegnNøgletal(); } }, 30e3);
   setInterval(hentPoStatus, 60e3);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') store.hentAlt().catch(() => {}); });
 }

@@ -1,7 +1,7 @@
 // Marken: fotografens telefon. Kort og liste over hændelser, tag en hændelse, meld status.
 import { store } from './store.js';
 import {
-  STATUS, H_STATUS, KATEGORI_IKON, ikonFor, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
+  STATUS, H_STATUS, H_STATUS_KORT, køretid, KATEGORI_IKON, ikonFor, aktiv, senesteOpdatering, esc, $, siden, klokken, km, kmTekst, navigationsLink,
   toast, prøv, bip, lavKort, haendelsesIkon, fotografIkon, markørLag, logInd,
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
@@ -27,10 +27,9 @@ function tegn() {
   if (!mig) return;
   const st = STATUS[mig.status] || STATUS.offline;
   $('#mig-navn').textContent = mig.navn;
-  const chip = $('#mig-status'); chip.textContent = st.tekst; chip.style.setProperty('--c', st.farve);
+  const chip = $('#mig-status'); chip.textContent = st.tekst; chip.className = 'chip ' + st.klasse;
   document.querySelectorAll('.status-knapper button').forEach(b => {
-    b.classList.toggle('aktiv', b.dataset.status === mig.status);
-    b.style.setProperty('--c', STATUS[b.dataset.status].farve);
+    b.setAttribute('aria-pressed', String(b.dataset.status === mig.status));
     if (b.dataset.status === 'ankommet') b.disabled = !mig.haendelse_id;
   });
   tegnSos(); tegnTilbud(); tegnOpgave(); tegnListe(); tegnKort();
@@ -70,28 +69,54 @@ function kort_(h) {
   const d = afstand(h);
   const tagbar = h.status === 'ny' && !mig.haendelse_id;
   const min = h.taget_af === mig.id;
+  const k = kommentarerTil(h.id).length;
+  const hvem = h.auto_lukket && !aktiv(h) ? '<span class="hvem">Lukket automatisk</span>'
+    : min ? '<span class="hvem">Din opgave</span>'
+    : h.taget_af && aktiv(h) ? `<span class="hvem">${esc(navn(h.taget_af))} ${h.status === 'ankommet' ? 'er på stedet' : 'er på vej'}</span>` : '';
   return `
     <article class="h-kort h-${h.status} prio-${prioAf(h)}${min ? ' min' : ''}" data-id="${h.id}">
       <span class="kat">${ikonFor(h)}</span>
       <div class="h-tekst">
-        <h3>${prioAf(h) === 1 && aktiv(h) ? '<span class="prio-mærke">🔴 Høj prioritet</span> ' : ''}${h.eskaleret ? '<span class="stor-mærke">⬆️ Stor hændelse</span> ' : ''}${esc(h.titel)}</h3>
+        <div class="h-hoved">
+          <h3>${prioAf(h) === 1 && aktiv(h) ? '<span class="prio-ikon" title="Høj prioritet" aria-label="Høj prioritet">!</span>' : ''}${h.eskaleret ? '<span class="stor-mærke">Stor hændelse</span> ' : ''}${esc(h.titel)}</h3>
+          <span class="chip h-${h.status}">${H_STATUS_KORT[h.status] || esc(h.status)}</span>
+        </div>
         <p class="adresse">${esc(h.adresse || (h.lat != null ? 'Placeret på kortet' : 'Ingen adresse'))}${h.cirka ? ' (ca.)' : ''}</p>
         ${naboHjælp(h) ? `<p class="lille nabo-hjælp">🆘 Naboområdet${omrNavn(h.omraade_id) ? ` (${esc(omrNavn(h.omraade_id))})` : ''} mangler en fotograf</p>`
           : andetOmråde(h) && aktiv(h) ? `<p class="lille base-lille">Andet område${omrNavn(h.omraade_id) ? `: ${esc(omrNavn(h.omraade_id))}` : ''}</p>` : ''}
-        <p class="lille">${siden(h.oprettet)} siden${d != null ? ` · ${kmTekst(d)}` : ''} ·
-          ${kommentarerTil(h.id).length ? `<span class="k-antal" title="Kommentarer">💬 ${kommentarerTil(h.id).length}</span> · ` : ''}<span class="h-status">${h.auto_lukket && !aktiv(h) ? 'Lukket automatisk (ingen opdateringer)' : h.status === 'ny' ? 'Ledig opgave' : min ? 'Din opgave' : `${H_STATUS[h.status]} – ${esc(navn(h.taget_af))}`}</span></p>
       </div>
-      ${tagbar ? `<button class="tag-knap" data-tag="${h.id}">Tag</button>` : ''}
+      <div class="h-bund">
+        ${d != null && aktiv(h) ? `<span class="afstand"><b>${kmTekst(d)}</b><small>${køretid(d)}</small></span>` : ''}
+        <span class="lille">${siden(h.oprettet)} siden${k ? ` · <span class="k-antal" title="Kommentarer">💬 ${k}</span>` : ''}</span>
+        ${tagbar ? `<button class="tag-knap" data-tag="${h.id}">Tag opgaven</button>` : hvem}
+      </div>
     </article>`;
+}
+
+// Sortering: min opgave, så ledige, så andres. Høj prioritet øverst i hver gruppe, derefter nærmest eller nyeste.
+const sorterNær = () => pref.get('sort-naer', true);
+function sorterAktive(liste) {
+  const gruppe = h => h.taget_af === mig.id ? 0 : h.status === 'ny' ? 1 : 2;
+  const høj = h => prioAf(h) === 1 ? 0 : 1;
+  const nær = sorterNær();
+  return liste.sort((a, b) => gruppe(a) - gruppe(b) || høj(a) - høj(b)
+    || (nær ? (afstand(a) ?? Infinity) - (afstand(b) ?? Infinity) : 0)
+    || efterPrio(a, b));
 }
 
 function tegnListe() {
   const alle = store.state.haendelser;
-  const aktive = alle.filter(aktiv).sort(efterPrio);   // kontorets prioritet først
+  const aktive = sorterAktive(alle.filter(aktiv));
   const afsluttede = alle.filter(h => !aktiv(h)).slice(0, 15);
   const nye = aktive.filter(h => h.status === 'ny').length;
   const t = $('#antal-nye'); t.hidden = !nye; t.textContent = nye;
-  $('#liste').innerHTML = (aktive.length ? aktive.map(kort_).join('') : '<p class="tom">Ingen aktive hændelser lige nu.</p>')
+  const nær = sorterNær();
+  const vælger = aktive.length > 1 ? `<div class="sortering" role="group" aria-label="Sortér hændelser">
+      <span>Sortér:</span>
+      <button type="button" data-sort="naer" aria-pressed="${nær}">Nærmest</button>
+      <button type="button" data-sort="nyeste" aria-pressed="${!nær}">Nyeste</button>
+    </div>` : '';
+  $('#liste').innerHTML = vælger + (aktive.length ? aktive.map(kort_).join('') : '<p class="tom">Ingen aktive hændelser lige nu.</p>')
     + kollegaListe()
     + (afsluttede.length ? `<h4 class="sektion">Afsluttet seneste døgn</h4>${afsluttede.map(kort_).join('')}` : '');
 }
@@ -118,13 +143,15 @@ function kollegaListe() {
 function tegnKort() {
   if (!kort) return;
   const aktive = store.state.haendelser.filter(aktiv);
-  hLag.opdater(aktive, h => ({ ikon: haendelsesIkon(h, h.taget_af === mig.id), klik: () => visHaendelse(h.id) }));
+  hLag.opdater(aktive, h => ({ ikon: haendelsesIkon(h, h.taget_af === mig.id), klik: () => visHaendelse(h.id), z: 1000 }));
   const kolleger = store.state.profiler.filter(p => p.rolle === 'foto' && p.status !== 'offline' && p.lat != null);
   const medMig = kolleger.map(p => p.id === mig.id && minPos ? { ...p, ...minPos } : p);
   if (minPos && !medMig.some(p => p.id === mig.id)) medMig.push({ ...mig, ...minPos });
   fLag.opdater(medMig, p => ({ ikon: fotografIkon(p, p.id === mig.id), popup: `<b>${esc(p.navn)}</b><br>${STATUS[p.status]?.tekst || ''}` }));
   if (førsteZoom) {
-    const pkt = aktive.filter(h => h.lat != null).map(h => [h.lat, h.lon]);
+    // Start ved "mig + aktive hændelser i nærheden" i stedet for hele landet
+    const nær = aktive.filter(h => h.lat != null && (afstand(h) ?? 0) < 150);
+    const pkt = (nær.length || minPos ? nær : aktive.filter(h => h.lat != null)).map(h => [h.lat, h.lon]);
     if (minPos) pkt.push([minPos.lat, minPos.lon]);
     if (pkt.length) { kort.vis(pkt, 12); førsteZoom = false; }
   }
@@ -154,7 +181,7 @@ function tegnSos() {
   // Lyd, indtil jeg har trykket "Set" (eller nogen har kvitteret)
   alarm(andre.some(s => !s.kvitteret_af && !sosSet.has(s.id)));
   if (sLag) sLag.opdater(aktiveSos(), s => ({
-    ikon: sosIkon(),
+    ikon: sosIkon(), z: 2000,
     popup: `<b>🆘 SOS: ${esc(store.state.profiler.find(p => p.id === s.bruger)?.navn || '')}</b><br>kl. ${klokken(s.start)}`,
   }));
   // Mens min egen alarm er aktiv, sendes positionen løbende (også hvis deling ellers er slået fra)
@@ -412,6 +439,7 @@ async function start() {
     if (b.dataset.tilbudVis) visHaendelse(b.dataset.tilbudVis);
   };
   $('#liste').onclick = e => {
+    const so = e.target.closest('[data-sort]'); if (so) { pref.set('sort-naer', so.dataset.sort === 'naer'); return tegnListe(); }
     const t = e.target.closest('[data-tag]'); if (t) { e.stopPropagation(); return tag(t.dataset.tag); }
     const k = e.target.closest('[data-id]'); if (k) visHaendelse(k.dataset.id);
   };
@@ -487,7 +515,7 @@ async function start() {
 
   startPosition();
   setInterval(pulsSlag, 60e3);
-  setInterval(() => { tegnListe(); }, 30e3);
+  setInterval(() => { if (!document.hidden) tegnListe(); }, 30e3);
   setInterval(() => { if (document.querySelector('#tilbud-omraade .tilbud-boks') && !mineTilbud().length) tegnTilbud(); }, 1000); // "x min siden" holdes opdateret
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { store.hentAlt().catch(() => {}); pulsSlag(); } });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

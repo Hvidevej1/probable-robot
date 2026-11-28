@@ -8,15 +8,13 @@
   <meta name="theme-color" content="#1c1c21">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="vendor/inter/inter.css">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=23">
-  <script src="config.js?v=1"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script type="module" src="kontor.js?v=32"></script>
+  <script type="module" src="kontor.js"></script>
 </head>
 <body class="kontor">
   <section id="login" class="login" hidden>
@@ -48,16 +46,20 @@
       <div class="nøgletal" id="nøgletal"></div>
       <div class="top-knapper">
         <button id="btn-ny">+ Ny hændelse</button>
-        <button id="btn-menu" class="secondary menu-knap" aria-expanded="false" aria-controls="top-menu">☰ Menu</button>
-        <div class="top-menu" id="top-menu">
-        <button id="btn-auto" class="secondary" title="Automatiske tilbud til nærmeste fotograf">📩 Auto</button>
-        <button id="btn-push" class="secondary" title="Få SOS-alarmer som push på denne computer">🔔 Push</button>
-        <button id="btn-pushover" class="secondary"><span id="po-prik" class="prik"></span>Pushover</button>
-        <button id="btn-stedviden" class="secondary" title="Det Fotovagt har lært om adresser, vejnavne og stationer">🧠 Stedviden</button>
-        <button id="btn-rapport" class="secondary" title="Indsatsrapport: hvilke hændelser fotograferne har kørt på">📄 Rapport</button>
-        <button id="btn-kode" class="secondary" title="Skift din adgangskode">🔑 Kode</button>
-        <button id="btn-logud" class="secondary">Log ud</button>
-        <span class="app-version" data-version title="Fotovagts version"></span>
+        <button id="btn-menu" class="secondary menu-knap" aria-expanded="false" aria-controls="top-menu" aria-haspopup="menu">
+          Værktøjer <span class="prikker" id="vaerktoej-prikker" aria-hidden="true"><i data-prik="auto" class="grå"></i><i data-prik="push" class="grå"></i><i data-prik="po" class="grå"></i></span>
+        </button>
+        <div class="top-menu" id="top-menu" role="menu">
+          <button id="btn-auto" role="menuitemcheckbox" aria-checked="false" title="Automatiske tilbud til nærmeste fotograf">Auto-tilbud til nærmeste <small id="auto-tekst"></small></button>
+          <button id="btn-push" role="menuitemcheckbox" aria-checked="false" title="Få SOS-alarmer som push på denne computer">Push på denne computer <small id="push-tekst"></small></button>
+          <button id="btn-pushover" role="menuitem"><span id="po-prik" class="prik"></span>Pushover <small id="po-tekst"></small></button>
+          <hr>
+          <button id="btn-stedviden" role="menuitem" title="Det Fotovagt har lært om adresser, vejnavne og stationer">Stedviden</button>
+          <button id="btn-rapport" role="menuitem" title="Indsatsrapport: hvilke hændelser fotograferne har kørt på">Indsatsrapport</button>
+          <hr>
+          <button id="btn-kode" role="menuitem">Skift adgangskode</button>
+          <button id="btn-logud" role="menuitem">Log ud</button>
+          <span class="app-version" data-version title="Fotovagts version"></span>
         </div>
       </div>
     </header>

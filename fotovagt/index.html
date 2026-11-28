@@ -11,15 +11,13 @@
   <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Fotovagt">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="vendor/inter/inter.css">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=23">
-  <script src="config.js?v=1"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
   <script src="vendor/supabase-js-2.119.0.js"></script>
-  <script type="module" src="marken.js?v=31"></script>
+  <script type="module" src="marken.js"></script>
 </head>
 <body class="marken">
   <section id="login" class="login" hidden>
@@ -45,21 +43,22 @@
 
   <div id="app" hidden>
     <header class="top">
+      <div class="top-række">
       <div class="brand"><img class="logo-maerke kun-smal" src="logo.svg" alt="HRC-Fotos" width="34" height="34"><img class="hrc-top kun-bred" src="hrc-fotos-logo.png" alt="HRC-Fotos" width="66" height="34"><span class="brand-skil kun-bred"></span><span>Fotovagt</span></div>
       <span id="demo-mærke" class="demo-chip" hidden>DEMO</span>
       <nav class="skift" id="skift" aria-label="Skift side" hidden><a href="index.html" aria-current="page">Marken</a><a href="kontor.html">Kontor</a></nav>
-      <button id="btn-sos" class="sos-knap" aria-label="SOS – tilkald hjælp">SOS</button>
       <button id="btn-mig" class="mig-knap" aria-label="Min profil"><span id="mig-navn"></span><span id="mig-status" class="chip"></span></button>
+      <button id="btn-sos" class="sos-knap" aria-label="SOS – tilkald hjælp">SOS</button>
+      </div>
+      <nav class="status-knapper" aria-label="Meld status">
+        <button data-status="ledig" class="s-ledig" aria-pressed="false">Ledig</button>
+        <button data-status="optaget" class="s-optaget" aria-pressed="false">Optaget</button>
+        <button data-status="pause" class="s-pause" aria-pressed="false">Pause</button>
+        <button data-status="ankommet" class="s-ankommet" aria-pressed="false">Ankommet</button>
+      </nav>
     </header>
 
     <section id="sos-omraade" aria-live="assertive"></section>
-
-    <nav class="status-knapper" aria-label="Meld status">
-      <button data-status="ledig">Ledig</button>
-      <button data-status="optaget">Optaget</button>
-      <button data-status="pause">Pause</button>
-      <button data-status="ankommet">Ankommet</button>
-    </nav>
 
     <div id="push-banner" class="push-banner" hidden>
       <span>Få besked om nye hændelser, også når telefonen er låst.</span>
@@ -72,13 +71,13 @@
     <section id="opgave" class="opgave" hidden aria-live="polite"></section>
 
     <div class="faner" role="tablist">
-      <button role="tab" data-fane="kort" aria-selected="true">Kort</button>
-      <button role="tab" data-fane="liste" aria-selected="false">Hændelser <span id="antal-nye" class="tæller" hidden></span></button>
+      <button role="tab" id="fane-kort" aria-controls="kort" data-fane="kort" aria-selected="true">Kort</button>
+      <button role="tab" id="fane-liste" aria-controls="liste" data-fane="liste" aria-selected="false">Hændelser <span id="antal-nye" class="tæller" hidden></span></button>
     </div>
 
     <main class="marken-main">
-      <div id="kort" class="kort" data-panel="kort"></div>
-      <div id="liste" class="liste" data-panel="liste" hidden></div>
+      <div id="kort" class="kort" data-panel="kort" role="tabpanel" aria-labelledby="fane-kort"></div>
+      <div id="liste" class="liste" data-panel="liste" role="tabpanel" aria-labelledby="fane-liste" hidden></div>
     </main>
   </div>
 

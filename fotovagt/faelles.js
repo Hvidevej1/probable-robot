@@ -2,15 +2,17 @@
 import { store } from './store.js';
 
 export const STATUS = {
-  ledig: { tekst: 'Ledig', farve: 'var(--ledig)' },
-  optaget: { tekst: 'Optaget', farve: 'var(--optaget)' },
-  pause: { tekst: 'Pause', farve: 'var(--pause)' },
-  ankommet: { tekst: 'Ankommet', farve: 'var(--ankommet)' },
-  offline: { tekst: 'Offline', farve: 'var(--offline)' },
+  ledig: { tekst: 'Ledig', farve: 'var(--ledig)', klasse: 's-ledig' },
+  optaget: { tekst: 'Optaget', farve: 'var(--optaget)', klasse: 's-optaget' },
+  pause: { tekst: 'Pause', farve: 'var(--pause)', klasse: 's-pause' },
+  ankommet: { tekst: 'Ankommet', farve: 'var(--ankommet)', klasse: 's-ankommet' },
+  offline: { tekst: 'Offline', farve: 'var(--offline)', klasse: 's-offline' },
 };
 export const H_STATUS = {
   ny: 'Ny', taget: 'Taget', ankommet: 'Fotograf ankommet', afsluttet: 'Afsluttet', annulleret: 'Annulleret',
 };
+// Kort statustekst til pillen på fotografens hændelseskort
+export const H_STATUS_KORT = { ny: 'Ledig', taget: 'Taget', ankommet: 'På stedet', afsluttet: 'Afsluttet', annulleret: 'Annulleret' };
 export const KATEGORI_IKON = {
   Brand: '🔥', Trafik: '🚗', Politi: '🚓', Redning: '🛟', Miljø: '☣️', Vejr: '🌧️', Forsyning: '🔧', Andet: '📍',
 };
@@ -62,6 +64,12 @@ export function km(a, b) {
   const dLa = (b.lat - a.lat) * rad, dLo = (b.lon - a.lon) * rad;
   const x = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLo / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(x));
+}
+// Grov køretid: 75 km/t i snit + 3 min til at komme af sted. Kun til at sammenligne opgaver.
+export function køretid(d) {
+  if (d == null) return '';
+  const m = Math.round(d / 75 * 60 + 3);
+  return m < 60 ? `ca. ${m} min` : `ca. ${Math.floor(m / 60)} t${m % 60 ? ' ' + (m % 60) + ' min' : ''}`;
 }
 export const kmTekst = d => d == null ? '' : d < 1 ? `${Math.round(d * 1000)} m` : `${d < 10 ? d.toFixed(1).replace('.', ',') : Math.round(d)} km`;
 
@@ -284,10 +292,10 @@ export function markørLag(kort) {
       for (const x of liste) {
         if (x.lat == null || x.lon == null) continue;
         tilbage.delete(x.id);
-        const { ikon, popup, klik } = lav(x);
+        const { ikon, popup, klik, z = 0 } = lav(x);
         let mk = m.get(x.id);
-        if (!mk) { mk = L.marker([x.lat, x.lon], { icon: ikon }).addTo(lag); m.set(x.id, mk); }
-        else { mk.setLatLng([x.lat, x.lon]); mk.setIcon(ikon); }
+        if (!mk) { mk = L.marker([x.lat, x.lon], { icon: ikon, zIndexOffset: z }).addTo(lag); m.set(x.id, mk); }
+        else { mk.setLatLng([x.lat, x.lon]); mk.setIcon(ikon); mk.setZIndexOffset(z); }
         if (popup) mk.bindPopup(popup); else mk.unbindPopup();
         mk.off('click'); if (klik) mk.on('click', () => klik(x));
       }
@@ -383,6 +391,7 @@ export async function logInd({ kunKontor = false } = {}) {
       if (pw !== form.igen.value) { msg.textContent = 'De to adgangskoder er ikke ens.'; return; }
       const knap = form.querySelector('button[type=submit]'); knap.disabled = true;
       try {
+        if (await lækketKode(pw)) { msg.textContent = LÆKKET_TEKST; return; }
         const r = await store.opretBruger(email, pw);
         if (r?.profil) {
           if (kunKontor && r.profil.rolle !== 'kontor') { await store.logout(); throw new Error('Din bruger er fotograf. Brug siden for marken.'); }
@@ -402,7 +411,11 @@ export function nedtælling(iso) {
   const s = Math.max(0, Math.round((new Date(iso) - Date.now()) / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
-setInterval(() => document.querySelectorAll('[data-udloeber]').forEach(el => { el.textContent = nedtælling(el.dataset.udloeber); }), 1000);
+setInterval(() => {
+  if (document.hidden) return;
+  const els = document.querySelectorAll('[data-udloeber]');
+  if (els.length) els.forEach(el => { el.textContent = nedtælling(el.dataset.udloeber); });
+}, 1000);
 
 // I demo (?demo i adressen) beholder links mellem Marken og Kontor demo-tilstanden
 if (/[?&]demo\b/.test(location.search)) {
@@ -528,6 +541,44 @@ export function offentligSted(h) {
   return dele.join(', ');
 }
 
+// Lækkede adgangskoder (HaveIBeenPwned, k-anonymitet): kun de første 5 tegn af SHA-1 sendes,
+// aldrig adgangskoden. Svarer tjenesten ikke, lukkes der igennem (Supabase-reglerne gælder stadig).
+export async function lækketKode(pw) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(pw));
+    const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 5000);
+    const r = await fetch('https://api.pwnedpasswords.com/range/' + hex.slice(0, 5), { headers: { 'Add-Padding': 'true' }, signal: ctl.signal });
+    clearTimeout(t);
+    if (!r.ok) return 0;
+    const rest = hex.slice(5);
+    for (const linje of (await r.text()).split('\n')) {
+      const [suf, n] = linje.trim().split(':');
+      if (suf === rest) return parseInt(n, 10) || 0;
+    }
+    return 0;
+  } catch { return 0; }
+}
+export const LÆKKET_TEKST = 'Den adgangskode er kendt fra datalæk og kan gættes. Vælg en anden.';
+
+// Bjælke øverst, når forbindelsen til serveren er tabt (realtime) eller telefonen er uden net
+function forbindelsesBjælke() {
+  let el = document.getElementById('forbindelse-bjaelke');
+  const tabt = !navigator.onLine || store.state.forbindelse === 'tabt';
+  if (!tabt) { if (el) el.hidden = true; return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'forbindelse-bjaelke'; el.className = 'forbindelse-bjaelke'; el.setAttribute('role', 'status');
+    document.body.prepend(el);
+  }
+  el.textContent = navigator.onLine ? 'Forbindelsen til Fotovagt er tabt – prøver igen …' : 'Ingen net. Det, du ser, kan være forældet.';
+  el.hidden = false;
+}
+if (!store.demo) {
+  store.lyt(forbindelsesBjælke);
+  window.addEventListener('online', forbindelsesBjælke);
+  window.addEventListener('offline', forbindelsesBjælke);
+}
+
 // Skift adgangskode (samme dialog i Marken og på Kontoret)
 export function åbnSkiftKode({ velkommen = null } = {}) {
   let dlg = $('#dlg-kode');
@@ -556,7 +607,9 @@ export function åbnSkiftKode({ velkommen = null } = {}) {
       if (f.ny.value.length < 8) { fejl.textContent = 'Adgangskoden skal være mindst 8 tegn.'; return; }
       if (f.ny.value !== f.igen.value) { fejl.textContent = 'De to adgangskoder er ikke ens.'; return; }
       const knap = f.querySelector('button[type=submit]'); knap.disabled = true;
-      try { await store.skiftKode(f.ny.value); dlg.close(); toast('Din adgangskode er skiftet.', 'ok'); }
+      try {
+        if (await lækketKode(f.ny.value)) { fejl.textContent = LÆKKET_TEKST; return; }
+        await store.skiftKode(f.ny.value); dlg.close(); toast('Din adgangskode er skiftet.', 'ok'); }
       catch (err) { fejl.textContent = store.fejlTekst(err); }
       finally { knap.disabled = false; }
     });
@@ -881,8 +934,8 @@ export function stationsKontrol(kort) {
   const Kontrol = L.Control.extend({
     onAdd() {
       const d = L.DomUtil.create('div', 'st-kontrol leaflet-bar');
-      d.innerHTML = Object.entries(STATIONSTYPER).map(([t, T]) => `<button type="button" data-st="${t}" title="Vis ${T.navn.toLowerCase()}" aria-pressed="false">${T.ikon}</button>`).join('')
-        + '<button type="button" data-tlfliste title="Telefonliste: vagtcentraler og politikredse">☎</button>';
+      d.innerHTML = Object.entries(STATIONSTYPER).map(([t, T]) => `<button type="button" data-st="${t}" title="Vis ${T.navn.toLowerCase()}" aria-label="Vis ${T.navn.toLowerCase()}" aria-pressed="false">${T.ikon}</button>`).join('')
+        + '<button type="button" data-tlfliste title="Telefonliste: vagtcentraler og politikredse" aria-label="Telefonliste: vagtcentraler og politikredse">☎</button>';
       L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
       d.addEventListener('click', e => {
         const b = e.target.closest('button'); if (!b) return;

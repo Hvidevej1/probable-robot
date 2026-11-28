@@ -326,3 +326,13 @@ på noget alvorligt: påkørsel, ulykke, afsporing, brand, røg, evakuering, sam
 Kommer det senere, hæves de til normal, og det normale forløb starter. Assistenten viser **Hvad sker der** (forsinkelse,
 aflysning, stop + årsag) og en vurdering – fx "venter på en ambulance → formentlig en syg passager, ikke en ulykke".
 SQL: `supabase/togmeldinger.sql`.
+
+## Version 15.00 (design og robusthed)
+Bygget efter `fotovagt-forslag/IMPLEMENTERING.md` (trin 2–6). Appens arbejdsgang, SOS, auto-tilbud, push, Pushover og databasen er uændrede.
+- **Farver:** status og hændelser har tonede chips med mørk tekst (`.s-ledig`, `.h-ny` … sætter `--c`, `--b`, `--t`). Rød flade bruges kun til SOS; optaget er rød-orange.
+- **Marken:** status som segmentkontrol i toppen (`aria-pressed`), hændelseskort med afstand og grov køretid, sortering Nærmest/Nyeste (huskes i `fotovagt-sort-naer`), kortet åbner ved fotografen og hændelser inden for 150 km.
+- **Kontoret:** "Værktøjer"-menu på alle skærme (Escape og klik udenfor lukker), prikker for Auto/Push/Pushover, tomme regioner samlet på én linje, prioritet i en vælger.
+- **Adgangskoder:** når en adgangskode vælges eller skiftes, tjekkes den mod HaveIBeenPwned med k-anonymitet (kun 5 tegn af SHA-1 sendes). Svarer tjenesten ikke, lukkes der igennem.
+- **Skrift:** Inter ligger i `vendor/inter/` (SIL OFL), så der ikke sendes kald til Google.
+- **Forbindelse:** tabt realtime-forbindelse vises som en gul bjælke, og appen abonnerer igen, når nettet er tilbage.
+- **Ikke med i 15.00** (efter planen): offline-cache og statuskø (15.10), oprydning i `style.css` (15.20), danske kortfliser.

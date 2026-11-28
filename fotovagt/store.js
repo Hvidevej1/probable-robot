@@ -71,7 +71,7 @@ function supabaseBackend() {
 
   function abonnér() {
     kanal?.unsubscribe();
-    kanal = sb.channel('fotovagt')
+    const denne = kanal = sb.channel('fotovagt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'haendelser' }, e => {
         if (e.eventType === 'DELETE') state.haendelser = state.haendelser.filter(x => x.id !== e.old.id);
         else { const ny = e.eventType === 'INSERT' && !state.haendelser.some(x => x.id === e.new.id); upsertListe(state.haendelser, e.new); if (ny) state.nyHaendelse = e.new; }
@@ -114,8 +114,18 @@ function supabaseBackend() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'logbog' }, e => {
         state.log.unshift(e.new); state.log.length = Math.min(state.log.length, 150); ændret();
       })
-      .subscribe(s => { if (s === 'SUBSCRIBED') hentAlt().catch(() => {}); });
+      .subscribe(s => {
+        if (denne !== kanal) return;   // svar fra en gammel kanal (efter genabonnement) ignoreres
+        // Tabt forbindelse (tunnel, elevator): vis det, og hent det man gik glip af, når den er tilbage
+        const før = state.forbindelse;
+        if (s === 'SUBSCRIBED') { state.forbindelse = 'ok'; hentAlt().catch(() => {}); }
+        else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') state.forbindelse = 'tabt';
+        if (før !== state.forbindelse) ændret();
+      });
   }
+  // Nettet er tilbage, eller appen kommer frem igen efter at have været tabt: abonnér forfra
+  window.addEventListener('online', () => { if (kanal && state.mig) abonnér(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && kanal && state.mig && state.forbindelse === 'tabt') abonnér(); });
 
   async function startSession(user) {
     const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();

@@ -1,7 +1,7 @@
 // Service worker: viser push-beskeder (også når telefonen er låst) og åbner hændelsen ved klik.
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch', () => { /* altid netværk: data skal være friske */ });
+// Ingen fetch-handler: alt hentes fra netværket (en tom handler gør kun navigationen langsommere)
 
 self.addEventListener('push', e => {
   let b = { title: 'Fotovagt', body: 'Der er nyt i Fotovagt.', tag: 'fotovagt', url: './' };
