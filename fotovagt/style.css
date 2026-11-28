@@ -804,3 +804,15 @@ dialog.ark.bred .ark-indhold { max-width: 760px; }
 .forbindelse-bjaelke { position: fixed; top: env(safe-area-inset-top); left: 50%; transform: translateX(-50%); z-index: 3500; margin-top: 6px;
   background: var(--pause-bg); color: var(--pause-tekst); border: 1px solid var(--pause); border-radius: 99px; padding: 6px 14px; font-size: .86rem; font-weight: 700;
   box-shadow: var(--skygge); max-width: calc(100% - 24px); text-align: center; }
+.vejr-fare { color: var(--fare); font-weight: 700; }
+.adr-forslag { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 50; list-style: none; margin: 0; padding: 4px;
+  background: var(--flade); border: 1px solid var(--kant2); border-radius: 12px; box-shadow: var(--skygge-l); max-height: 260px; overflow-y: auto; }
+.adr-forslag li { padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: .92rem; }
+.adr-forslag li:hover, .adr-forslag li[aria-selected="true"] { background: var(--flade3); }
+.adr-forslag .tom-forslag { color: var(--dæmpet); cursor: default; }
+.ok-tekst { color: var(--ledig-tekst); }
+.heli-pin { width: 44px; height: 44px; display: grid; place-items: center; position: relative; }
+.heli-pin span { font-size: 24px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); display: inline-block; }
+.heli-pin b { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); background: #e11d48; color: #fff; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 6px; white-space: nowrap; }
+.heli-pin.gammel { opacity: .5; filter: grayscale(.6); }
+.heli-pin.jorden b { background: var(--offline-tekst); }

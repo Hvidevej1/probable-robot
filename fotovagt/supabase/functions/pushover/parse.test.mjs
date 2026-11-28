@@ -190,5 +190,14 @@ const assAndet = { ...parseBesked({ app: 'Pf-upload 3 backup ', title: '🚒 Esb
 tjek('Assistance fra samme station lægges ind i ISL-forespørgslen', findMatch(assSamme, [islF])?.id === 'isl');
 tjek('Assistance fra nabostation i samme beredskab (13 km) lægges ind', findMatch(assNabo, [islF])?.id === 'isl');
 tjek('Assistance fra et andet beredskab lægges ikke ind', !findMatch(assAndet, [islF]));
+// Bilbrand på E45 28/11: TrekantBrand (Kolding), Vejle Brandvæsen og trafikmeldingen er samme hændelse
+const bbKolding = { id: 'k', titel: 'BTBF - Brand-Bil i det fri (112 VB)', kategori: 'Brand', adresse: 'Sønderjyske Motorvej, 6000 Kolding', cirka: true, lat: 55.47, lon: 9.4836,
+  tekst: '🔥 BTBF - (VB ISL + VB MR-1 + VB V-1) Brand-Bil i det fri (112 VB) MTV S E45 M50 91 6000 Kolding Sønderjyske Motorvej #1537026\nBeredskab: TrekantBrand\nStation: Kolding' };
+const bbVejle = parseBesked({ title: 'Brand-Bil i det fri', message: '🔥 Brand-Bil i det fri\nBeredskab: Vejle Brandvæsen\nStation: Vejle\n28-11-2026 15:36', app: 'Pf-upload 3 backup' });
+const bbTrafik = parseBesked({ title: 'Trafikmelding', message: '🚙 Bilbrand på E45 Sønderjyske Motorvej i sydgående retning\nSe placering her: https://112meldinger.dk/map.php?uid=H8XY7rA', app: 'Pf-upload 3 backup', url: 'https://112meldinger.dk/map.php?uid=H8XY7rA' });
+tjek('Vejle-alarm om bilbrand lægges ind i Koldings (26 km, 13 min)', findMatch({ ...bbVejle, lat: 55.7079, lon: 9.5329, cirka: true }, [aktiv(bbKolding, 13)])?.id === 'k');
+tjek('Trafikmelding "Bilbrand på E45" lægges ind i alarmen', findMatch({ ...bbTrafik, lat: 55.5648, lon: 9.5571, cirka: false }, [aktiv(bbKolding, 13)])?.id === 'k');
+tjek('Bilbrand på E20 lægges ikke ind i bilbrand på E45', !findMatch({ ...bbTrafik, titel: 'Bilbrand på E20 Fynske Motorvej', tekst: 'Bilbrand på E20 Fynske Motorvej', lat: 55.5, lon: 9.6, cirka: false }, [aktiv(bbKolding, 10)]));
+tjek('Bilbrand en time senere er en ny hændelse', !findMatch({ ...bbVejle, lat: 55.7079, lon: 9.5329, cirka: true }, [aktiv(bbKolding, 60)]));
 console.log(fejl ? `\n${fejl} fejl` : '\nAlt OK');
 process.exit(fejl ? 1 : 0);

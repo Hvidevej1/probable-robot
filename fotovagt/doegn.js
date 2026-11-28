@@ -25,9 +25,28 @@
   const dagTekst = d => d === iDag() ? 'I dag' : d === flyt(iDag(), -1) ? 'I går'
     : new Date(d + 'T12:00:00Z').toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
   const $ = s => document.querySelector(s);
+  // Vejret ved alarmen (met.no)
+  const komma = x => String(x).replace('.', ',');
+  const vejrLinje = v => [v.tekst, v.temp != null ? `${komma(v.temp)} °C` : '', v.vind != null ? `vind ${komma(v.vind)} m/s${v.retning && v.retning !== '?' ? ` fra ${v.retning}` : ''}` : '', v.nedboer > 0 ? `${komma(v.nedboer)} mm/t` : ''].filter(Boolean).join(' · ');
+  const vejrIkon = s => !s ? '🌡️' : /thunder/.test(s) ? '⛈️' : /snow|sleet/.test(s) ? '🌨️' : /rain/.test(s) ? '🌧️' : /^fog/.test(s) ? '🌫️' : /^clearsky/.test(s) ? (/night/.test(s) ? '🌙' : '☀️') : /^fair|^partly/.test(s) ? '⛅' : '☁️';
 
   let dag = /^\d{4}-\d{2}-\d{2}$/.test(q.get('dag') || '') ? q.get('dag') : iDag();
   let data = { haendelser: [] }, valgt = null;
+
+  // ---- Google AdSense (kun når klient-id står i config.js, og ikke indlejret i rammen på hrc-fotos.dk) ----
+  const ad = cfg.adsense || {};
+  const annoncer = /^ca-pub-\d{10,20}$/.test(ad.klient || '') && !indlejret;
+  const annonce = (slot, cls) => annoncer && /^\d{6,12}$/.test(slot || '')
+    ? `<div class="annonce ${cls}" aria-label="Annonce"><span class="annonce-mærke">Annonce</span><ins class="adsbygoogle" style="display:block" data-ad-client="${ad.klient}" data-ad-slot="${slot}" data-ad-format="auto" data-full-width-responsive="true"></ins></div>` : '';
+  const vækAnnoncer = () => { if (!annoncer) return; document.querySelectorAll('ins.adsbygoogle:not([data-adsbygoogle-status])').forEach(() => { try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch { /* blokeret */ } }); };
+  if (annoncer) {
+    const sc = document.createElement('script');
+    sc.async = true; sc.crossOrigin = 'anonymous';
+    sc.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ad.klient}`;
+    document.head.append(sc);
+    const top = document.getElementById('annonce-top');
+    if (top) { top.innerHTML = annonce(ad.pladser?.top, 'top'); top.hidden = !top.innerHTML; }
+  }
 
   const kort = L.map('kort', { scrollWheelZoom: !indlejret, attributionControl: true });
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -88,7 +107,7 @@
       + Object.entries(antal).sort((a, b) => b[1] - a[1])
         .map(([k, n]) => `<button type="button" class="filter${filter.has(k) ? ' valgt' : ''}" data-kat="${esc(k)}" aria-pressed="${filter.has(k)}" style="--k: ${farve(k)}" title="Vis kun ${esc(k.toLowerCase())}">${IKON[k] || '📍'} ${esc(k === 'Andet' ? 'Andet' : k)} <b>${n}</b></button>`).join('');
     // Liste
-    $('#liste').innerHTML = hs.length ? hs.map(h => `
+    $('#liste').innerHTML = hs.length ? hs.map((h, i) => (i > 0 && i % 8 === 0 ? annonce(ad.pladser?.liste, 'i-liste') : '') + `
       <article class="h${valgt === h.id ? ' valgt' : ''}" data-id="${h.id}" tabindex="0" style="--k: ${farve(gruppe(h))}">
         <div class="ikon" aria-hidden="true">${ikon(h)}</div>
         <div>
@@ -98,6 +117,8 @@
             <span class="mærke ${h.status === 'aktiv' ? 'aktiv' : ''}">${h.status === 'aktiv' ? 'I gang' : 'Afsluttet'}</span>
             ${h.paa_stedet ? '<span class="mærke foto">📷 HRC-Fotos på stedet</span>' : ''}
           </div>
+          ${h.vejr ? `<p class="vejr" title="Vejret på stedet ved alarmen (met.no)">${vejrIkon(h.vejr.symbol)} ${esc(vejrLinje(h.vejr))}</p>` : ''}
+          ${h.nyheder?.length ? `<p class="nyheder">📰 Læs mere: ${h.nyheder.filter(n => /^https?:\/\//i.test(n.url)).map(n => `<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.kilde || 'nyhed')}</a>`).join(' · ')}</p>` : ''}
           ${h.kommentarer?.length ? `<ul class="kommentarer">${h.kommentarer.map(k => `<li><time>${kl(k.tid)}</time>${esc(k.tekst)}</li>`).join('')}</ul>` : ''}
         </div>
         <span class="tid">${kl(h.tid)}</span>
@@ -121,6 +142,7 @@
     tom.hidden = !(hs.length && !pkt.length);
     tom.querySelector('span').textContent = hs.length === 1 ? 'Hændelsen har ingen placering på kortet – se listen' : 'De valgte hændelser har ingen placering på kortet – se listen';
     if (uden && pkt.length) kort.attributionControl.setPrefix(`${uden} uden placering`); else kort.attributionControl.setPrefix('');
+    vækAnnoncer();
     if (førsteVisning) { tilpas(); førsteVisning = false; }
     sendHøjde();
   }

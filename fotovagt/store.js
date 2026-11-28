@@ -6,7 +6,7 @@ import { parseBesked, geokod, findMatch, flet, række, skalIgnoreres } from './s
 const cfg = window.FOTOVAGT_CONFIG || {};
 const cloud = !!(cfg.supabaseUrl && cfg.supabaseAnonKey) && !/[?&]demo\b/.test(location.search);
 const lyttere = new Set();
-const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], omraader: [], fotos: {}, indst: {}, mig: null };
+const state = { haendelser: [], profiler: [], log: [], sos: [], tilbud: [], kommentarer: [], omraader: [], fotos: {}, indst: {}, helikoptere: [], mig: null };
 const fejlTekst = e => (e && (e.message || e.error_description)) || String(e);
 const ændret = () => lyttere.forEach(f => f(state));
 const kodeFejl = m => /different from the old/i.test(m) ? 'Den nye adgangskode skal være forskellig fra den gamle.'
@@ -54,7 +54,14 @@ function supabaseBackend() {
     state.mig = state.profiler.find(x => x.id === state.mig?.id) || state.mig;
     await hentOmraader(false);
     await hentFotos(false);
+    await hentHelikoptere(false);
     ændret();
+  }
+  // Lægehelikoptere (helikopter.sql) – findes tabellen ikke, er listen bare tom
+  async function hentHelikoptere(vis = true) {
+    const { data, error } = await sb.from('helikoptere').select('*');
+    state.helikoptere = error ? [] : data;
+    if (vis) ændret();
   }
   // Profilbilleder (profilfoto.sql) – findes tabellen ikke endnu, er der bare ingen billeder
   async function hentFotos(vis = true) {
@@ -95,6 +102,11 @@ function supabaseBackend() {
         ændret(); state.nytTilbud = null;
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'omraader' }, () => hentOmraader())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'helikoptere' }, e => {
+        if (e.eventType === 'DELETE') state.helikoptere = state.helikoptere.filter(x => x.hex !== e.old.hex);
+        else { const i = state.helikoptere.findIndex(x => x.hex === e.new.hex); if (i >= 0) state.helikoptere[i] = e.new; else state.helikoptere.push(e.new); }
+        ændret();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profilfoto' }, e => {
         if (e.eventType === 'DELETE') delete state.fotos[e.old.id]; else state.fotos[e.new.id] = e.new.foto;
         ændret();

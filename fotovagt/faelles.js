@@ -281,6 +281,25 @@ export function fotografIkon(p, migSelv = false) {
   });
 }
 
+// Lægehelikoptere ("Doc") live på kortet – positioner fra adsb.lol via databasen (helikopter.sql).
+// Viser kun helikoptere set inden for 6 timer; ældre end 15 min tegnes blege med "sidst set".
+export function helikopterLag(kort) {
+  const lag = markørLag(kort);
+  kort.attributionControl?.addAttribution('Helikoptere: <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> (ODbL)');
+  const tegn = () => lag.opdater((store.state.helikoptere || []).map(x => ({ ...x, id: x.hex })), x => {
+    const min = (Date.now() - new Date(x.set)) / 60e3, gammel = min > 15;
+    const status = x.paa_jorden ? 'på jorden' : x.hoejde_ft != null ? `i luften · ${Math.round(x.hoejde_ft * 0.3048 / 10) * 10} m · ${Math.round((x.fart_kt || 0) * 1.852)} km/t` : 'i luften';
+    return {
+      z: 1500,
+      ikon: L.divIcon({ className: '', html: `<div class="heli-pin${gammel ? ' gammel' : ''}${x.paa_jorden ? ' jorden' : ''}" title="${esc(x.kaldesignal || 'Doc')}"><span>🚁</span><b>${esc(x.kaldesignal || '')}</b></div>`, iconSize: [44, 44], iconAnchor: [22, 22] }),
+      popup: `<b>🚁 Akutlægehelikopter ${esc(x.kaldesignal || '')}</b><br>${esc([x.reg, x.type].filter(Boolean).join(' · '))}<br>${status}<br><small>${min < 1 ? 'set lige nu' : `sidst set for ${siden(x.set)} siden`}</small>`,
+    };
+  });
+  store.lyt(tegn); tegn();
+  setInterval(() => { if (!document.hidden) tegn(); }, 60e3);   // "sidst set" og blegning holdes opdateret
+  return lag;
+}
+
 // Holder markører i sync med en liste uden at tegne alt forfra.
 export function markørLag(kort) {
   const lag = L.layerGroup().addTo(kort);
@@ -656,7 +675,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 // Svaret gemmes et par minutter pr. hændelse og hentes igen, når der kommer nyt i teksten.
 const indsigtCache = new Map();
 export function indsigt(h, nårKlar) {
-  const c = indsigtCache.get(h.id), længde = (h.tekst || '').length + (h.prio || 0);
+  const c = indsigtCache.get(h.id), længde = (h.tekst || '').length + (h.prio || 0) + (h.vejr ? 1e6 : 0);   // nyt vejr = ny vurdering
   if (c && (c.henter || (c.længde === længde && Date.now() - c.t < 120e3))) return c.data;
   indsigtCache.set(h.id, { ...(c || {}), henter: true });
   store.indsigt(h.id)
@@ -822,6 +841,92 @@ export function minimumsbemanding(h) {
 }
 const pct = x => `${Math.round((x || 0) * 100)} %`;
 const varighedTekst = m => m == null ? '' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} t ${m % 60 ? `${m % 60} min` : ''}`.trim();
+// Adresseopslag med forslag: kun rigtige adresser (vej + husnummer + postnummer) fra OpenStreetMaps adressedata
+// via Photon, med Nominatim som reserve. Bruges til "Kører ud fra", så udgangspunktet ikke kan være fiktivt.
+const DK_BBOX = '7.9,54.5,15.3,57.8';
+export async function adresseForslag(q, { signal } = {}) {
+  q = String(q || '').trim();
+  if (q.length < 3) return [];
+  const ren = x => x.filter(a => a.vej && a.nr && /^\d{4}$/.test(a.postnr || ''))
+    .filter((a, i, l) => l.findIndex(b => b.tekst === a.tekst) === i).slice(0, 6);
+  try {
+    const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10&bbox=${DK_BBOX}&layer=house`, { signal });
+    if (r.ok) {
+      const j = await r.json();
+      const l = ren((j.features || []).filter(f => f.properties?.countrycode === 'DK').map(f => {
+        const p = f.properties, [lon, lat] = f.geometry.coordinates;
+        return { vej: p.street, nr: p.housenumber, postnr: p.postcode, by: p.city || p.town || p.village || p.district || '', lat, lon };
+      }).map(a => ({ ...a, tekst: `${a.vej} ${a.nr}, ${a.postnr} ${a.by}`.trim() })));
+      if (l.length) return l;
+    }
+  } catch (e) { if (e.name === 'AbortError') throw e; }
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&countrycodes=dk&addressdetails=1&limit=6`, { signal });
+    if (!r.ok) return [];
+    return ren((await r.json()).map(x => {
+      const a = x.address || {};
+      return { vej: a.road, nr: a.house_number, postnr: a.postcode, by: a.city || a.town || a.village || a.suburb || '', lat: +x.lat, lon: +x.lon };
+    }).map(a => ({ ...a, tekst: `${a.vej} ${a.nr}, ${a.postnr} ${a.by}`.trim() })));
+  } catch (e) { if (e.name === 'AbortError') throw e; return []; }
+}
+// Forslagsliste under et tekstfelt. vælg(a) kaldes med den valgte adresse.
+export function adresseFelt(input, vælg) {
+  let liste = input.parentElement.querySelector('.adr-forslag');
+  if (!liste) {
+    liste = document.createElement('ul'); liste.className = 'adr-forslag'; liste.setAttribute('role', 'listbox'); liste.hidden = true;
+    input.parentElement.style.position = 'relative'; input.parentElement.append(liste);
+  }
+  input.setAttribute('role', 'combobox'); input.setAttribute('aria-autocomplete', 'list'); input.setAttribute('aria-expanded', 'false');
+  let timer = null, ctl = null, valgt = -1, fundne = [];
+  const luk = () => { liste.hidden = true; input.setAttribute('aria-expanded', 'false'); valgt = -1; };
+  const vis = () => {
+    liste.innerHTML = fundne.length ? fundne.map((a, i) => `<li role="option" data-i="${i}"${i === valgt ? ' aria-selected="true"' : ''}>${esc(a.tekst)}</li>`).join('')
+      : '<li class="tom-forslag">Ingen rigtige adresser fundet – skriv vej, husnummer og by</li>';
+    liste.hidden = false; input.setAttribute('aria-expanded', 'true');
+  };
+  const tag = i => { const a = fundne[i]; if (!a) return; input.value = a.tekst; luk(); vælg(a); };
+  input.addEventListener('input', () => {
+    clearTimeout(timer); ctl?.abort();
+    if (input.value.trim().length < 3) return luk();
+    timer = setTimeout(async () => {
+      ctl = new AbortController();
+      try { fundne = await adresseForslag(input.value, { signal: ctl.signal }); valgt = -1; vis(); } catch { /* afbrudt */ }
+    }, 300);
+  });
+  input.addEventListener('keydown', e => {
+    if (liste.hidden) return;
+    if (e.key === 'ArrowDown') { valgt = Math.min(fundne.length - 1, valgt + 1); vis(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { valgt = Math.max(0, valgt - 1); vis(); e.preventDefault(); }
+    else if (e.key === 'Enter' && valgt >= 0) { tag(valgt); e.preventDefault(); }
+    else if (e.key === 'Escape') { luk(); e.stopPropagation(); }
+  });
+  liste.addEventListener('mousedown', e => { const li = e.target.closest('[data-i]'); if (li) { e.preventDefault(); tag(+li.dataset.i); } });
+  input.addEventListener('blur', () => setTimeout(luk, 150));
+}
+
+// Nyhedslinks på hændelsen (gemt af databasen, se supabase/nyheder.sql)
+export function nyhederHtml(h) {
+  const liste = (h?.nyheder || []).filter(n => sikkerUrl(n.url));
+  if (!liste.length) return '';
+  const kilde = u => { try { return new URL(u).hostname.replace(/^(www|via)\./, ''); } catch { return 'link'; } };
+  return `<p class="lille nyheder">📰 ${liste.map(n => `<a href="${esc(sikkerUrl(n.url))}" target="_blank" rel="noopener noreferrer" title="${esc(n.titel || '')}">${esc(kilde(n.url))}</a>`).join(' · ')}</p>`;
+}
+// Vejret på stedet (hentes af databasen fra met.no, se supabase/vejr.sql) og assistentens fareadvarsler
+const VINDRETNING = ['nord', 'nordøst', 'øst', 'sydøst', 'syd', 'sydvest', 'vest', 'nordvest'];
+const komma = x => String(x).replace('.', ',');
+export function vejrTekst(v) {
+  if (!v) return '';
+  return [v.tekst, v.temp != null ? `${komma(v.temp)} °C` : '',
+    v.vind != null ? `vind ${komma(v.vind)} m/s${v.stoed != null && v.stoed > v.vind + 2 ? ` (stød ${komma(v.stoed)})` : ''}${v.retning != null ? ` fra ${VINDRETNING[Math.round(v.retning / 45) % 8]}` : ''}` : '',
+    v.nedboer > 0 ? `${komma(v.nedboer)} mm nedbør/t` : ''].filter(Boolean).join(' · ');
+}
+function vejrHtml(h, d) {
+  const v = h?.vejr || d?.vejr;
+  if (!v) return '';
+  const fare = d?.vejr_fare?.advarsler || [];
+  return `<p><b>Vejret:</b> ${esc(vejrTekst(v))} <small>(met.no)</small></p>
+    ${fare.map(f => `<p class="vejr-fare">⚠️ ${esc(f)}</p>`).join('')}`;
+}
 export function indsigtHtml(h, d, { kontor = false } = {}) {
   if (d === undefined) return '<div class="ai-boks"><p class="ai-top">🤖 Assistent</p><p class="lille">Tænker …</p></div>';
   // Togmelding: forklar hvad der sker – ingen brand-udrykning, medmindre det er en ulykke/brand
@@ -830,6 +935,7 @@ export function indsigtHtml(h, d, { kontor = false } = {}) {
     return `<div class="ai-boks"><p class="ai-top">🤖 Assistent <small>togmelding${d?.n ? ` · lærer af ${d.n} tidligere` : ''}</small></p>
       <p><b>Hvad sker der:</b> ${esc(tg.hvad)}${tg.årsag ? ` – årsag: ${esc(tg.årsag)}` : ''}</p>
       <p><b>Vurdering:</b> ${esc(tg.vurdering)}</p>
+      ${vejrHtml(h, d)}
       ${prof ? `<p><b>Typisk udrykning:</b> ${esc(prof)}</p>` : ''}
       <p class="lille">${tg.alvorlig ? 'Fotograferne får tilbud som normalt.' : 'Fotograferne får ikke tilbud, og kontoret får ikke blink, før meldingen udvikler sig (fx påkørsel, ulykke, afsporing, brand, evakuering eller politiets arbejde på banen).'}
         ${d?.n ? ` Fotograf kørte på ${pct(d.andel_foto)} af de tidligere togmeldinger.` : ''}</p>
@@ -842,6 +948,7 @@ export function indsigtHtml(h, d, { kontor = false } = {}) {
     return `<div class="ai-boks"><p class="ai-top">🤖 Assistent</p>
       ${udrykningsprofil(h) ? `<p><b>Typisk udrykning:</b> ${esc(udrykningsprofil(h))} <small>(udrykningsprofil efter Beredskab Østs plan – lokale picklister kan afvige)</small></p>` : ''}
       <p><b>Niveau:</b> ${niv.navn} <small>(${niv.tekst})</small>${minimumsbemanding(h) ? `<br><small>Minimumsbemanding: ${minimumsbemanding(h)}</small>` : ''}</p>
+      ${vejrHtml(h, d)}
       ${b ? `<p class="lille">🚒 <b>${esc(b.navn)}</b> · ${esc(b.region)}${b.tekst ? ` (${esc(b.kilde)}): ${esc(b.tekst)}` : ''}${b.tlf.length ? `<br>${tlfLinks(b.tlf)}` : ''}</p>` : ''}
       <p class="lille">Ingen lignende hændelser endnu – assistenten lærer, efterhånden som der kommer flere.</p></div>`;
   }
@@ -857,6 +964,7 @@ export function indsigtHtml(h, d, { kontor = false } = {}) {
     ${udrykningsprofil(h) ? `<p><b>Typisk udrykning:</b> ${esc(udrykningsprofil(h))} <small>(udrykningsprofil efter Beredskab Østs plan – lokale picklister kan afvige)</small></p>` : ''}
     ${(b => b ? `<p class="lille">🚒 <b>${esc(b.navn)}</b> · ${esc(b.region)}${b.tekst ? ` (${esc(b.kilde)}): ${esc(b.tekst)}` : ''} · <a href="${esc(b.web)}" target="_blank" rel="noopener">hjemmeside</a>${b.tlf.length ? `<br>${tlfLinks(b.tlf)}` : ''}</p>` : '')(beredskabFor(h))}
     ${d.n_med_enheder ? `<p class="lille">Ekstra enheder/assistance tilkaldt senere ved ${pct(d.andel_ekstra)} af de lignende${(d.ekstra_nu || []).length ? ` · <b>her: ${d.ekstra_nu.map(enhedNavn).join(', ')}</b>` : ''}</p>` : ''}
+    ${vejrHtml(h, d)}
     <p><b>Forslag:</b> <span class="prio-tekst p${p}">${PRIO[p]?.navn || 'Normal'} prioritet</span> · alvor ${esc(d.alvor)}
       <br><small>${(d.grund || []).map(esc).join(' · ')}</small></p>
     <p class="lille">Fotograf kørte på ${pct(d.andel_foto)} af de lignende${d.varighed_min != null ? ` · de varer typisk ${varighedTekst(d.varighed_min)}` : ''}</p>

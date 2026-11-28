@@ -9,6 +9,7 @@ import {
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, offentligSted, åbnSkiftKode,
   PRIO, prioAf, efterPrio, iNærheden, indsigt, indsigtHtml,
   stationsKontrol, regionFraPostnr, avatar, fotoFelt,
+  nyhederHtml, adresseForslag, adresseFelt, helikopterLag,
 } from './faelles.js';
 
 let sLag;
@@ -150,6 +151,7 @@ function haendelseKort(h) {
         ${valgtId === h.id ? indsigtHtml(h, indsigt(h, () => tegnHaendelser()), { kontor: true }) : ''}
         ${tilbudLinjer(h)}
         ${(n => n ? `<p class="opdatering"><span>${n.ikon} ${esc(n.tekst)}</span></p>` : '')(senesteNyt(h))}
+        ${nyhederHtml(h)}
         <p class="lille doegn-linje">${h.offentlig === false ? '🚫 Ikke på døgnrapporten' : `🌐 Døgnrapport: <b>${esc(h.offentlig_titel || (h.kategori === 'Andet' || !h.kategori ? 'Hændelse' : h.kategori))}</b>${offentligSted(h) ? ` · ${esc(offentligSted(h))}` : ''}`}</p>
         ${h.note ? `<p class="lille note">Note: ${esc(h.note)}</p>` : ''}
         ${h.auto_lukket && !aktiv(h) ? `<p class="lille auto-lukket">⏱ Lukket automatisk kl. ${klokken(h.afsluttet_tid)} – ingen opdateringer i ${String((S().indst?.luk_efter_min || 90) / 60).replace('.', ',')} time. Tryk <b>Genåbn</b> for at åbne den igen.</p>` : ''}
@@ -493,19 +495,26 @@ function åbnFoto(id) {
   fotoFelt($('#foto-foto'), p);
   f.omraade_id.innerHTML = områdeValg(p.omraade_id);
   f.base_adresse.value = p.base_adresse || ''; f.base_lat.value = p.base_lat ?? ''; f.base_lon.value = p.base_lon ?? '';
-  const hint = () => { $('#base-hint').textContent = f.base_lat.value
-    ? '✓ Fundet på kortet. Tilbud bruger udgangspunktet, når fotografens egen position er gammel eller mangler.'
-    : 'Tryk "Find". Udgangspunktet bruges til tilbud, når fotografens position er gammel, og til at bestemme hændelsernes område.'; };
+  const hint = () => { const el = $('#base-hint'); el.classList.toggle('ok-tekst', !!f.base_lat.value); el.textContent = f.base_lat.value
+    ? `✓ Rigtig adresse fundet${f.base_adresse.value ? `: ${f.base_adresse.value}` : ''}. Tilbud bruger udgangspunktet, når fotografens egen position er gammel eller mangler.`
+    : 'Skriv vej, husnummer og by, og vælg adressen på listen. Kun rigtige adresser kan gemmes.'; };
   hint();
+  // Kun en valgt adresse fra listen (eller et eksakt opslag) giver koordinater – ellers gemmes ingen position
+  const brug = a => { f.base_adresse.value = a.tekst; f.base_lat.value = a.lat; f.base_lon.value = a.lon; hint(); sætRegion(); };
   f.base_adresse.oninput = () => { f.base_lat.value = ''; f.base_lon.value = ''; hint(); };
+  adresseFelt(f.base_adresse, brug);
+  const slåOp = async () => {
+    const a = f.base_adresse.value.trim(); if (!a) return null;
+    const l = await adresseForslag(a).catch(() => []);
+    return l[0] || null;
+  };
   $('#btn-find-base').onclick = async () => {
-    const a = f.base_adresse.value.trim(); if (!a) return toast('Skriv en adresse først.', 'fejl');
+    if (!f.base_adresse.value.trim()) return toast('Skriv en adresse først.', 'fejl');
     const knap = $('#btn-find-base'); knap.disabled = true; knap.textContent = '…';
-    const pos = await store.geokod(a).catch(() => null);
+    const a = await slåOp();
     knap.disabled = false; knap.textContent = 'Find';
-    if (!pos) return toast('Adressen blev ikke fundet. Prøv med postnummer og by.', 'fejl');
-    f.base_lat.value = pos.lat; f.base_lon.value = pos.lon; hint();
-    sætRegion();
+    if (!a) return toast('Ingen rigtig adresse fundet. Skriv vej, husnummer og postnummer/by.', 'fejl');
+    brug(a); toast(`Adressen er fundet: ${a.tekst}`);
   };
   // Regionen følger udgangspunktets postnummer (kan stadig vælges om)
   function sætRegion() {
@@ -515,15 +524,19 @@ function åbnFoto(id) {
   dlg.onclose = async () => {
     if (dlg.returnValue !== 'gem') return;
     if (f.status.value !== p.status) await prøv(() => store.saetStatus(id, f.status.value));
-    const adr = f.base_adresse.value.trim();
-    if (adr && !f.base_lat.value) {           // glemt at trykke Find: prøv selv
-      const pos = await store.geokod(adr).catch(() => null);
-      if (pos) { f.base_lat.value = pos.lat; f.base_lon.value = pos.lon; sætRegion(); } else toast('Udgangspunktet blev ikke fundet på kortet – ret adressen.', 'fejl');
+    let adr = f.base_adresse.value.trim();
+    if (adr && !f.base_lat.value) {           // ikke valgt på listen: slå op, og gem kun hvis det er en rigtig adresse
+      const a = await slåOp();
+      if (a) { f.base_adresse.value = a.tekst; f.base_lat.value = a.lat; f.base_lon.value = a.lon; sætRegion(); }
+      else { toast('Udgangspunktet er ikke gemt: adressen findes ikke. Ret den og prøv igen.', 'fejl'); }
     }
     await prøv(() => store.retFotograf(id, {
       navn: f.navn.value.trim(), telefon: f.telefon.value.trim() || null, rolle: f.rolle.value,
-      omraade_id: f.omraade_id.value || null, base_adresse: adr || null,
-      base_lat: adr && f.base_lat.value ? +f.base_lat.value : null, base_lon: adr && f.base_lon.value ? +f.base_lon.value : null,
+      omraade_id: f.omraade_id.value || null,
+      // Rigtig adresse: gem den. Ugyldig: behold det gamle udgangspunkt. Tomt felt: fjern udgangspunktet.
+      ...((adr = f.base_adresse.value.trim()) && f.base_lat.value ? { base_adresse: adr, base_lat: +f.base_lat.value, base_lon: +f.base_lon.value }
+        : adr ? { base_adresse: p.base_adresse || null, base_lat: p.base_lat ?? null, base_lon: p.base_lon ?? null }
+        : { base_adresse: null, base_lat: null, base_lon: null }),
     }), 'Gemt.');
   };
   dlg.showModal();
@@ -703,7 +716,7 @@ async function start() {
   $('#demo-mærke').hidden = !store.demo;
   kort = lavKort($('#kort'));
   stationsKontrol(kort);   // brand-, politi- og ambulancestationer + telefonliste
-  hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort);
+  hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort); helikopterLag(kort);
 
   store.lyt(s => {
     tegn();
@@ -750,7 +763,12 @@ async function start() {
     const t = e.target.closest('[data-prio],[data-eskaler],[data-giv],[data-tildel],[data-luk],[data-ret],[data-kommentarer],[data-zoom],[data-find-foto],[data-ret-foto],[data-filter],.h-kort');
     if (!t || t.closest('dialog')) return;
     const d = t.dataset;
-    if (d.prio) return;   // prioritet skiftes i vælgeren (change herunder), klik må ikke vælge kortet
+    if (d.prio) {
+      if (t.tagName === 'SELECT') return;   // vælgeren håndteres af change herunder; klik må ikke vælge kortet
+      const p = +d.p, h = H(d.prio);        // "Brug forslaget"-knappen i assistentens boks
+      if (!h || ![1, 2, 3].includes(p) || prioAf(h) === p) return;
+      return prøv(() => store.ret(d.prio, { prio: p }), `Prioritet: ${PRIO[p].navn}.`);
+    }
     if (d.eskaler) {
       const ja = d.ja === '1';
       return prøv(() => store.eskaler(d.eskaler, ja), ja ? 'Opgraderet. Fotograferne får besked.' : 'Forslaget er afvist.');

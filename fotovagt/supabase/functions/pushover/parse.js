@@ -371,6 +371,13 @@ export function efterBrand(ny, alle, nu = Date.now()) {
   }
   return null;
 }
+// Brand i et køretøj (alarmkoder som BTBF/"Brand-Bil i det fri" og trafikmeldinger som "Bilbrand på E45")
+const BILBRAND = /bilbrand|brand[- ]bil\b|btbf|brand i (?:en )?(?:bil|personbil|lastbil|varevogn|bus|køretøj)|køretøjsbrand|(?:bil|lastbil|bus|varevogn) (?:i brand|brænder)/i;
+// Motorvej/rute i teksten (E45, E20, M50, rute 18, "Sønderjyske Motorvej" …) – til at se, om to meldinger er på samme vej
+const VEJKODE = /\b(E\d{2}|rute \d{1,3}|[a-zæøå]+(?:ske)? motorvej(?:en)?)\b/gi;
+const vejeI = t => new Set((String(t || '').match(VEJKODE) || []).map(v => v.toLowerCase().replace(/motorvejen$/, 'motorvej')));
+const vejAf = h => [...vejeI(`${h.titel} ${h.adresse} ${førsteLinje(h)}`)][0] || null;
+const sammeVej = (a, b) => { const x = vejeI(`${a.titel} ${a.adresse} ${a.tekst}`), y = vejeI(`${b.titel} ${b.adresse} ${b.tekst}`); return [...x].some(v => y.has(v)); };
 export function findMatch(ny, aktive, nu = Date.now()) {
   const n = nøgle(ny.titel), na = adrNøgle(ny.adresse);
   // Opfølgning på samme pressemeddelelse fra politiet (fx "personen er fundet")
@@ -397,6 +404,11 @@ export function findMatch(ny, aktive, nu = Date.now()) {
     // Samme gade og samme slags hændelse inden for 3 timer: politi, nyheder og 112 om samme ulykke
     //   (kun når mindst én mangler husnummer; præcise adresser bruger reglerne herunder)
     if (ny.gade && (!na || !adrNøgle(h.adresse)) && ny.kategori === h.kategori && ny.gade === gadeAf(h) && !(afstand > (præcis ? 2 : 25))) return h;
+    // Bilbrand: alarmen "Brand-Bil i det fri" (kendt ved stationen), nabobrandvæsenets alarm om samme bil og
+    //   trafikmeldingen "Bilbrand på E45 …" er samme hændelse, selvom kategorien (Brand/Trafik) og stationen er forskellige.
+    //   Inden for 30 min og 30 km, og mindst én af dem kendes kun ved stationen / er en trafikmelding fra en vej.
+    if (BILBRAND.test(`${ny.titel} ${førsteLinje(ny)}`) && BILBRAND.test(`${h.titel} ${førsteLinje(h)}`) && alder < 30 * 60e3
+      && afstand != null && afstand < 30 && (h.cirka || ny.cirka) && (!vejAf(ny) || !vejAf(h) || sammeVej(ny, h))) return h;
     // Nyhed om en alarm: medierne skriver typisk 20–90 min efter alarmen og nævner kun vej/by. Samme kategori,
     // samme slags sted (lejlighed, villa, bil …) og højst 15 km fra alarmens station (alarmen kendes kun ved stationen).
     if (ny.url && !ny.station && h.cirka && stationAf(h) && ny.kategori === h.kategori && afstand != null && afstand < 15 && sammeObjekt(ny, h)) return h;
@@ -489,8 +501,17 @@ export function flet(h, ny, app) {
   else if (bedreAdresse && h.cirka && !ny.cirka) { felter.lat = null; felter.lon = null; felter.cirka = false; } // slås op igen
   if (!felter.kategori && (!h.kategori || h.kategori === 'Andet') && ny.kategori !== 'Andet') felter.kategori = ny.kategori;
   if (!h.url && ny.url) felter.url = ny.url;
+  // Nyhedslinks samles på hændelsen (vises på kontoret og i døgnrapporten)
+  if (erNyhedslink(ny.url) && !(h.nyheder || []).some(n => n.url === ny.url)) {
+    const liste = (h.nyheder || []).length ? h.nyheder : (erNyhedslink(h.url) ? [{ url: h.url, titel: h.titel, tid: h.oprettet }] : []);
+    felter.nyheder = [...liste, { url: ny.url, titel: ny.titel, tid: new Date().toISOString() }].slice(-20);
+  }
   return felter;
 }
+
+// Et link til en artikel/pressemeddelelse (ikke et kortlink) – samme regel som er_nyhedslink() i databasen
+const IKKE_NYHED = /^https?:\/\/([a-z0-9-]+\.)*(google\.[a-z.]+\/maps|maps\.google\.|maps\.apple\.|goo\.gl\/maps|openstreetmap\.|osm\.org|112meldinger\.dk|pushover\.net|waze\.com|greenpowerdenmark\.dk|trafikinfo\.dk|vejdirektoratet\.dk)|^https?:\/\/(www\.)?google\.[a-z.]+\/(maps|search)/i;
+export const erNyhedslink = u => typeof u === 'string' && /^https?:\/\/[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(u) && !IKKE_NYHED.test(u);
 
 // Slår en adresse op og giver { lat, lon, navn } eller null. Bruger OpenStreetMap (Nominatim, højst
 // ca. ét kald i sekundet) og Photon (samme kortdata) som reserve, hvis Nominatim afviser eller intet finder.

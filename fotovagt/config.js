@@ -11,4 +11,9 @@ window.FOTOVAGT_CONFIG = {
   // Hvor kortet starter (midt i Danmark) og zoom
   kortCenter: [56.1, 10.6],
   kortZoom: 7,
+  // Google AdSense på døgnrapporten (doegn.html, kun når den åbnes direkte – ikke i rammen på hrc-fotos.dk,
+  // hvor annoncerne i stedet sættes op i WordPress). Tomt = ingen annoncer.
+  // klient: dit publisher-id fra AdSense ("ca-pub-1234567890123456"). pladser: annonceenhedernes "data-ad-slot"-numre.
+  // Husk også at slå Googles samtykkebesked (Privatliv og beskeder → GDPR) til i AdSense, og at lægge ads.txt i roden.
+  adsense: { klient: '', pladser: { top: '', liste: '' } },
 };

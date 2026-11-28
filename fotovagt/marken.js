@@ -6,7 +6,7 @@ import {
   pushKanBruges, abonnérPush, afmeldPush, SOS_RADIUS_KM, aktiveSos, sosBoks, sosIkon, alarm, påVejTekst, nedtælling, set,
   tidslinjeHtml, gentegnMedFormular, kommentarHandlinger, kommentarerTil, senesteNyt, åbnSkiftKode,
   PRIO, prioAf, efterPrio, indsigt, indsigtHtml,
-  stationsKontrol, avatar, fotoFelt, sikkerUrl,
+  stationsKontrol, avatar, fotoFelt, sikkerUrl, nyhederHtml, helikopterLag,
 } from './faelles.js';
 
 const pref = {
@@ -265,6 +265,7 @@ function visHaendelse(id, åbn = true) {
     <p class="lille">Modtaget kl. ${klokken(h.oprettet)} (${siden(h.oprettet)} siden) · ${esc(h.kategori || '')}</p>
     <p class="status-linje h-${h.status}">${h.status === 'ny' ? 'Ingen har taget den endnu' : min ? 'Det er din opgave' : `${H_STATUS[h.status]}: ${esc(navn(h.taget_af))}`}</p>
     ${sikkerUrl(h.url) ? `<p><a href="${esc(sikkerUrl(h.url))}" target="_blank" rel="noopener noreferrer">Åbn link fra beskeden</a></p>` : ''}
+    ${nyhederHtml(h)}
     ${h.note ? `<p class="note">Note: ${esc(h.note)}</p>` : ''}
     <div class="knap-række">
       ${h.status === 'ny' && !mig.haendelse_id ? `<button data-tag="${h.id}" class="stor-knap">Tag hændelsen</button>` : ''}
@@ -351,7 +352,7 @@ async function start() {
   $('#skift').hidden = mig.rolle !== 'kontor';   // kontoret kan skifte mellem fotografens side og sit dashboard
   kort = lavKort($('#kort'));
   stationsKontrol(kort);   // brand-, politi- og ambulancestationer + telefonliste
-  hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort);
+  hLag = markørLag(kort); fLag = markørLag(kort); sLag = markørLag(kort); helikopterLag(kort);
 
   // Live opdateringer: hvis teksten på min opgave (eller en ledig hændelse) bliver længere, får jeg besked
   const kendtTekst = new Map(store.state.haendelser.map(h => [h.id, h.tekst || '']));

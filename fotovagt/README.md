@@ -336,3 +336,11 @@ Bygget efter `fotovagt-forslag/IMPLEMENTERING.md` (trin 2–6). Appens arbejdsga
 - **Skrift:** Inter ligger i `vendor/inter/` (SIL OFL), så der ikke sendes kald til Google.
 - **Forbindelse:** tabt realtime-forbindelse vises som en gul bjælke, og appen abonnerer igen, når nettet er tilbage.
 - **Ikke med i 15.00** (efter planen): offline-cache og statuskø (15.10), oprydning i `style.css` (15.20), danske kortfliser.
+
+## Version 15.10 (vejr, nyheder, lægehelikopter, døgnrapport på hrc-fotos.dk)
+- **Vejr** (`supabase/vejr.sql`): databasen henter vejret på stedet fra MET Norway hvert minut for nye hændelser med placering (`haendelser.vejr`). `vejr_vurdering()` giver fareadvarsler, og assistenten (`ai_indsigt`) flytter sit prioritetsforslag én tak op eller ned. Vejret vises i assistentens boks og i døgnrapporten.
+- **Nyheder** (`supabase/nyheder.sql`): links til artikler og pressemeddelelser gemmes i `haendelser.nyheder`, også når nyheden lægges sammen med en alarm. Døgnrapporten linker til dem (ikke ved efterlysninger).
+- **Lægehelikopter** (`supabase/helikopter.sql`): positioner for kaldesignal DOC0x i Danmark fra adsb.lol hvert 3. minut (tabellen `helikoptere`, realtime). Vises på kortet i Marken og på Kontoret. En gratis nøgle fra adsb.lol kan gemmes i `intern.adsb_noegle`.
+- **Kører ud fra**: forslagsliste med rigtige adresser (vej, husnummer, postnummer) fra OpenStreetMaps adressedata. En adresse, der ikke findes, gemmes ikke.
+- **Døgnrapport på hrc-fotos.dk** (`supabase/functions/doegn-wp`): hver morgen laves en side for i går under hrc-fotos.dk/doegnrapport/. Kræver hemmelighederne `WP_BRUGER` og `WP_APP_KODE` (WordPress-programadgangskode) i Supabase → Edge Functions → Secrets.
+- **AdSense**: sæt `adsense.klient` (ca-pub-…) og pladsnumre i `config.js`. Annoncer vises kun, når døgnrapporten åbnes direkte, ikke i rammen på hrc-fotos.dk.
