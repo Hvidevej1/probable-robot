@@ -588,6 +588,7 @@ const ENHEDSNAVN = { ISL: 'indsatsleder', OC: 'operationschef', M: 'autosprøjte
 // Nord (Lisbjerg), City og Syd (Højbjerg), deltidsstationerne Odder og Skanderborg, og indsatslederne Nord og Syd.
 // Andre forkortelser vises som de står.
 const STATIONER = { CI: 'Aarhus City', NO: 'Aarhus Nord', SY: 'Aarhus Syd', OD: 'Odder', SK: 'Skanderborg' };
+const enhedNavn = k => { const m = /^([A-ZÆØÅ]{2,3})-/.exec(k) || /^ISL (NO|SY)$/.exec(k); return m && STATIONER[m[1]] ? `${esc(k)} <small>${k.startsWith('ISL') ? 'indsatsleder ' + STATIONER[m[1]].split(' ')[1] : STATIONER[m[1]]}</small>` : esc(k); };
 
 // Viden fra beredskabernes egne planer for risikobaseret dimensionering. Alle 29 kommunale redningsberedskaber
 // (liste fra RBIS) er med med region og hjemmeside; dem, hvis plan er læst, har også fakta og minimumsbemanding.
@@ -724,6 +725,14 @@ export function udrykningsprofil(h) {
   const t = (h.titel || '').toLowerCase();
   return (PROFILER.find(([re]) => re.test(t)) || [])[1] || null;
 }
+// Hændelsesniveau efter Østjyllands Brandvæsens plan 2026-2030 (hverdags-, større og ekstraordinær hændelse)
+export function beredskabsNiveau(h) {
+  const t = `${h.titel || ''}\n${h.tekst || ''}`;
+  const isl = new Set((t.match(/\bISL\s+[A-ZÆØÅ]{2,3}\b/g) || []).map(x => x.replace(/\s+/g, ' '))).size;
+  if (/\bOC\b/.test(t) || (h.antal_ass || 0) >= 3) return { navn: 'Ekstraordinær hændelse', tekst: 'operationschefen rekvirerer assistance' };
+  if (h.eskaleret || isl >= 2 || (h.antal_enheder || 0) >= 5) return { navn: 'Større hændelse', tekst: 'minimum 1+2+10' };
+  return { navn: 'Hverdagshændelse', tekst: 'nærmeste relevante enhed' };
+}
 export function minimumsbemanding(h) {
   const b = beredskabFor(h);
   return b?.minimum ? b.minimum((h.titel || '').toLowerCase()) : null;
@@ -732,7 +741,15 @@ const pct = x => `${Math.round((x || 0) * 100)} %`;
 const varighedTekst = m => m == null ? '' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} t ${m % 60 ? `${m % 60} min` : ''}`.trim();
 export function indsigtHtml(h, d, { kontor = false } = {}) {
   if (d === undefined) return '<div class="ai-boks"><p class="ai-top">🤖 Assistent</p><p class="lille">Tænker …</p></div>';
-  if (!d || !d.n) return '<div class="ai-boks"><p class="ai-top">🤖 Assistent</p><p class="lille">Ingen lignende hændelser endnu – assistenten lærer, efterhånden som der kommer flere.</p></div>';
+  // Uden historik: vis stadig de forventede ressourcer (typisk udrykning, niveau, minimumsbemanding, beredskab)
+  if (!d || !d.n) {
+    const niv = beredskabsNiveau(h), b = beredskabFor(h);
+    return `<div class="ai-boks"><p class="ai-top">🤖 Assistent</p>
+      ${udrykningsprofil(h) ? `<p><b>Typisk udrykning:</b> ${esc(udrykningsprofil(h))} <small>(udrykningsprofil efter Beredskab Østs plan – lokale picklister kan afvige)</small></p>` : ''}
+      <p><b>Niveau:</b> ${niv.navn} <small>(${niv.tekst})</small>${minimumsbemanding(h) ? `<br><small>Minimumsbemanding: ${minimumsbemanding(h)}</small>` : ''}</p>
+      ${b ? `<p class="lille">🚒 <b>${esc(b.navn)}</b> · ${esc(b.region)}${b.tekst ? ` (${esc(b.kilde)}): ${esc(b.tekst)}` : ''}${b.tlf.length ? `<br>${tlfLinks(b.tlf)}` : ''}</p>` : ''}
+      <p class="lille">Ingen lignende hændelser endnu – assistenten lærer, efterhånden som der kommer flere.</p></div>`;
+  }
   const typer = (d.enhedstyper || []).filter(t => t.andel >= 0.2);
   const her = d.enheder_her || [];
   const p = d.forslag_prio, nu = prioAf(h);
